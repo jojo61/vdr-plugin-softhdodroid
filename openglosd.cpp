@@ -1030,7 +1030,7 @@ cOglCmdCopyBufferToOutputFb::cOglCmdCopyBufferToOutputFb(cOglFb * fb, cOglOutput
     this->y = y;
 }
 
-unsigned char posd[1920*1080*4];
+unsigned char posd[3840*2160*4];
 
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
