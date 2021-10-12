@@ -1,7 +1,7 @@
 ///
 /// @file codec.c   @brief Codec functions
 ///
-/// Copyright (c) 2009 - 2015 by Johns.  All Rights Reserved.
+/// Copyright (c) 2021 by Jojo61.  All Rights Reserved.
 ///
 /// Contributor(s):
 ///

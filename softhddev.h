@@ -1,7 +1,7 @@
 ///
 /// @file softhddev.h   @brief software HD device plugin header file.
 ///
-/// Copyright (c) 2011 - 2015 by Johns.  All Rights Reserved.
+/// Copyright (c) 2021 by Jojo61  All Rights Reserved.
 ///
 /// Contributor(s):
 ///

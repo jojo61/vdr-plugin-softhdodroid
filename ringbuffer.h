@@ -1,7 +1,7 @@
 ///
 /// @file ringbuffer.h  @brief Ringbuffer module header file
 ///
-/// Copyright (c) 2009, 2011 by Johns.  All Rights Reserved.
+/// Copyright (c) 2021 by jojo61.  All Rights Reserved.
 ///
 /// Contributor(s):
 ///

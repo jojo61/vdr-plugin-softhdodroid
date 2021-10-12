@@ -1,7 +1,7 @@
 ///
 /// @file softhddev.c   @brief A software HD device plugin for VDR.
 ///
-/// Copyright (c) 2011 - 2015 by Johns.  All Rights Reserved.
+/// Copyright (c) 2021 by Jojo61  All Rights Reserved.
 ///
 /// Contributor(s):
 ///

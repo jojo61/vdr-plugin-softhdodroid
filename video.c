@@ -1,3 +1,25 @@
+///
+/// @file video.h   @brief Video module header file
+///
+/// Copyright (c) 2021 by Jojo61.  All Rights Reserved.
+///
+/// Contributor(s):
+///
+/// License: AGPLv3
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU Affero General Public License as
+/// published by the Free Software Foundation, either version 3 of the
+/// License.
+///
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+/// GNU Affero General Public License for more details.
+///
+/// $Id: 83cd827a8744e8c80c8adba6cb87653b0ad58c45 $
+//////////////////////////////////////////////////////////////////////////////
+
 #include <stdint.h>
 #include <stddef.h>
 #include "ge2d.h"
