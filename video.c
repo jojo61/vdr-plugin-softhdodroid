@@ -75,6 +75,7 @@ static int VideoWindowX = 0;                ///< video output window x coordinat
 static int VideoWindowY = 0;                ///< video outout window y coordinate
 static int VideoWindowWidth = 1920;       ///< video output window width
 static int VideoWindowHeight = 1080;      ///< video output window height
+static int ScreenResolution;
 static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
@@ -144,13 +145,14 @@ bool isAnnexB = false;
 bool isShortStartCode = false;
 bool isExtraDataSent = false;
 int64_t estimatedNextPts = 0;
-int HDMIRefresh = -1;
+int Hdr2Sdr = 0;
+int NoiseReduction = 1;
 
 const uint64_t PTS_FREQ = 90000;
 
 bool doPauseFlag = false;
 bool doResumeFlag = false;
-int Trick=0;
+
 
 AVRational timeBase;
 
@@ -267,8 +269,6 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 /// Set scaler test.
  void VideoSetScalerTest(int i) {};
 
-/// Set denoise.
- void VideoSetDenoise(int *i) {};
 
 /// Set sharpen.
  void VideoSetSharpen(int *i) {};
@@ -294,6 +294,10 @@ void VideoSetAudioDelay(int ms) {
 void VideoOsdClear(void) {
     ClearDisplay();
  };
+
+ void VideoSetScreenResolution (int r) {
+	 ScreenResolution = r;
+ }
 
 int64_t VideoGetClock(const VideoHwDecoder *i) {};
 
@@ -412,14 +416,12 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 	info.yres_virtual = info.yres * 2;
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
-	close(fd);
-
-	if (HDMIRefresh != -1) {
+	if (ScreenResolution) {
 		fd = open("/sys/class/display/mode",O_RDWR);
 		write(fd,vid60hz,sizeof(vid60hz));
 		close(fd);
 	}
-
+	
  };            ///< Cleanup and exit video module.
 
 
@@ -448,11 +450,11 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 extern void amlClearVBuf();
 /// Flush video buffers.
  void CodecVideoFlushBuffers(VideoDecoder *decoder) {
-
+#if 0
 	int i,j=100; 
 
 	printf("Flushbuffer \n");
-#if 0
+
 	amlDecReset();
 	while ((i = amlGetBufferStatus()) && j--) {
 		if ( i < 1000)
@@ -489,12 +491,31 @@ extern void amlClearVBuf();
 /// C plugin play TS video packet
 void PlayTsVideo(const uint8_t *i, int j) {};
    
-void VideoSetRefresh(char *r) {
+void VideoSetHdr2Sdr(int i) 
+{
 
-	HDMIRefresh = atoi(r);
-
+	Hdr2Sdr = i;
+	if (Hdr2Sdr) {
+		Debug(3,"Enable HDR2SDR\n");
+		amlSetInt("/sys/module/am_vecm/parameters/hdr_mode", 1);
+	} else {
+		Debug(3,"Disable HDR2SDR\n");
+		amlSetInt("/sys/module/am_vecm/parameters/hdr_mode", 0);
+	}
 };
-               
+
+void VideoSetDenoise(int i) 
+{
+
+	NoiseReduction = i;
+	if (!NoiseReduction) {
+		Debug(3,"Disable Noise reduction\n");
+		amlSetString("/sys/module/di/parameters/nr2_en", "0");
+	} else {
+		Debug(3,"Enable Noise reduction\n");
+		amlSetString("/sys/module/di/parameters/nr2_en", "1");
+	}
+};           
 
 void VideoDelHwDecoder(VideoHwDecoder * hw_decoder)
 {
@@ -506,6 +527,8 @@ void VideoDelHwDecoder(VideoHwDecoder * hw_decoder)
         // VideoThreadUnlock();
     }
 }
+
+
 extern int64_t AudioGetClock(void);
 extern int64_t GetCurrentPts(void);
 extern void SetCurrentPts(double );
@@ -527,10 +550,10 @@ void ProcessClockBuffer()
 
 		double drift = ((double)vpts - (double)pts) / (double)PTS_FREQ;
 		//double driftTime = drift / (double)PTS_FREQ;
+
 		double driftFrames = drift * 25.0; // frameRate;
-//printf("pts %ld vpts %ld drift %f driftframes %f\n",pts,vpts,drift,driftFrames);
-#if 1
 		const int maxDelta = 2;
+
 		// To minimize clock jitter, only adjust the clock if it
 		// deviates more than +/- 2 frames
 		if (driftFrames >= maxDelta || driftFrames <= -maxDelta)
@@ -542,54 +565,19 @@ void ProcessClockBuffer()
 				//printf("AmlVideoSink: Adjust PTS - pts=%f vpts=%f drift=%f (%f frames)\n", pts / (double)PTS_FREQ, vpts / (double)PTS_FREQ, drift, driftFrames);
 			}
 		}
-#endif
+
 	}
 
 void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt) 
-{
-#if 0
-	int64_t apts,vpts,ppts;
-
-	vpts = GetCurrentPts() & 0xffffffff;
-	ppts = avpkt->pts & 0xffffffff;
-	apts = AudioGetClock() & 0xffffffff;
-
-	if (decoder->PTS == AV_NOPTS_VALUE) { 	// new stream
-		decoder->PTS = ppts;   		// save first vpts
-		printf("new stream noPTS\n");
-	}
-	else {
-		if (vpts != 0) {	// is decoder aktiv
-			if (decoder->PTS == vpts) { 	// Video not yet running
-				printf("kein Fortschritt\n");
-				//SetCurrentPts(vpts / PTS_FREQ);
-
-			} else {
-				printf("normal decode\n");
-				decoder->PTS = vpts;	// update PTS
-				AudioVideoReady(avpkt->pts);
-			}
-		}
-	}
-
-	//AudioVideoReady(avpkt->pts);
-	
-	
-#if 1
-	//apts /= 90;
-	//vpts /= 90;  // make ms
-#endif
-	printf("apts %ld vpts %ld  paket-PTS %ld diff %ld ms\n",apts,vpts,ppts,vpts-decoder->PTS);
-#endif
-	
+{	
 	decoder->PTS = avpkt->pts;   		// save last pts;
-	if (!Trick)
+	if (!decoder->HwDecoder->TrickSpeed)
 		ProcessClockBuffer();
 	else {
 		
 		if (avpkt->pts != AV_NOPTS_VALUE) {
 			SetCurrentPts(avpkt->pts);
-			printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
+			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
 	ProcessBuffer(avpkt);
@@ -950,7 +938,10 @@ int GetApiLevel()
  void VideoInit(const char *i) 
  {
 
-	char vid50hz[] = "1080p50hz";
+	const char *const sr[] = {
+        "auto", "1080p50hz" ,"1080p60hz" , "2160p50hz" ,"2160p60hz" , "2160p50hz420" ,"2160p50hz420" 
+    };
+
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
@@ -998,12 +989,18 @@ int GetApiLevel()
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
 	close(fd);
 
-	if (HDMIRefresh == 50) {
+	if (ScreenResolution > 2 && ScreenResolution < 7) {   // UHD Resolutions
+		VideoWindowWidth = 3840;
+		VideoWindowHeight = 2160;
+	}
+
+	if (ScreenResolution > 0 && ScreenResolution < 7) {
 		fd = open("/sys/class/display/mode",O_RDWR);
-		write(fd,vid50hz,sizeof(vid50hz));
+		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution]));
 		close(fd);
 	}
 
+	
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d\n",apiLevel);
  };    
@@ -1066,6 +1063,84 @@ int GetApiLevel()
 	//GetVideoAxis();
 	
 };
+
+int codec_h_ioctl_set(int h, int subcmd, unsigned long  paramter)
+{
+    int r;
+    int cmd_new = AMSTREAM_IOC_SET;
+    unsigned long parm_new;
+
+    switch (subcmd) {
+    case AMSTREAM_SET_VB_SIZE:
+    case AMSTREAM_SET_AB_SIZE:
+    case AMSTREAM_SET_VID:
+    case AMSTREAM_SET_ACHANNEL:
+    case AMSTREAM_SET_SAMPLERATE:
+    case AMSTREAM_SET_TSTAMP:
+    case AMSTREAM_SET_AID:
+    case AMSTREAM_SET_TRICKMODE:
+    case AMSTREAM_SET_SID:
+    case AMSTREAM_SET_TS_SKIPBYTE:
+    case AMSTREAM_SET_PCRSCR:
+    case AMSTREAM_SET_SUB_TYPE:
+    case AMSTREAM_SET_DEMUX:
+    case AMSTREAM_SET_VIDEO_DELAY_LIMIT_MS:
+    case AMSTREAM_SET_AUDIO_DELAY_LIMIT_MS:
+    case AMSTREAM_SET_DRMMODE: {
+        struct am_ioctl_parm parm;
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = subcmd;
+        parm.data_32 = paramter;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(h, cmd_new, parm_new);
+    }
+    break;
+    case AMSTREAM_SET_VFORMAT: {
+        struct am_ioctl_parm parm;
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = subcmd;
+        parm.data_vformat = paramter;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(h, cmd_new,parm_new);
+    }
+    break;
+    case AMSTREAM_SET_AFORMAT: {
+        struct am_ioctl_parm parm;
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = subcmd;
+        parm.data_aformat = paramter;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(h, cmd_new, parm_new);
+    }
+    break;
+    case AMSTREAM_PORT_INIT:
+    case AMSTREAM_AUDIO_RESET:
+    case AMSTREAM_SUB_RESET:
+    case AMSTREAM_DEC_RESET: {
+        struct am_ioctl_parm parm;
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = subcmd;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(h, cmd_new, parm_new);
+    }
+    break;
+    default: {
+        struct am_ioctl_parm parm;
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = subcmd;
+        parm.data_32 = paramter;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(h, cmd_new, parm_new);
+    }
+    break;
+    }
+
+    if (r < 0) {
+        printf("codec_h_ioctl_set failed,handle=%d,cmd=%x,paramter=%x, t=%x errno=%d\n", h, subcmd, paramter, r, errno);
+        return r;
+    }
+    return 0;
+}
 
 void InternalOpen(int format, double frameRate)
 {
@@ -1199,15 +1274,7 @@ void InternalOpen(int format, double frameRate)
 
 	if (apiLevel >= S905) // S905
 	{
-		parm.cmd = AMSTREAM_SET_VFORMAT;
-		parm.data_vformat = amlFormat;
-
-		r = ioctl(handle, AMSTREAM_IOC_SET, (unsigned long)&parm);
-		if (r < 0)
-		{
-			printf("AMSTREAM_IOC_SET failed.\n");
-            return;
-		}
+		codec_h_ioctl_set(handle,AMSTREAM_SET_VFORMAT,amlFormat);
 	}
 	else //S805
 	{
@@ -1252,16 +1319,8 @@ void InternalOpen(int format, double frameRate)
 
 	if (apiLevel >= S905)	//S905
 	{
-		struct am_ioctl_parm parm = { 0 };
-		parm.cmd = AMSTREAM_PORT_INIT;
+		codec_h_ioctl_set(handle,AMSTREAM_PORT_INIT,0);
 
-		r = ioctl(handle, AMSTREAM_IOC_SET, (unsigned long)&parm);
-		if (r != 0)
-		{
-			//codecMutex.Unlock();
-			printf("AMSTREAM_PORT_INIT failed.\n");
-            return;
-		}
 	}
 	else	//S805
 	{
@@ -1273,7 +1332,6 @@ void InternalOpen(int format, double frameRate)
             return;
 		}
 	}
-
 
 	//codec_h_control(pcodec->cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)enable);
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)1);
@@ -1301,49 +1359,6 @@ void InternalOpen(int format, double frameRate)
 		return;
 	}
 
-#if 0
-	// Debug info
-	printf("\tw=%d h=%d ", width, height);
-
-	printf("fps=%f ", frameRate);
-
-	printf("am_sysinfo.rate=%d ",
-		am_sysinfo.rate);
-
-	printf("\n");
-#endif
-
-	//// Intialize the hardware codec
-	//int api = codec_init(&codec);
-	////int api = codec_init_no_modeset(&codecContext);
-	//if (api != 0)
-	//{
-	//	printf("codec_init failed (%x).\n", api);
-
-	//	codecMutex.Unlock();
-	//	throw Exception();
-	//}
-
-#if 0
-	// Set video size
-	int video_fd = open("/dev/amvideo", O_RDWR);
-	if (video_fd < 0)
-	{
-		throw Exception("open /dev/amvideo failed.\n");
-	}
-
-	
-	int params[4]{ 0, 0, -1, -1 };
-
-	int ret = ioctl(video_fd, AMSTREAM_IOC_SET_VIDEO_AXIS, &params);
-	if (ret < 0)
-	{
-		throw Exception("ioctl AMSTREAM_IOC_SET_VIDEO_AXIS failed.\n");
-	}
-
-	close(video_fd);
-#endif
-   
 	isOpen = true;
 }
 
@@ -1424,23 +1439,8 @@ void SetCurrentPts(double value)
 
 	if (apiLevel >= S905)	// S905
 	{
-		struct am_ioctl_parm parm = { 0 };
+		codec_h_ioctl_set(handle,AMSTREAM_SET_PCRSCR,pts);
 
-		parm.cmd = AMSTREAM_SET_PCRSCR;
-		parm.data_32 = (unsigned int)(pts);
-		//parm.data_64 = (unsigned long)(value * PTS_FREQ);
-
-		int ret = ioctl(handle, AMSTREAM_IOC_SET, (unsigned long)&parm);
-		if (ret < 0)
-		{
-			// codecMutex.Unlock();
-			printf("AMSTREAM_SET_PCRSCR failed.\n");
-			return;
-		}
-		else
-		{
-			//printf("AmlCodec::SetCurrentPts - parm.data_32=%u\n", parm.data_32);
-		}
 	}
 	else	// S805
 	{
@@ -1683,17 +1683,7 @@ CheckinPts(unsigned long pts)
 
 	if (apiLevel >= S905)	// S905
 	{
-		struct am_ioctl_parm parm = { 0 };
-		parm.cmd = AMSTREAM_SET_TSTAMP;
-		parm.data_32 = (unsigned int)pts;
-
-		int r = ioctl(handle, AMSTREAM_IOC_SET, (unsigned long)&parm);
-		if (r < 0)
-		{
-			//codecMutex.Unlock();
-			printf("AMSTREAM_SET_TSTAMP failed\n");
-			return;
-		}
+		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,pts);
 	}
 	else	// S805
 	{
@@ -1856,11 +1846,11 @@ amlClearVideo()
 
 	
 	//codec_resume(&codec);
-	int ret = ioctl(cntl_handle, AMSTREAM_IOC_CLEAR_VIDEO, 1);
+	int ret = ioctl(cntl_handle, AMSTREAM_IOC_CLEAR_VIDEO, 0);
 	if (ret < 0)
 	{
 		//codecMutex.Unlock();
-		printf("AMSTREAM_IOC_CLEAR_VIDEO (1) failed.\n");
+		printf("AMSTREAM_IOC_CLEAR_VIDEO (0) failed.\n");
 	}
     printf("clear video\n");
 	//codecMutex.Unlock();
@@ -1876,10 +1866,20 @@ amlReset()
 		printf("The codec is not open.\n");
 		return;
 	}
+	// set the system blackout_policy to leave the last frame showing
+	int blackout_policy;
+	amlGetInt("/sys/class/video/blackout_policy", &blackout_policy);
+	amlSetInt("/sys/class/video/blackout_policy", 0);
 
+	//amlPause();
+;
 	InternalClose();
 	InternalOpen(videoFormat,FrameRate);
 
+	//amlSetVideoDelayLimit(1000);
+
+	amlSetInt("/sys/class/video/blackout_policy", blackout_policy);
+	
 	//printf("amlReset\n");
 	
 	//codecMutex.Unlock();
@@ -1888,7 +1888,9 @@ amlReset()
 void InternalClose()
 {
 	int r;
-	
+
+	//amlClearVideo();
+
 	r = close(cntl_handle);
 	if (r < 0)
 	{
@@ -1963,57 +1965,6 @@ void amlGetVideoAxis()
 	return;
 }
 
-static void VideoSetPts(int64_t * pts_p, int interlaced,  const AVFrame * frame)
-{
-    int64_t pts;
-    int duration;
-
-    //
-    //  Get duration for this frame.
-    //  FIXME: using framerate as workaround for av_frame_get_pkt_duration
-    //
-    
-    duration = interlaced ? 40 : 20;    // 50Hz -> 20ms default
-    
-    // update video clock
-    if (*pts_p != (int64_t) AV_NOPTS_VALUE) {
-        *pts_p += duration * 90;
-        //Info("video: %s +pts\n", Timestamp2String(*pts_p));
-    }
-    // av_opt_ptr(avcodec_get_frame_class(), frame, "best_effort_timestamp");
-    // pts = frame->best_effort_timestamp;
-    // pts = frame->pkt_pts;
-    pts = frame->pts;
-    if (pts == (int64_t) AV_NOPTS_VALUE || !pts) {
-        // libav: 0.8pre didn't set pts
-        pts = frame->pkt_dts;
-    }
-    // libav: sets only pkt_dts which can be 0
-    if (pts && pts != (int64_t) AV_NOPTS_VALUE) {
-        // build a monotonic pts
-        if (*pts_p != (int64_t) AV_NOPTS_VALUE) {
-            int64_t delta;
-
-            delta = pts - *pts_p;
-            // ignore negative jumps
-            if (delta > -600 * 90 && delta <= -40 * 90) {
-                if (-delta > VideoDeltaPTS) {
-                    VideoDeltaPTS = -delta;
-                    Debug(4, "video: %#012" PRIx64 "->%#012" PRIx64 " delta%+4" PRId64 " pts\n", *pts_p, pts,
-                        pts - *pts_p);
-                }
-                return;
-            }
-        } else {                        // first new clock value
-            Debug(3, "++++++++++++++++++++++++++++++++++++starte audio\n");
-            AudioVideoReady(pts);
-        }
-        if (*pts_p != pts) {
-            Debug(4, "video: %#012" PRIx64 "->%#012" PRIx64 " delta=%4" PRId64 " pts\n", *pts_p, pts, pts - *pts_p);
-            *pts_p = pts;
-        }
-    }
-}
 
 int amlGetBufferStatus()
 {
@@ -2097,6 +2048,12 @@ void amlClearVBuf()
 	}
 }
 
+void amlSetVideoDelayLimit(int ms)
+{
+	
+    codec_h_ioctl_set (handle, AMSTREAM_SET_VIDEO_DELAY_LIMIT_MS, ms);
+
+}
 
 void amlDecReset()
 {
@@ -2162,4 +2119,104 @@ void amlTrickMode(int val)
 		printf("AMSTREAM_TRICKMODE failed. %d",val);
 		return;
 	}	
+}
+
+int amlSetString(char *path, char *valstr)
+{
+  int fd = open(path, O_RDWR, 0644);
+  int ret = 0;
+  if (fd >= 0)
+  {
+    if (write(fd, valstr, sizeof(*valstr)) < 0)
+      ret = -1;
+    close(fd);
+  }
+  if (ret)
+    Debug(3, "%s: error writing %s",__FUNCTION__, path);
+
+  return ret;
+}
+
+int amlGetString(char *path, char *valstr)
+{
+  int len;
+  char buf[256] = {0};
+
+  int fd = open(path, O_RDONLY);
+  if (fd >= 0)
+  {
+    *valstr = 0;
+    while ((len = read(fd, buf, 256)) > 0)
+      strncat(valstr,buf,len);
+    close(fd);
+
+    //StringUtils::Trim(valstr);
+
+    return 0;
+  }
+
+  Debug(3, "%s: error reading %s",__FUNCTION__, path);
+  valstr = "fail";
+  return -1;
+}
+
+int amlSetInt(char *path, int val)
+{
+  int fd = open(path, O_RDWR, 0644);
+  int ret = 0;
+  if (fd >= 0)
+  {
+    char bcmd[16];
+    sprintf(bcmd, "%d", val);
+    if (write(fd, bcmd, strlen(bcmd)) < 0)
+      ret = -1;
+    close(fd);
+  }
+  if (ret)
+    Debug(3, "%s: error writing %s",__FUNCTION__, path);
+
+  return ret;
+}
+
+int amlGetInt(char *path, int *val)
+{
+  int fd = open(path, O_RDONLY);
+  int ret = 0;
+  long res;
+  if (fd >= 0)
+  {
+    char bcmd[16];
+    if (read(fd, bcmd, sizeof(bcmd)) < 0)
+      ret = -1;
+    else
+      res = strtol(bcmd, NULL, 16);
+
+    close(fd);
+  }
+  if (ret)
+    Debug(3, "%s: error reading %s",__FUNCTION__, path);
+  *val = res;
+  return ret;
+}
+
+bool amlHas(char *path)
+{
+  int fd = open(path, O_RDONLY);
+  if (fd >= 0)
+  {
+    close(fd);
+    return true;
+  }
+  return false;
+}
+
+bool amlHasRW(char *path)
+{
+  int fd = open(path, O_RDWR);
+  if (fd >= 0)
+  {
+    close(fd);
+    return true;
+  }
+  return false;
 }

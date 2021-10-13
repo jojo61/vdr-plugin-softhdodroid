@@ -176,7 +176,6 @@ extern char VideoIgnoreRepeatPict;      ///< disable repeat pict warning
 extern int VideoAudioDelay;             ///< audio/video delay
 extern char ConfigStartX11Server;       ///< flag start the x11 server
 extern char MyConfigDir[];
-extern int Trick;
 //----------------------------------------------------------------------------
 //  Prototypes
 //----------------------------------------------------------------------------
@@ -274,7 +273,10 @@ extern void VideoSetScaling(int[]);
 extern void VideoSetScalerTest(int);
 
 /// Set denoise.
-extern void VideoSetDenoise(int[]);
+extern void VideoSetDenoise(int);
+
+/// Set Hdr 2 Sdr Mode
+extern void VideoSetHdr2Sdr(int);
 
 /// Set sharpen.
 extern void VideoSetSharpen(int[]);
@@ -287,6 +289,9 @@ extern void VideoSetCutLeftRight(int[]);
 
 /// Set studio levels.
 extern void VideoSetStudioLevels(int);
+
+/// Set Screen Resolution
+extern void VideoSetScreenResolution(int);
 
 /// Set background.
 extern void VideoSetBackground(uint32_t);

@@ -68,7 +68,6 @@ static void DumpMpeg(const uint8_t * data, int size);
 //////////////////////////////////////////////////////////////////////////////
 
 extern int ConfigAudioBufferTime;       ///< config size ms of audio buffer
-extern int ConfigVideoClearOnSwitch;    //<  clear decoder on channel switch
 char ConfigStartX11Server;              ///< flag start the x11 server
 static signed char ConfigStartSuspended;    ///< flag to start in suspend mode
 static char ConfigFullscreen;           ///< fullscreen modus
@@ -2481,7 +2480,7 @@ int SetPlayMode(int play_mode)
             // tell video parser we get new stream
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                 // clear buffers on close configured always or replay only
-                if (ConfigVideoClearOnSwitch || MyVideoStream->ClearClose) {
+                if (MyVideoStream->ClearClose) {
                     Clear();            // flush all buffers
                     MyVideoStream->ClearClose = 0;
                 }
@@ -2671,12 +2670,6 @@ void StillPicture(const uint8_t * data, int size)
     static uint8_t seq_end_h265[] = { 0x00, 0x00, 0x00, 0x01, 0x48, 0x01 }; //0x48 = end of seq   0x4a = end of stream
     int i;
 
-    printf("Show Stillpicture I-Frame\n");
-    for (i=0;i<15;i++) {
-        printf("%02x ",data[i]);
-    }
-    printf("\n");
-
     // might be called in Suspended Mode
     if (!MyVideoStream->Decoder || MyVideoStream->SkipStream) {
         printf("still return 1\n");
@@ -2691,7 +2684,6 @@ void StillPicture(const uint8_t * data, int size)
     InStillPicture = 1;
 #endif
     VideoSetTrickSpeed(MyVideoStream->HwDecoder, 1);
-    Trick = 1;
     
     VideoResetPacket(MyVideoStream);
     
@@ -2713,25 +2705,13 @@ void StillPicture(const uint8_t * data, int size)
     amlTrickMode(1);
     amlClearVBuf();
     
-    int num_frames =  4;
-    switch(MyVideoStream->CodecID) {
-        case AV_CODEC_ID_HEVC:
-            num_frames = 25;
-            break;
-        case AV_CODEC_ID_H264:
-            num_frames = 10;
-            break;
-        case AV_CODEC_ID_MPEG2VIDEO:
-            num_frames = 4;
-            break;
-    }
-    for (i = 0; i < num_frames; ++i) {
+    for (i = 0; i < 4; ++i) {
         const uint8_t *split;
         int n;
                 
         // FIXME: vdr pes recordings sends mixed audio/video
         if ((data[3] & 0xF0) == 0xE0) { // PES packet
-printf("Found PES Paket\n");
+
             split = data;
             n = size;
             // split the I-frame into single pes packets
@@ -2788,7 +2768,7 @@ printf("Found PES Paket\n");
 #endif
     
   //  VideoNextPacket(MyVideoStream, AV_CODEC_ID_NONE);   // close last stream
-    Trick = 0;
+   
     usleep(25000);
    amlTrickMode(0);
    amlFreerun(0);
@@ -2922,7 +2902,6 @@ const char *CommandLineHelp(void)
         "  -p device\taudio device for pass-through (hw:0,1 or /dev/dsp1)\n"
         "  -c channel\taudio mixer channel name (fe. PCM)\n" 
         "  -g geometry\tx11 window geometry wxh+x+y\n" 
-        "  -r Refresh\tRefreshrate for HDMI (default is no change)\n"
         "  -s\t\tstart in suspended mode\n"
         "  -D\t\tstart in detached mode\n"
         "  -w workaround\tenable/disable workarounds\n"
@@ -2951,15 +2930,12 @@ int ProcessArgs(int argc, char *const argv[])
 #endif
 
     for (;;) {
-        switch (getopt(argc, argv, "-a:c:r:d:fg:p:S:sv:w:xDX:")) {
+        switch (getopt(argc, argv, "-a:c:d:fg:p:S:sv:w:xDX:")) {
             case 'a':                  // audio device for pcm
                 AudioSetDevice(optarg);
                 continue;
             case 'c':                  // channel of audio mixer
                 AudioSetChannel(optarg);
-                continue;
-            case 'r':                  // Refresh for HDMI
-                VideoSetRefresh(optarg);
                 continue;
 			case 'p':                  // pass-through audio device
                 AudioSetPassthroughDevice(optarg);

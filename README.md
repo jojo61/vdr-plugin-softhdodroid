@@ -33,9 +33,7 @@ This is a Device driver for Odroid-n2(plus) Hardware.  SD, HD and UHD is working
 
 Current Status:
 The driver supports SD, HD and UHD Streams. So far I have only tested with SD and HD.
-Video editing is possible but not perfect yet. I found no way to clear the Video Buffer
-and so I have to Reset the Device befor showing an I-Frame. This resuts in a short black
-screen.
+Video editing is also possible.
 
 
 Good luck
@@ -51,7 +49,7 @@ Install:
 	make
 	make install
 
-	You have to start vdr with e.g.:  -P 'softhdodroid -a default -r 50  ..<more options>.. '
+	You have to start vdr with e.g.:  -P 'softhdodroid -a default  ..<more options>.. '
 
  
 
