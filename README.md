@@ -26,7 +26,7 @@ A software and GPU emulated UHD output device plugin for VDR.
     o Audio FFMpeg / Alsa / Digital
     o Audio FFMpeg / OSS / Analog
     o HDMI/SPDIF pass-through
-    o Suspend / Dettach  (not working yet)
+    o Suspend / Dettach 
 
 
 This is a Device driver for Odroid-n2(plus) Hardware.  SD, HD and UHD is working.

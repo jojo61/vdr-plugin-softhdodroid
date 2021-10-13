@@ -2622,7 +2622,7 @@ void Play(void)
     TrickSpeed(0);                      // normal play
     SkipAudio = 0;
     AudioPlay();
-    //amlResume();
+    amlResume();
 }
 
 /**
@@ -2640,9 +2640,8 @@ void Freeze(void)
     StreamFreezed = 1;
     MyVideoStream->Freezed = 1;
     AudioPause();
-    //amlPause();
-    //amlClearVBuf();
-    //amlResume();
+    amlPause();
+    
 }
 
 /**
