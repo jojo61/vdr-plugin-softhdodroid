@@ -340,11 +340,16 @@ void VideoSetClosing(VideoHwDecoder *decoder) {
 
 /// Set trick play speed.
 void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
+	if (speed > 6)
+		speed = 6;
 	decoder->TrickSpeed = speed;
     decoder->TrickCounter = speed;
     if (speed) {
+		amlFreerun(1);
         decoder->Closing = 0;
-    }
+    } else {
+		amlFreerun(0);
+	}
 };
 
 /// Grab screen.
@@ -574,13 +579,15 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 	if (!decoder->HwDecoder->TrickSpeed)
 		ProcessClockBuffer();
 	else {
-		
 		if (avpkt->pts != AV_NOPTS_VALUE) {
 			SetCurrentPts(avpkt->pts);
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
 	ProcessBuffer(avpkt);
+	if (decoder->HwDecoder->TrickSpeed) {
+		usleep(20000*decoder->HwDecoder->TrickSpeed);
+	}
 	//amlGetBufferStatus();
 };
 
@@ -1673,7 +1680,7 @@ CheckinPts(unsigned long pts)
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.\n");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1717,6 +1724,9 @@ int WriteData(unsigned char* data, int length)
 	// while (written < length)
 	// {
 		int ret = write(handle, data, length);
+		if (ret == length) {
+			usleep(2000);
+		}
 	// 	if (ret < 0)
 	// 	{
 	// 		if (errno == EAGAIN)
@@ -1795,7 +1805,7 @@ amlPause()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1817,7 +1827,7 @@ amlResume()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.\n");
+		//printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1840,7 +1850,7 @@ amlClearVideo()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.\n");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1863,8 +1873,7 @@ amlReset()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.\n");
-		return;
+		printf("The codec is not open. %s\n",__FUNCTION__);
 	}
 	// set the system blackout_policy to leave the last frame showing
 	int blackout_policy;
@@ -1921,7 +1930,7 @@ void amlSetVideoAxis(int x, int y, int width, int height)
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1945,7 +1954,7 @@ void amlGetVideoAxis()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -1973,7 +1982,7 @@ int amlGetBufferStatus()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -2023,7 +2032,7 @@ void amlClearVBuf()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 
@@ -2062,7 +2071,7 @@ void amlDecReset()
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 	
@@ -2084,7 +2093,7 @@ void amlFreerun(int val)
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		//printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 	
@@ -2106,7 +2115,7 @@ void amlTrickMode(int val)
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.");
+		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 	
