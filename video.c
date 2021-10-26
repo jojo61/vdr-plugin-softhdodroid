@@ -315,6 +315,7 @@ void VideoGetOsdSize(int *width, int *height) {
         *width = OsdWidth;
         *height = OsdHeight;
     }
+	
 
 };
 
@@ -366,16 +367,12 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 
  void VideoOsdInit(void) {
 
-	if (OsdConfigWidth && OsdConfigHeight) {
-        OsdWidth = OsdConfigWidth;
-        OsdHeight = OsdConfigHeight;
-    } else {
-        OsdWidth = VideoWindowWidth;
-        OsdHeight = VideoWindowHeight;
-    }
+	OsdWidth = VideoWindowWidth;
+	OsdHeight = VideoWindowHeight;
+ 	
+ };         ///< Setup osd
 
 
- };         ///< Setup osd.
  void VideoOsdExit(void) {};         ///< Cleanup osd.
 
 
@@ -445,39 +442,11 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
  void CodecVideoDelDecoder(VideoDecoder *i){};
 
 /// Close video codec.
- void CodecVideoClose(VideoDecoder *decoder){
-	Debug(3,"codecvideoclose\n") ;
-//	if (isOpen) {
-//		InternalClose();
-//	}
- };
+ void CodecVideoClose(VideoDecoder *decoder){};
 
 extern void amlClearVBuf();
 /// Flush video buffers.
- void CodecVideoFlushBuffers(VideoDecoder *decoder) {
-#if 0
-	int i,j=100; 
-
-	printf("Flushbuffer \n");
-
-	amlDecReset();
-	while ((i = amlGetBufferStatus()) && j--) {
-		if ( i < 1000)
-			break;
-		usleep(25000);
-	}
-	printf("\n");
-	
-	
-	//amlClearVBuf();
-	amlGetBufferStatus();
-    //if (!Trick)
-	//	amlReset();
-	
-		
-	 //SetCurrentPts(0);
-#endif
- };
+ void CodecVideoFlushBuffers(VideoDecoder *decoder) {};
 
 
 /// Setup and initialize codec module.
@@ -737,26 +706,6 @@ void OdroidDisplayHandlerThread(void)
 
     decoder = OdroidDecoders[0];
 	
-
-#if 0
-    akt_pts = GetCurrentPts() & 0xffffffff;
-	new_pts = decoder->Stream->Decoder->PTS & 0xffffffff;
-
-
-    //printf("Display Thread\n");
-
-    
-    
-	if (akt_pts && new_pts) {
-		filled = abs((int)(akt_pts - new_pts)) / 3600; 
-	}
-	else {
-		filled = 0;
-	}
-	
-	//if (filled)
-	//	printf("%ld %ld filled %ld \n",akt_pts,new_pts,filled);
-#endif
 	filled = 0;
 
     if (filled < 60) {
@@ -893,18 +842,8 @@ void VideoResetStart(VideoHwDecoder * hw_decoder)
 
     Debug(3, "video: reset start\n");
 	//amlReset();
-#if 0
-	amlPause();
-	amlClearVBuf();
-	SetCurrentPts(0);
-	amlResume();
-#endif
+
 }
-
-    // VideoUsedModule->ResetStart(hw_decoder);
-    // clear clock to trigger new video stream
-    //VideoSetClock(hw_decoder, AV_NOPTS_VALUE);
-
 
 void VideoSetClock(VideoHwDecoder * decoder, int64_t pts)
 {
@@ -946,30 +885,25 @@ int GetApiLevel()
  {
 
 	const char *const sr[] = {
-        "auto", "1080p50hz" ,"1080p60hz" , "2160p50hz" ,"2160p60hz" , "2160p50hz420" ,"2160p50hz420" 
+        "auto", "1080p50hz" ,"1080p60hz" , "2160p50hz" ,"2160p60hz" , "2160p50hz420" ,"2160p60hz420" 
     };
 
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-	// Set graphics mode
-	int ttyfd = open("/dev/tty0", O_RDWR);	
-	if (ttyfd < 0)
-	{
-		printf("Could not open /dev/tty0\n");
-		return;
+	if (ScreenResolution > 0 && ScreenResolution < 7) {
+		fd = open("/sys/class/display/mode",O_RDWR);
+		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution])+1);
+		close(fd);
 	}
-	else
-	{
-		int ret = ioctl(ttyfd, KDSETMODE, KD_GRAPHICS);
-		if (ret < 0) {
-			printf("KDSETMODE failed.");
-			return;
-		}
+    
 
-		close(ttyfd);
+	
+
+	if (ScreenResolution > 2 && ScreenResolution < 7) {   // UHD Resolutions
+		OsdWidth =  VideoWindowWidth = 3840;
+		OsdHeight =  VideoWindowHeight = 2160;
 	}
-
 
 	// enable alpha setting
 
@@ -982,7 +916,7 @@ int GetApiLevel()
 	info.reserved[2] = 0;
 	info.xoffset = 0;
 	info.yoffset = 0;
-	info.activate = FB_ACTIVATE_NOW;
+	info.activate = FB_ACTIVATE_ALL;
 	info.red.offset = 16;
 	info.red.length = 8;
 	info.green.offset = 8;
@@ -991,23 +925,31 @@ int GetApiLevel()
 	info.blue.length = 8;
 	info.transp.offset = 24;
 	info.transp.length = 8;
+	info.xres = VideoWindowWidth;
+	info.yres = VideoWindowHeight;
+	info.xres_virtual = VideoWindowWidth;
+	info.yres_virtual = VideoWindowHeight*2;
+	info.bits_per_pixel = 32;
 	info.nonstd = 1;
-	info.yres_virtual = info.yres * 2;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
 	close(fd);
 
-	if (ScreenResolution > 2 && ScreenResolution < 7) {   // UHD Resolutions
-		VideoWindowWidth = 3840;
-		VideoWindowHeight = 2160;
+	// Set graphics mode
+	int ttyfd = open("/dev/tty0", O_RDWR);	
+	if (ttyfd < 0)
+	{
+		printf("Could not open /dev/tty0\n");
+		return;
 	}
+	else
+	{	int ret = ioctl(ttyfd, KDSETMODE, KD_GRAPHICS);
+		if (ret < 0) {
+			printf("KDSETMODE failed.");
+			return;
+		}
 
-	if (ScreenResolution > 0 && ScreenResolution < 7) {
-		fd = open("/sys/class/display/mode",O_RDWR);
-		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution]));
-		close(fd);
+		close(ttyfd);
 	}
-
-	
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d\n",apiLevel);
  };    

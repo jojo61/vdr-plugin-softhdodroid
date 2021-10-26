@@ -1049,9 +1049,7 @@ inline cOsdItem *cMenuSetupSoft::CollapsedItem(const char *label, int &flag, con
 */
 void cMenuSetupSoft::Create(void)
 {
-    static const char *const osd_size[] = {
-        "auto", "1920x1080", "1280x720", "custom",
-    };
+
     static const char *const screenresolution[] = {
         "auto", "1920x1080p50hz" ,"1920x1080p60hz" , "3840x2160p50hz" ,"3840x2160p60hz" , "3840x2160p50hz420" ,"3840x2160p50hz420" 
     };
@@ -1082,14 +1080,7 @@ void cMenuSetupSoft::Create(void)
     if (General) {
         Add(new cMenuEditBoolItem(tr("Make primary device"), &MakePrimary, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("Hide main menu entry"), &HideMainMenuEntry, trVDR("no"), trVDR("yes")));
-        //
-        //  osd
-        //
-        Add(new cMenuEditStraItem(tr("Osd size"), &OsdSize, 4, osd_size));
-        if (OsdSize == 3) {
-            Add(new cMenuEditIntItem(tr("Osd width"), &OsdWidth, 0, 4096));
-            Add(new cMenuEditIntItem(tr("Osd height"), &OsdHeight, 0, 4096));
-        }
+    
         Add(new cMenuEditIntItem(tr("GPU mem used for image caching (MB)"), &MaxSizeGPUImageCache, 0, 4000));
         //
         //  suspend
@@ -1334,28 +1325,7 @@ void cMenuSetupSoft::Store(void)
     SetupStore("MakePrimary", ConfigMakePrimary = MakePrimary);
     SetupStore("HideMainMenuEntry", ConfigHideMainMenuEntry = HideMainMenuEntry);
     SetupStore("DetachFromMainMenu", ConfigDetachFromMainMenu = DetachFromMainMenu);
-    switch (OsdSize) {
-        case 0:
-            OsdWidth = 0;
-            OsdHeight = 0;
-            break;
-        case 1:
-            OsdWidth = 1920;
-            OsdHeight = 1080;
-            break;
-        case 2:
-            OsdWidth = 1280;
-            OsdHeight = 720;
-        default:
-            break;
-    }
-    if (ConfigOsdWidth != OsdWidth || ConfigOsdHeight != OsdHeight) {
-        VideoSetOsdSize(ConfigOsdWidth = OsdWidth, ConfigOsdHeight = OsdHeight);
-        // FIXME: shown osd size not updated
-    }
-    SetupStore("Osd.Width", ConfigOsdWidth);
-    SetupStore("Osd.Height", ConfigOsdHeight);
-
+    
     SetupStore("Suspend.Close", ConfigSuspendClose = SuspendClose);
     
     SetupStore("StudioLevels", ConfigVideoStudioLevels = StudioLevels);
@@ -2657,16 +2627,6 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
     }
     if (!strcasecmp(name, "DetachFromMainMenu")) {
         ConfigDetachFromMainMenu = atoi(value);
-        return true;
-    }
-    if (!strcasecmp(name, "Osd.Width")) {
-        ConfigOsdWidth = atoi(value);
-        VideoSetOsdSize(ConfigOsdWidth, ConfigOsdHeight);
-        return true;
-    }
-    if (!strcasecmp(name, "Osd.Height")) {
-        ConfigOsdHeight = atoi(value);
-        VideoSetOsdSize(ConfigOsdWidth, ConfigOsdHeight);
         return true;
     }
     if (!strcasecmp(name, "Suspend.Close")) {

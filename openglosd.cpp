@@ -2047,6 +2047,7 @@ bool cOglThread::InitOpenGL(void)
 {
     
     EGLNativeDisplayType nativeDisplay=EGL_DEFAULT_DISPLAY;
+    
 #if 0
     fd = open("/dev/fb0", O_RDWR);
 	if (fd < 0) {
@@ -2580,7 +2581,7 @@ cOglOsd::cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > o
 
 //    pthread_mutex_lock(&OSDMutex);
     VideoGetOsdSize((int*)&MyOsdWidth, (int *)&MyOsdHeight);
-    
+   
     dsyslog("[softhddev]cOglOsd osdLeft %d osdTop %d screenWidth %d screenHeight %d", Left, Top, MyOsdWidth, MyOsdHeight);
 
 #if 0

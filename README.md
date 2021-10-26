@@ -49,7 +49,7 @@ Install:
 	make
 	make install
 
-	You have to start vdr with e.g.:  -P 'softhdodroid -a default  ..<more options>.. '
+	You have to start vdr with e.g.:  -P 'softhdodroid -a hw:CARD=AMLAUGESOUND,DEV=0 ..<more options>.. '
 
  
 
