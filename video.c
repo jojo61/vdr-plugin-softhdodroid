@@ -377,23 +377,7 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 
 
  void VideoExit(void) {
-	// Set text mode
-
-	char vid60hz[] = "1080p60hz";
-	int ttyfd = open("/dev/tty0", O_RDWR);
-	if (ttyfd < 0)
-	{
-		printf("Could not open /dev/tty0\n");
-	}
-	else
-	{
-		int ret = ioctl(ttyfd, KDSETMODE, KD_TEXT);
-		if (ret < 0) {
-			printf("KDSETMODE failed.");
-			return;
-		}
-		close(ttyfd);
-	}
+	
 	// Restore alpha setting
 	int fd_m;
 	struct fb_var_screeninfo info;
@@ -418,12 +402,31 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 	info.yres_virtual = info.yres * 2;
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
+
+#if 0
+	char vid60hz[] = "1080p60hz";
 	if (ScreenResolution) {
 		fd = open("/sys/class/display/mode",O_RDWR);
 		write(fd,vid60hz,sizeof(vid60hz));
 		close(fd);
 	}
-	
+#endif
+
+	// Set text mode
+	int ttyfd = open("/dev/tty0", O_RDWR);
+	if (ttyfd < 0)
+	{
+		printf("Could not open /dev/tty0\n");
+	}
+	else
+	{
+		int ret = ioctl(ttyfd, KDSETMODE, KD_TEXT);
+		if (ret < 0) {
+			printf("KDSETMODE failed.");
+			return;
+		}
+		close(ttyfd);
+	}
  };            ///< Cleanup and exit video module.
 
 
