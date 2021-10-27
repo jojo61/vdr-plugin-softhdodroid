@@ -85,6 +85,7 @@ APIVERSION = $(call PKGCFG,apiversion)
 
 ### Parse softhddevice config
 
+$(shell mkdir -p po)
 
 _CFLAGS += $(shell pkg-config --cflags alsa)
 LIBS += $(shell pkg-config --libs alsa)
