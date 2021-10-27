@@ -1064,7 +1064,6 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         printf("ION_IOC_ALLOC failed.");					
     }
     
-
     IonSurface surface = { 0 };
     surface.length = size;
     surface.stride = stride;

@@ -1051,7 +1051,7 @@ void cMenuSetupSoft::Create(void)
 {
 
     static const char *const screenresolution[] = {
-        "auto", "1920x1080p50hz" ,"1920x1080p60hz" , "3840x2160p50hz" ,"3840x2160p60hz" , "3840x2160p50hz420" ,"3840x2160p50hz420" 
+        "auto", "1920x1080p50hz" ,"1920x1080p60hz" , "3840x2160p50hz" ,"3840x2160p60hz" , "3840x2160p50hz420" ,"3840x2160p60hz420" 
     };
     static const char *const resolution[RESOLUTIONS] = {
         "576i", "720p", "fake 1080", "1080", "2160p"

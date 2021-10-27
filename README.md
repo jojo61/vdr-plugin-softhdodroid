@@ -51,6 +51,10 @@ Install:
 
 	You have to start vdr with e.g.:  -P 'softhdodroid -a hw:CARD=AMLAUGESOUND,DEV=0 ..<more options>.. '
 
+	You should adapt config.ini in /media/boot and change the Screensettings from hdmimode=1080p60hz to your preferred 
+	Resolution. Also set display_autodetect=false
+
+
  
 
 

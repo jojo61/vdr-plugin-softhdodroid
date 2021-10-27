@@ -899,15 +899,14 @@ int GetApiLevel()
 		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution])+1);
 		close(fd);
 	}
-    
 
-	
-
-	if (ScreenResolution > 2 && ScreenResolution < 7) {   // UHD Resolutions
-		OsdWidth =  VideoWindowWidth = 3840;
-		OsdHeight =  VideoWindowHeight = 2160;
+	if (ScreenResolution > 2) {
+		OsdWidth = VideoWindowWidth = 3840;
+		OsdHeight =  VideoWindowHeight =  2160;
+	} else {
+		OsdWidth =  VideoWindowWidth = 1920;
+		OsdHeight =  VideoWindowHeight = 1080;
 	}
-
 	// enable alpha setting
 
 	struct fb_var_screeninfo info;
@@ -928,10 +927,12 @@ int GetApiLevel()
 	info.blue.length = 8;
 	info.transp.offset = 24;
 	info.transp.length = 8;
-	info.xres = VideoWindowWidth;
-	info.yres = VideoWindowHeight;
-	info.xres_virtual = VideoWindowWidth;
-	info.yres_virtual = VideoWindowHeight*2;
+
+	if (!ScreenResolution) {
+		OsdWidth =  VideoWindowWidth = info.xres;
+		OsdHeight =  VideoWindowHeight = info.yres;
+	}
+	
 	info.bits_per_pixel = 32;
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
