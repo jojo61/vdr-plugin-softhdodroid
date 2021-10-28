@@ -23,8 +23,6 @@
 /// @addtogroup Video
 /// @{
 
-#include <GL/gl.h>
-#include <GL/glx.h>
 #include <libavcodec/avcodec.h>
 #include "iatomic.h"
 
@@ -365,9 +363,6 @@ extern int VideoRaiseWindow(void);
 /// Set Shaders
 extern int VideoSetShader(char *);
 
-#ifdef USE_OPENGLOSD
-extern void ActivateOsd(GLuint, int, int, int, int);
-#endif
 
 #ifdef GAMMA
 extern void Init_Gamma();

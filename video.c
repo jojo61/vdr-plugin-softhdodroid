@@ -891,9 +891,31 @@ int GetApiLevel()
         "auto", "1080p50hz" ,"1080p60hz" , "2160p50hz" ,"2160p60hz" , "2160p50hz420" ,"2160p60hz420" 
     };
 
+	char attr[256], dc_cap[256];
+
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
+#if 0
+	amlGetString("/sys/class/amhdmitx/amhdmitx0/dc_cap",dc_cap);
+
+	if (strstr(dc_cap,"444,12bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","444,12bit");
+	} else if (strstr(dc_cap,"444,10bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","444,10bit");
+	} else if (strstr(dc_cap,"422,12bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","422,12bit");
+	} else if (strstr(dc_cap,"422,10bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","422,10bit");
+	} else if (strstr(dc_cap,"420,12bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,12bit");
+	} else if (strstr(dc_cap,"420,10bit")) {
+		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,10bit");
+	}
+	amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,10bit");
+	amlGetString("/sys/class/amhdmitx/amhdmitx0/attr",attr);
+	Debug(3,"Use Attr %s\n",attr);
+#endif
 	if (ScreenResolution > 0 && ScreenResolution < 7) {
 		fd = open("/sys/class/display/mode",O_RDWR);
 		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution])+1);
@@ -954,6 +976,9 @@ int GetApiLevel()
 
 		close(ttyfd);
 	}
+
+	
+
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d\n",apiLevel);
  };    
@@ -2082,7 +2107,7 @@ int amlSetString(char *path, char *valstr)
   int ret = 0;
   if (fd >= 0)
   {
-    if (write(fd, valstr, sizeof(*valstr)) < 0)
+    if (write(fd, valstr, sizeof(valstr)+1) < 0)
       ret = -1;
     close(fd);
   }
