@@ -897,32 +897,13 @@ int GetApiLevel()
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-#if 0
-	amlGetString("/sys/class/amhdmitx/amhdmitx0/dc_cap",dc_cap);
-
-	if (strstr(dc_cap,"444,12bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","444,12bit");
-	} else if (strstr(dc_cap,"444,10bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","444,10bit");
-	} else if (strstr(dc_cap,"422,12bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","422,12bit");
-	} else if (strstr(dc_cap,"422,10bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","422,10bit");
-	} else if (strstr(dc_cap,"420,12bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,12bit");
-	} else if (strstr(dc_cap,"420,10bit")) {
-		amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,10bit");
-	}
-	amlSetString("/sys/class/amhdmitx/amhdmitx0/attr","420,10bit");
-	amlGetString("/sys/class/amhdmitx/amhdmitx0/attr",attr);
-	Debug(3,"Use Attr %s\n",attr);
-#endif
 	if (ScreenResolution > 0 && ScreenResolution < 7) {
 		fd = open("/sys/class/display/mode",O_RDWR);
-		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution])+1);
+		write(fd,sr[ScreenResolution],strlen(sr[ScreenResolution]));
 		close(fd);
+		sleep(3);
 	}
-	sleep(3);
+	
 	if (ScreenResolution > 2) {
 		VideoWindowWidth = 3840;
 		VideoWindowHeight =  2160;
