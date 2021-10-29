@@ -1800,7 +1800,7 @@ cOglThread::cOglThread(cCondWait * startWait, int maxCacheSize):cThread("oglThre
     stalled = false;
     memCached = 0;
 
-    this->maxCacheSize = maxCacheSize * 1024 * 1024;
+    this->maxCacheSize = 0;
     this->startWait = startWait;
     wait = new cCondWait();
     maxTextureSize = 0;

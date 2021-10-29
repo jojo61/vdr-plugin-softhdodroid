@@ -168,9 +168,6 @@ static int ConfigPipAltVideoHeight = 50;    ///< config pip alt. video height in
 static char ConfigEnableDPMSatBlackScreen;  ///< Enable DPMS(Screensaver) while displaying black screen(radio)
 #endif
 
-#ifdef USE_OPENGLOSD
-static int ConfigMaxSizeGPUImageCache = 128;    ///< maximum size of GPU mem to be used for image caching
-#endif
 
 static volatile int DoMakePrimary;      ///< switch primary device to this
 
@@ -859,7 +856,7 @@ bool cSoftOsdProvider::StartOpenGlThread(void)
     cCondWait wait;
 
     dsyslog("[softhddev]Trying to start OpenGL Worker Thread");
-    oglThread.reset(new cOglThread(&wait, ConfigMaxSizeGPUImageCache));
+    oglThread.reset(new cOglThread(&wait, 0));
     wait.Wait();
     if (oglThread->Active()) {
         dsyslog("[softhddev]OpenGL Worker Thread successfully started");
@@ -1000,8 +997,6 @@ class cMenuSetupSoft:public cMenuSetupPage
     int PipAltVideoHeight;
 #endif
 
-    int MaxSizeGPUImageCache;
-
     /// @}
   private:
      inline cOsdItem * CollapsedItem(const char *, int &, const char * = NULL);
@@ -1081,7 +1076,6 @@ void cMenuSetupSoft::Create(void)
         Add(new cMenuEditBoolItem(tr("Make primary device"), &MakePrimary, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("Hide main menu entry"), &HideMainMenuEntry, trVDR("no"), trVDR("yes")));
     
-        Add(new cMenuEditIntItem(tr("GPU mem used for image caching (MB)"), &MaxSizeGPUImageCache, 0, 4000));
         //
         //  suspend
         //
@@ -1310,9 +1304,6 @@ cMenuSetupSoft::cMenuSetupSoft(void)
     AudioBufferTime = ConfigAudioBufferTime;
     AudioAutoAES = ConfigAudioAutoAES;
 
-    MaxSizeGPUImageCache = ConfigMaxSizeGPUImageCache;
-
-
     Create();
 }
 
@@ -1437,9 +1428,7 @@ void cMenuSetupSoft::Store(void)
     SetupStore("pip.Alt.VideoHeight", ConfigPipAltVideoHeight = PipAltVideoHeight);
 #endif
 
-#ifdef USE_OPENGLOSD
-    SetupStore("MaxSizeGPUImageCache", ConfigMaxSizeGPUImageCache = MaxSizeGPUImageCache);
-#endif
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2810,10 +2799,6 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
     if (!strcasecmp(name, "AudioAutoAES")) {
         ConfigAudioAutoAES = atoi(value);
         AudioSetAutoAES(ConfigAudioAutoAES);
-        return true;
-    }
-    if (!strcasecmp(name, "MaxSizeGPUImageCache")) {
-        ConfigMaxSizeGPUImageCache = atoi(value);
         return true;
     }
 
