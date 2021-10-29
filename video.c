@@ -308,15 +308,13 @@ int64_t VideoGetClock(const VideoHwDecoder *i) {};
 /// Get OSD size.
 void VideoGetOsdSize(int *width, int *height) {
 
-    *width = 1920;
-    *height = 1080;
+    *width = 0;
+    *height = 0;
 
 	if (OsdWidth && OsdHeight) {
         *width = OsdWidth;
         *height = OsdHeight;
     }
-	
-
 };
 
 /// Set OSD size.
@@ -367,8 +365,8 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 
  void VideoOsdInit(void) {
 
-	OsdWidth = VideoWindowWidth;
-	OsdHeight = VideoWindowHeight;
+	//OsdWidth = VideoWindowWidth;
+	//OsdHeight = VideoWindowHeight;
  	
  };         ///< Setup osd
 
@@ -411,6 +409,9 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 		close(fd);
 	}
 #endif
+
+	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
 
 	// Set text mode
 	int ttyfd = open("/dev/tty0", O_RDWR);
@@ -577,8 +578,8 @@ void ClearDisplay(void)
     fill_config.src_para.format = GE2D_FORMAT_S32_ARGB;
     fill_config.src_para.left = 0;
     fill_config.src_para.top = 0;
-    fill_config.src_para.width = OsdWidth; //width;
-    fill_config.src_para.height = OsdHeight; //height;
+    fill_config.src_para.width = VideoWindowWidth;
+    fill_config.src_para.height = VideoWindowHeight; 
     fill_config.src_para.x_rev = 0;
     fill_config.src_para.y_rev = 0;
 
@@ -597,8 +598,8 @@ void ClearDisplay(void)
 
     fillRect.src1_rect.x = 0;
     fillRect.src1_rect.y = 0;
-    fillRect.src1_rect.w = OsdWidth; //width;
-    fillRect.src1_rect.h = OsdHeight; //height;
+    fillRect.src1_rect.w = VideoWindowWidth;
+    fillRect.src1_rect.h = VideoWindowHeight; 
     fillRect.color = 0;
 
     io = ioctl(ge2d_fd, GE2D_FILLRECTANGLE, &fillRect);
@@ -921,13 +922,13 @@ int GetApiLevel()
 		write(fd,sr[ScreenResolution],sizeof(sr[ScreenResolution])+1);
 		close(fd);
 	}
-
+	sleep(3);
 	if (ScreenResolution > 2) {
-		OsdWidth = VideoWindowWidth = 3840;
-		OsdHeight =  VideoWindowHeight =  2160;
+		VideoWindowWidth = 3840;
+		VideoWindowHeight =  2160;
 	} else {
-		OsdWidth =  VideoWindowWidth = 1920;
-		OsdHeight =  VideoWindowHeight = 1080;
+		VideoWindowWidth = 1920;
+		VideoWindowHeight = 1080;
 	}
 	// enable alpha setting
 
@@ -951,8 +952,8 @@ int GetApiLevel()
 	info.transp.length = 8;
 
 	if (!ScreenResolution) {
-		OsdWidth =  VideoWindowWidth = info.xres;
-		OsdHeight =  VideoWindowHeight = info.yres;
+		VideoWindowWidth = info.xres;
+		VideoWindowHeight = info.yres;
 	}
 	
 	info.bits_per_pixel = 32;
@@ -976,8 +977,27 @@ int GetApiLevel()
 
 		close(ttyfd);
 	}
-
 	
+	if (VideoWindowWidth < 1920) {    // is screen is only 1280 or smaller
+		OsdWidth = VideoWindowWidth;
+		OsdHeight = VideoWindowHeight;
+	} else {
+		OsdWidth = 1920;
+		OsdHeight = 1080;
+	}
+
+	char fsaxis_str[256] = {0};
+	char waxis_str[256] = {0};
+
+	sprintf(fsaxis_str, "0 0 %d %d", OsdWidth-1, OsdHeight-1);
+	sprintf(waxis_str, "0 0 %d %d", VideoWindowWidth-1, VideoWindowHeight-1);
+
+	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+	amlSetString("/sys/class/graphics/fb0/free_scale_axis", fsaxis_str);
+	amlSetString("/sys/class/graphics/fb0/window_axis", waxis_str);
+	amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
+	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
+	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
 
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d\n",apiLevel);
@@ -1906,7 +1926,6 @@ void amlSetVideoAxis(int x, int y, int width, int height)
 	}
 
 	int params[4] = { x, y, width, height };
-		
 
 	int ret = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_AXIS, &params);
 
@@ -2107,7 +2126,7 @@ int amlSetString(char *path, char *valstr)
   int ret = 0;
   if (fd >= 0)
   {
-    if (write(fd, valstr, sizeof(valstr)+1) < 0)
+    if (write(fd, valstr, strlen(valstr)) < 0)
       ret = -1;
     close(fd);
   }
