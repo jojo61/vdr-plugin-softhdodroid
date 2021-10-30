@@ -288,9 +288,6 @@ extern void VideoSetCutLeftRight(int[]);
 /// Set studio levels.
 extern void VideoSetStudioLevels(int);
 
-/// Set Screen Resolution
-extern void VideoSetScreenResolution(int);
-
 /// Set background.
 extern void VideoSetBackground(uint32_t);
 

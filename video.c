@@ -75,7 +75,6 @@ static int VideoWindowX = 0;                ///< video output window x coordinat
 static int VideoWindowY = 0;                ///< video outout window y coordinate
 static int VideoWindowWidth = 1920;       ///< video output window width
 static int VideoWindowHeight = 1080;      ///< video output window height
-static int ScreenResolution;
 static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
@@ -242,7 +241,7 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 		height = (height * VideoWindowHeight) / OsdHeight;
 	}
 
-	amlSetVideoAxis(x,y,x+width,y+height);
+	amlSetVideoAxis(0,x,y,x+width,y+height);
 };
 
 /// Set 4 {} {};3 display format.
@@ -295,11 +294,7 @@ void VideoOsdClear(void) {
     ClearDisplay();
  };
 
- void VideoSetScreenResolution (int r) {
-	 ScreenResolution = r;
- }
-
-int64_t VideoGetClock(const VideoHwDecoder *i) {};
+ int64_t VideoGetClock(const VideoHwDecoder *i) {};
 
 
 /// Draw an OSD ARGB image.
@@ -885,32 +880,67 @@ int GetApiLevel()
     return;
 }
 
+bool getResolution(char *mode) {
+	 int width = 0, height = 0, rrate = 60;
+    char smode[2] = { 0 };
+
+    if (sscanf(mode, "%dx%dp%dhz", &width, &height, &rrate) == 3)
+    {
+      *smode = 'p';
+    }
+    else if (sscanf(mode, "%d%1[ip]%dhz", &height, smode, &rrate) >= 2)
+    {
+      switch (height)
+      {
+        case 480:
+        case 576:
+          width = 720;
+          break;
+        case 720:
+          width = 1280;
+          break;
+        case 1080:
+          width = 1920;
+          break;
+        case 2160:
+          width = 3840;
+          break;
+      }
+    }
+    else if (sscanf(mode, "%dcvbs", &height) == 1)
+    {
+      width = 720;
+      *smode = 'i';
+      rrate = (height == 576) ? 50 : 60;
+    }
+    else if (sscanf(mode, "4k2k%d", &rrate) == 1)
+    {
+      width = 3840;
+      height = 2160;
+      *smode = 'p';
+    }
+    else
+    {
+      return false;
+    }
+	VideoWindowWidth = width;
+	VideoWindowHeight = height;
+	return true;
+
+}
+
+
  void VideoInit(const char *i) 
  {
 
-	const char *const sr[] = {
-        "auto", "1080p50hz" ,"1080p60hz" , "2160p50hz" ,"2160p60hz" , "2160p50hz420" ,"2160p60hz420" 
-    };
-
-	char attr[256], dc_cap[256];
+	char mode[256];
 
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-	if (ScreenResolution > 0 && ScreenResolution < 7) {
-		fd = open("/sys/class/display/mode",O_RDWR);
-		write(fd,sr[ScreenResolution],strlen(sr[ScreenResolution]));
-		close(fd);
-		sleep(3);
-	}
-	
-	if (ScreenResolution > 2) {
-		VideoWindowWidth = 3840;
-		VideoWindowHeight =  2160;
-	} else {
-		VideoWindowWidth = 1920;
-		VideoWindowHeight = 1080;
-	}
+	amlGetString("/sys/class/display/mode",mode);
+	getResolution(mode);
+
 	// enable alpha setting
 
 	struct fb_var_screeninfo info;
@@ -931,12 +961,6 @@ int GetApiLevel()
 	info.blue.length = 8;
 	info.transp.offset = 24;
 	info.transp.length = 8;
-
-	if (!ScreenResolution) {
-		VideoWindowWidth = info.xres;
-		VideoWindowHeight = info.yres;
-	}
-	
 	info.bits_per_pixel = 32;
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
@@ -1038,7 +1062,7 @@ int GetApiLevel()
 	SetCurrentPts(avpkt->pts);
 	amlResume();
 	// GetVideoAxis();
-	amlSetVideoAxis(VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
+	amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
 	//GetVideoAxis();
 	
 };
@@ -1332,6 +1356,7 @@ void InternalOpen(int format, double frameRate)
 #endif
 	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_NORMAL;
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
+	//r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &screenMode);
 	if (r != 0)
 	{
 		printf("AMSTREAM_IOC_SET_SCREEN_MODE VIDEO_WIDEOPTION_NORMAL failed");
@@ -1792,6 +1817,7 @@ amlPause()
 
 	//codecMutex.Unlock();
 }
+
 amlResume()
 {
 	//codecMutex.Lock();
@@ -1815,7 +1841,7 @@ amlResume()
 	//codecMutex.Unlock();
 }
 
-amlClearVideo()
+amlClearVideo()  // unused
 {
 	//codecMutex.Lock();
 
@@ -1895,9 +1921,10 @@ void InternalClose()
 	isOpen = false;
 }
 
-void amlSetVideoAxis(int x, int y, int width, int height)
+void amlSetVideoAxis(int pip, int x, int y, int width, int height)
 {
 	//codecMutex.Lock();
+	int ret;
 
 	if (!isOpen)
 	{
@@ -1907,8 +1934,11 @@ void amlSetVideoAxis(int x, int y, int width, int height)
 	}
 
 	int params[4] = { x, y, width, height };
-
-	int ret = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_AXIS, &params);
+	if (!pip) {
+		ret = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_AXIS, &params);
+	} else {
+		ret = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_AXIS, &params);
+	}
 
 	//codecMutex.Unlock();
 
@@ -1918,7 +1948,7 @@ void amlSetVideoAxis(int x, int y, int width, int height)
 	}
 }
 
-void amlGetVideoAxis()
+void amlGetVideoAxis()  // unused
 {
 	//codecMutex.Lock();
 
@@ -1946,7 +1976,7 @@ void amlGetVideoAxis()
 }
 
 
-int amlGetBufferStatus()
+int amlGetBufferStatus()   // unused
 {
 	//codecMutex.Lock();
 
@@ -1996,7 +2026,7 @@ int amlGetBufferStatus()
 	return status.data_len;
 }
 
-void amlClearVBuf()
+void amlClearVBuf()   // unused
 {
 	//codecMutex.Lock();
 
@@ -2028,14 +2058,14 @@ void amlClearVBuf()
 	}
 }
 
-void amlSetVideoDelayLimit(int ms)
+void amlSetVideoDelayLimit(int ms)  // unused
 {
 	
     codec_h_ioctl_set (handle, AMSTREAM_SET_VIDEO_DELAY_LIMIT_MS, ms);
 
 }
 
-void amlDecReset()
+void amlDecReset()  // unused
 {
 	//codecMutex.Lock();
 
@@ -2079,7 +2109,7 @@ void amlFreerun(int val)
 	}	
 }
 
-void amlTrickMode(int val)
+void amlTrickMode(int val)  // unused
 {
 	//codecMutex.Lock();
 

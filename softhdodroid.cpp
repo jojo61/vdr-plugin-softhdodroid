@@ -1045,9 +1045,6 @@ inline cOsdItem *cMenuSetupSoft::CollapsedItem(const char *label, int &flag, con
 void cMenuSetupSoft::Create(void)
 {
 
-    static const char *const screenresolution[] = {
-        "auto", "1920x1080p50hz" ,"1920x1080p60hz" , "3840x2160p50hz" ,"3840x2160p60hz" , "3840x2160p50hz420" ,"3840x2160p60hz420" 
-    };
     static const char *const resolution[RESOLUTIONS] = {
         "576i", "720p", "fake 1080", "1080", "2160p"
     };
@@ -1091,8 +1088,7 @@ void cMenuSetupSoft::Create(void)
 
     if (Video) {
 
-        Add(new cMenuEditStraItem(tr("Screen Resolution (needs restart)"), &ScreenResolution, 7, screenresolution));
-        Add(new cMenuEditStraItem(tr("Monitor Type"), &TargetColorSpace, 4, target_colorspace));
+        //Add(new cMenuEditStraItem(tr("Monitor Type"), &TargetColorSpace, 4, target_colorspace));
         Add(new cMenuEditBoolItem(tr("Noise Reduction"), &Denoise, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("HDR to SDR Mode"), &HDR2SDR, trVDR("no"), trVDR("yes")));
         for (i = 0; i < RESOLUTIONS; ++i) {
@@ -1258,8 +1254,6 @@ cMenuSetupSoft::cMenuSetupSoft(void)
  
     StudioLevels = ConfigVideoStudioLevels;
  
-    ScreenResolution = ConfigScreenResolution;
-
     Brightness = ConfigVideoBrightness;
     Contrast = ConfigVideoContrast;
     Saturation = ConfigVideoSaturation;
@@ -1322,9 +1316,6 @@ void cMenuSetupSoft::Store(void)
     SetupStore("StudioLevels", ConfigVideoStudioLevels = StudioLevels);
     VideoSetStudioLevels(ConfigVideoStudioLevels);
     
-    SetupStore("ScreenResolution", ConfigScreenResolution = ScreenResolution);
-    VideoSetScreenResolution(ConfigScreenResolution);
-
     SetupStore("Brightness", ConfigVideoBrightness = Brightness);
     VideoSetBrightness(ConfigVideoBrightness);
     SetupStore("Contrast", ConfigVideoContrast = Contrast);
@@ -2624,10 +2615,6 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
     }
     if (!strcasecmp(name, "StudioLevels")) {
         VideoSetStudioLevels(ConfigVideoStudioLevels = atoi(value));
-        return true;
-    }
-    if (!strcasecmp(name, "ScreenResolution")) {
-        VideoSetScreenResolution(ConfigScreenResolution = atoi(value));
         return true;
     }
     if (!strcasecmp(name, "Brightness")) {
