@@ -953,12 +953,12 @@ bool getResolution(char *mode) {
 	info.xoffset = 0;
 	info.yoffset = 0;
 	info.activate = FB_ACTIVATE_ALL;
-	info.red.offset = 16;
-	info.red.length = 8;
-	info.green.offset = 8;
-	info.green.length = 8;
 	info.blue.offset = 0;
 	info.blue.length = 8;
+	info.green.offset = 8;
+	info.green.length = 8;
+	info.red.offset = 16;
+	info.red.length = 8;
 	info.transp.offset = 24;
 	info.transp.length = 8;
 	info.bits_per_pixel = 32;

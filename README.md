@@ -55,6 +55,12 @@ Install:
 	You should adapt config.ini in /media/boot and change the Screensettings from hdmimode=1080p60hz to your preferred 
 	Resolution. Also set display_autodetect=false
 
+	If you want to have 10Bit colordepth you should insert something like that in rc.local:
+	echo 420,10bit >/sys/class/amhdmitx/amhdmitx0/attr
+	echo 2160p50hz >/sys/class/display/mode
+	You need a UHD Display for this. All FullHD Displays are only 8 Bit.
+
+
 
  
 
