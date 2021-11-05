@@ -26,10 +26,11 @@
 
 
 //#include <GL/glew.h>
-//#define EGL_EGLEXT_PROTOTYPES
+#define EGL_EGLEXT_PROTOTYPES
 #define MESA_EGL_NO_X11_HEADERS
 #include <EGL/egl.h>
-//#include <EGL/eglext.h>
+#include <libdrm/drm_fourcc.h>
+#include <EGL/eglext.h>
 
 #include "ge2d.h"
 #include "ge2d_cmd.h"
@@ -39,6 +40,21 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
+
+// EGL_EXT_image_dma_buf_import
+#define EGL_LINUX_DMA_BUF_EXT          0x3270
+
+#define EGL_LINUX_DRM_FOURCC_EXT        0x3271
+#define EGL_DMA_BUF_PLANE0_FD_EXT       0x3272
+#define EGL_DMA_BUF_PLANE0_OFFSET_EXT   0x3273
+#define EGL_DMA_BUF_PLANE0_PITCH_EXT    0x3274
+#define EGL_DMA_BUF_PLANE1_FD_EXT       0x3275
+#define EGL_DMA_BUF_PLANE1_OFFSET_EXT   0x3276
+#define EGL_DMA_BUF_PLANE1_PITCH_EXT    0x3277
+#define EGL_DMA_BUF_PLANE2_FD_EXT       0x3278
+#define EGL_DMA_BUF_PLANE2_OFFSET_EXT   0x3279
+#define EGL_DMA_BUF_PLANE2_PITCH_EXT    0x327A
+#define EGL_YUV_COLOR_SPACE_HINT_EXT    0x327B
 
 #define USE_DRM
 
@@ -730,18 +746,40 @@ cOglOutputFb::~cOglOutputFb(void)
     glDeleteFramebuffers(1, &fb);
 }
 
+extern int DmaBufferHandle;
 bool cOglOutputFb::Init(void)
 {
     initiated = true;
 
-    glGenTextures(1, &texture);
+	glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    void *frameBufferImage = {0};
+
+    if (DmaBufferHandle >= 0 ) {
+        EGLint img_attrs[] = {
+                EGL_WIDTH, width,
+                EGL_HEIGHT, height,
+                EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,	//DRM_FORMAT_RGBA8888
+                EGL_DMA_BUF_PLANE0_FD_EXT,	DmaBufferHandle,
+                EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+                EGL_DMA_BUF_PLANE0_PITCH_EXT, width * 4,
+                EGL_NONE
+            };
+
+        frameBufferImage = eglCreateImageKHR(eglDisplay, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, 0, img_attrs);
+        GlxCheck();
+    } else {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
+
     GlxCheck();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    if (DmaBufferHandle >= 0)
+        glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, frameBufferImage);
 
     glGenFramebuffers(1, &fb);
     glBindFramebuffer(GL_FRAMEBUFFER, fb);
@@ -1038,7 +1076,15 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     
 
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
-    
+
+    if (DmaBufferHandle >= 0) {
+        fb->BindRead();
+        oFb->BindWrite();
+        fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
+        oFb->Unbind();
+        return true;
+    }
+
     fb->BindRead();
   
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

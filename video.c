@@ -155,7 +155,7 @@ bool doResumeFlag = false;
 
 AVRational timeBase;
 
-int handle,cntl_handle,fd;
+int handle,cntl_handle,fd,DmaBufferHandle;
 
 const char* CODEC_VIDEO_ES_DEVICE = "/dev/amstream_vbuf";
 const char* CODEC_VIDEO_ES_HEVC_DEVICE = "/dev/amstream_hevc";
@@ -929,6 +929,8 @@ bool getResolution(char *mode) {
 
 }
 
+// OSD dma_buf experimental support
+#define FBIOGET_OSD_DMABUF               0x46fc
 
  void VideoInit(const char *i) 
  {
@@ -944,6 +946,7 @@ bool getResolution(char *mode) {
 	// enable alpha setting
 
 	struct fb_var_screeninfo info;
+	uint32_t h[3];
 
 	fd = open("/dev/fb0", O_RDWR);
 	ioctl(fd, FBIOGET_VSCREENINFO, &info);
@@ -964,6 +967,12 @@ bool getResolution(char *mode) {
 	info.bits_per_pixel = 32;
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
+	if (ioctl(fd, FBIOGET_OSD_DMABUF, &h) < 0) {
+	  	DmaBufferHandle = -1;
+	} else {
+		DmaBufferHandle = h[1];
+	}
+
 	close(fd);
 
 	// Set graphics mode
