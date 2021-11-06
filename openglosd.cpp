@@ -746,7 +746,7 @@ cOglOutputFb::~cOglOutputFb(void)
     glDeleteFramebuffers(1, &fb);
 }
 
-extern int DmaBufferHandle;
+extern int DmaBufferHandle, VideoWindowWidth, VideoWindowHeight;
 bool cOglOutputFb::Init(void)
 {
     initiated = true;
@@ -757,12 +757,12 @@ bool cOglOutputFb::Init(void)
 
     if (DmaBufferHandle >= 0 ) {
         EGLint img_attrs[] = {
-                EGL_WIDTH, width,
-                EGL_HEIGHT, height,
+                EGL_WIDTH, VideoWindowWidth,
+                EGL_HEIGHT, VideoWindowHeight,
                 EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,	//DRM_FORMAT_RGBA8888
                 EGL_DMA_BUF_PLANE0_FD_EXT,	DmaBufferHandle,
                 EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-                EGL_DMA_BUF_PLANE0_PITCH_EXT, width * 4,
+                EGL_DMA_BUF_PLANE0_PITCH_EXT, VideoWindowWidth * 4,
                 EGL_NONE
             };
 
@@ -2280,6 +2280,7 @@ bool cOglThread::InitOpenGL(void)
 
     glDisable(GL_DEPTH_TEST);
     GlxCheck();
+    OsdClose();
     return true;
 
 }

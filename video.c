@@ -73,8 +73,8 @@ static OdroidDecoder *OdroidDecoders[2];  ///< open decoder streams
 static struct timespec OdroidFrameTime;  ///< time of last display
 static int VideoWindowX = 0;                ///< video output window x coordinate
 static int VideoWindowY = 0;                ///< video outout window y coordinate
-static int VideoWindowWidth = 1920;       ///< video output window width
-static int VideoWindowHeight = 1080;      ///< video output window height
+int VideoWindowWidth = 1920;       ///< video output window width
+int VideoWindowHeight = 1080;      ///< video output window height
 static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
@@ -565,6 +565,7 @@ void ClearDisplay(void)
 	int io;
    extern int ge2d_fd;
 
+
 	// Configure src/dst
     struct config_para_ex_ion_s fill_config = { 0 };
     fill_config.alu_const_color = 0xffffffff;
@@ -595,7 +596,7 @@ void ClearDisplay(void)
     fillRect.src1_rect.y = 0;
     fillRect.src1_rect.w = VideoWindowWidth;
     fillRect.src1_rect.h = VideoWindowHeight; 
-    fillRect.color = 0;
+	fillRect.color = 0;
 
     io = ioctl(ge2d_fd, GE2D_FILLRECTANGLE, &fillRect);
     if (io < 0)
@@ -999,6 +1000,9 @@ bool getResolution(char *mode) {
 		OsdWidth = 1920;
 		OsdHeight = 1080;
 	}
+		
+	if (VideoWindowWidth > 1920)
+		DmaBufferHandle = -1;			// disable dma for UHD  FIXME
 
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};
