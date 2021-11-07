@@ -939,8 +939,8 @@ bool getResolution(char *mode) {
 // OSD dma_buf experimental support
 #define FBIOGET_OSD_DMABUF               0x46fc
 
- void VideoInit(const char *i) 
- {
+void VideoInit(const char *i) 
+{
 	
 
 	char mode[256];
@@ -1033,12 +1033,12 @@ bool getResolution(char *mode) {
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d  usiing OSD dma: %s\n",apiLevel,(DmaBufferHandle >= 0) ? "yes": "no");
 	ClearDisplay();
- };    
+};    
  
 ///< Setup video module.
 // Open video codec.
- void CodecVideoOpen(VideoDecoder *decoder, int codec_id, AVPacket *avpkt)
- {
+void CodecVideoOpen(VideoDecoder *decoder, int codec_id, AVPacket *avpkt)
+{
 
 	switch (codec_id)
 	{
@@ -1073,7 +1073,7 @@ bool getResolution(char *mode) {
 		break;
 
 	default:
-			printf("Unknown Viedo Codec\n");
+			printf("Unknown Video Codec\n");
 			return;
 		
 	}
