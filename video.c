@@ -131,6 +131,8 @@ enum AudioFormatEnum
 	PcmS24LE
 };
 
+
+
 int videoFormat = 0;
 int width;
 int height;
@@ -375,6 +377,8 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 	int fd_m;
 	struct fb_var_screeninfo info;
 
+	InternalClose();
+
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -395,6 +399,8 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 	info.yres_virtual = info.yres * 2;
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
+
+	close (ge2d_fd);
 
 #if 0
 	char vid60hz[] = "1080p60hz";
@@ -935,11 +941,18 @@ bool getResolution(char *mode) {
 
  void VideoInit(const char *i) 
  {
+	
 
 	char mode[256];
 
 	timeBase.num = 1;
 	timeBase.den = 90000;
+
+	ge2d_fd = open("/dev/ge2d", O_RDWR);
+    if (ge2d_fd < 0)
+    {
+        printf("open /dev/ge2d failed.");
+    }
 
 	amlGetString("/sys/class/display/mode",mode);
 	getResolution(mode);
@@ -1000,7 +1013,7 @@ bool getResolution(char *mode) {
 		OsdWidth = 1920;
 		OsdHeight = 1080;
 	}
-		
+
 	if (VideoWindowWidth > 1920)
 		DmaBufferHandle = -1;			// disable dma for UHD  FIXME
 
@@ -1018,7 +1031,8 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
 
 	GetApiLevel();
-	Debug(3,"aml ApiLevel = %d\n",apiLevel);
+	Debug(3,"aml ApiLevel = %d  usiing OSD dma: %s\n",apiLevel,(DmaBufferHandle >= 0) ? "yes": "no");
+	ClearDisplay();
  };    
  
 ///< Setup video module.

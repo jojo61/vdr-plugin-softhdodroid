@@ -1072,9 +1072,6 @@ unsigned char posd[3840*2160*4];
 
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
-    static int t=0;
-    
-
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
 
     if (DmaBufferHandle >= 0) {
@@ -1868,7 +1865,7 @@ cOglThread::~cOglThread()
     wait = NULL;
     ClearCursor(0);
     //close(fd);
-    close(ge2d_fd);
+    //close(ge2d_fd);
     close(ion_fd);
 }
 
@@ -2038,14 +2035,6 @@ void cOglThread::Action(void)
     }
     dsyslog("[softhddev]Shaders initialized");
 
-    if (!InitVdpauInterop()) {
-        esyslog("[softhddev]: vdpau interop NOT initialized");
-        Cleanup();
-        startWait->Signal();
-        return;
-    }
-    dsyslog("[softhddev]vdpau interop initialized");
-
     if (!InitVertexBuffers()) {
         esyslog("[softhddev]: Vertex Buffers NOT initialized");
         Cleanup();
@@ -2094,30 +2083,12 @@ bool cOglThread::InitOpenGL(void)
     EGLNativeDisplayType nativeDisplay=EGL_DEFAULT_DISPLAY;
     
 #if 0
-    fd = open("/dev/fb0", O_RDWR);
-	if (fd < 0) {
-		printf("open /dev/fb0 failed.");
-    }
-
-    // Set the video layer axis
-    struct fb_var_screeninfo var_info;
-    if (ioctl(fd, FBIOGET_VSCREENINFO, &var_info) < 0)
-    {
-        printf("FBIOGET_VSCREENINFO failed.");
-    }
-
-    printf("axis: width=%d, height=%d\n",
-    	var_info.width,
-    	var_info.height);
-
-    //width = var_info.xres;
-    //height = var_info.yres;
-#endif
    	ge2d_fd = open("/dev/ge2d", O_RDWR);
     if (ge2d_fd < 0)
     {
         printf("open /dev/ge2d failed.");
     }
+#endif
 
 	ion_fd = open("/dev/ion", O_RDWR);
 	if (ion_fd < 0)
@@ -2148,13 +2119,11 @@ bool cOglThread::InitOpenGL(void)
 #endif
     
     const EGLint configAttributes[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,      
         EGL_ALPHA_SIZE, 0,
         EGL_RED_SIZE, 8,
         EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        
+        EGL_BLUE_SIZE, 8,       
         EGL_DEPTH_SIZE, 16,
         EGL_STENCIL_SIZE, 0,
         EGL_BUFFER_SIZE,  32,
@@ -2169,8 +2138,7 @@ bool cOglThread::InitOpenGL(void)
 	{
 		GlxCheck();
 	}
-
-    
+  
     EGLConfig* configs = new EGLConfig[num_configs];
 	success = eglChooseConfig(eglDisplay, configAttributes, configs, num_configs, &num_configs);
 	if (success != EGL_TRUE)
@@ -2178,7 +2146,6 @@ bool cOglThread::InitOpenGL(void)
         printf("No EGL Config found\n");
 		GlxCheck();
 	}
-
 
 	EGLConfig match = 0;
 
@@ -2220,6 +2187,7 @@ bool cOglThread::InitOpenGL(void)
         EGL_NONE
     };
 
+#if 0   
     EGLint windowAttributes[] =
     {
         EGL_RENDER_BUFFER,     EGL_BACK_BUFFER,
@@ -2230,13 +2198,10 @@ bool cOglThread::InitOpenGL(void)
          * EGL_NONE
          */
     };
-    
-    fbdev_window window;
 
+    fbdev_window window;
     window.height = MyOsdHeight;
     window.width =  MyOsdWidth;
-
-#if 0
     eglSurface = eglCreateWindowSurface(eglDisplay, match, (EGLNativeWindowType)(&window), windowAttributes);
     GlxCheck();
     if (eglSurface  == EGL_NO_SURFACE) {
@@ -2301,20 +2266,6 @@ void cOglThread::DeleteShaders(void)
 {
     for (int i = 0; i < stCount; i++)
         delete Shaders[i];
-}
-
-bool cOglThread::InitVdpauInterop(void)
-{
-#if 0
-    void *vdpDevice = GetVDPAUDevice();
-    void *procAdress = GetVDPAUProcAdress();
-
-    while (glGetError() != GL_NO_ERROR) ;
-    glVDPAUInitNV(vdpDevice, procAdress);
-    if (glGetError() != GL_NO_ERROR)
-        return false;
-#endif
-    return true;
 }
 
 bool cOglThread::InitVertexBuffers(void)

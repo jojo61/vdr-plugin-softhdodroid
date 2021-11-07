@@ -168,7 +168,7 @@ struct __video_stream__
 //----------------------------------------------------------------------------
 //  Variables
 //----------------------------------------------------------------------------
-
+extern int ge2d_fd;
 extern signed char VideoHardwareDecoder;    ///< flag use hardware decoder
 extern char VideoIgnoreRepeatPict;      ///< disable repeat pict warning
 extern int VideoAudioDelay;             ///< audio/video delay
