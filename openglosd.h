@@ -289,6 +289,7 @@ class cOglOutputFb:public cOglFb
      cOglOutputFb(GLint width, GLint height);
      virtual ~ cOglOutputFb(void);
     virtual bool Init(void);
+    void BindRead(void);
     virtual void BindWrite(void);
     virtual void Unbind(void);
 };

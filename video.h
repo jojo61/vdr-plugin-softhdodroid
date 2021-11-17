@@ -25,7 +25,7 @@
 
 #include <libavcodec/avcodec.h>
 #include "iatomic.h"
-
+#include "ion.h"
 
 typedef enum _video_resolutions_
 {
@@ -114,7 +114,32 @@ struct _video_decoder_
     int filter;                         // flag for deint filter
 };
 
+struct Rectangle
+{
+	float X;
+	float Y;
+	float Width;
+	float Height;
+};
 
+struct PackedColor
+{
+	unsigned char R;
+	unsigned char G;
+	unsigned char B;
+	unsigned char A;
+};
+struct IonSurface
+{
+	size_t length;
+	int stride;
+	ion_user_handle_t ion_handle;
+	int share_fd;
+	//void* map_ptr;
+	struct Rectangle rect;
+	float z_order;
+	struct PackedColor color;
+};
 
 //----------------------------------------------------------------------------
 //  Typedefs
@@ -163,12 +188,12 @@ struct __video_stream__
 
 
 
-
+#define ALIGN(val, align)	(((val) + (align) - 1) & ~((align) - 1))
 
 //----------------------------------------------------------------------------
 //  Variables
 //----------------------------------------------------------------------------
-extern int ge2d_fd;
+extern int ge2d_fd, ion_fd;
 extern signed char VideoHardwareDecoder;    ///< flag use hardware decoder
 extern char VideoIgnoreRepeatPict;      ///< disable repeat pict warning
 extern int VideoAudioDelay;             ///< audio/video delay

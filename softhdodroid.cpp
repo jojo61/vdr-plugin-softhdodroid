@@ -36,11 +36,10 @@
 
 #include "softhddev.h"
 #include "softhddevice.h"
-//#include "softhddevice_service.h"
+#include "softhddevice_service.h"
 
-#ifdef USE_OPENGLOSD
 #include "openglosd.h"
-#endif
+
 
 extern "C"
 {
@@ -2802,7 +2801,65 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
 bool cPluginSoftHdDevice::Service(const char *id, void *data)
 {
     // dsyslog("[softhddev]%s: id %s\n", __FUNCTION__, id);
- 
+    if (strcmp(id, OSD_3DMODE_SERVICE) == 0) {
+        SoftHDDevice_Osd3DModeService_v1_0_t *r;
+
+        r = (SoftHDDevice_Osd3DModeService_v1_0_t *) data;
+        VideoSetOsd3DMode(r->Mode);
+        return true;
+    }
+
+    if (strcmp(id, ATMO_GRAB_SERVICE) == 0) {
+        int width;
+        int height;
+
+        if (data == NULL) {
+            return true;
+        }
+
+        if (SuspendMode != NOT_SUSPENDED) {
+            return false;
+        }
+
+        SoftHDDevice_AtmoGrabService_v1_0_t *r = (SoftHDDevice_AtmoGrabService_v1_0_t *) data;
+
+        if (r->structSize != sizeof(SoftHDDevice_AtmoGrabService_v1_0_t)
+            || r->analyseSize < 64 || r->analyseSize > 256 || r->clippedOverscan < 0 || r->clippedOverscan > 200) {
+            return false;
+        }
+
+        width = r->analyseSize * -1;    // Internal marker for Atmo grab service
+        height = r->clippedOverscan;
+
+        r->img = VideoGrabService(&r->imgSize, &width, &height);
+        if (r->img == NULL) {
+            return false;
+        }
+        r->imgType = GRAB_IMG_RGBA_FORMAT_B8G8R8A8;
+        r->width = width;
+        r->height = height;
+        return true;
+    }
+
+    if (strcmp(id, ATMO1_GRAB_SERVICE) == 0) {
+        SoftHDDevice_AtmoGrabService_v1_1_t *r;
+
+        if (!data) {
+            return true;
+        }
+
+        if (SuspendMode != NOT_SUSPENDED) {
+            return false;
+        }
+
+        r = (SoftHDDevice_AtmoGrabService_v1_1_t *) data;
+        r->img = VideoGrabService(&r->size, &r->width, &r->height);
+        if (!r->img) {
+            return false;
+        }
+        return true;
+    }
+
     return false;
 }
 

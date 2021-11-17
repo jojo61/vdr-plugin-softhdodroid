@@ -53,21 +53,13 @@
 #define true True
 #define bool Bool
 
-struct Rectangle
-{
-   float X;
-	float Y;
-	float Width;
-	float Height;
-};
-
-struct PackedColor
-{
-	unsigned char R;
-	unsigned char G;
-	unsigned char B;
-	unsigned char A;
-};
+typedef struct
+{ 
+    uint32_t x0; 
+    uint32_t y0;
+    uint32_t x1;
+    uint32_t y1;
+} VdpRect;
 
 static OdroidDecoder *OdroidDecoders[2];  ///< open decoder streams
 static struct timespec OdroidFrameTime;  ///< time of last display
@@ -348,11 +340,276 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 	}
 };
 
-/// Grab screen.
- uint8_t *VideoGrab(int *i, int *j, int *k, int l) {};
-
 /// Grab screen raw.
- uint8_t *VideoGrabService(int *i, int *j, int *k) {};
+ uint8_t *VideoGrabService(int *size, int *width, int *height) {
+	 return VideoGrab(size,width,height,0);
+ };
+
+
+#define ION_IOC_MESON_PHYS_ADDR             8
+
+struct meson_phys_data {
+	int handle;
+	unsigned int phys_addr;
+	unsigned int size;
+};
+
+
+extern unsigned char posd[];
+uint8_t GrabVideo(char *base, int width, int height) {
+
+#if 1
+
+	return false;
+#else
+
+	memcpy(base, posd, width * height * 4);
+	printf("copy %d*%d\n",width,height);
+	return true;
+
+	char vdec_status[512];
+	amlGetString("/sys/class/vdec/vdec_status",vdec_status);
+	int vw,vh;
+
+	if(strstr(vdec_status,"No vdec")) {
+		return false;
+	}
+
+	sscanf(strstr(vdec_status,"width"),"width : %d",&vw);
+	sscanf(strstr(vdec_status,"height"),"height : %d",&vh);
+	printf("Video is %d-%d\n",vw,vh);
+
+	int handle1,io;
+	// Allocate a buffer
+	int stride = ALIGN(width * 4,64);
+	struct ion_allocation_data allocation_data = { 0 };
+	allocation_data.len = height * stride;
+	allocation_data.heap_id_mask =  (1 << ION_HEAP_TYPE_DMA); // ION_HEAP_CARVEOUT_MASK;
+	allocation_data.align = 64;
+	allocation_data.flags = 0;
+
+	//allocation_data.flags = ION_FLAG_CACHED_NEEDS_SYNC; //ION_FLAG_CACHED;
+
+	io = ioctl(ion_fd, ION_IOC_ALLOC, &allocation_data);
+	if (io != 0)
+	{
+		printf("ION_IOC_ALLOC failed. %d\n",io);
+		return false;
+	}
+
+	printf("ion handle=%d\n", allocation_data.handle);
+
+	struct IonSurface surface = { 0 };
+    surface.length = height * stride;
+    surface.stride = stride;
+    surface.ion_handle = allocation_data.handle;
+                
+    surface.rect.X = 0; 
+    surface.rect.Y = 0;
+    surface.rect.Width = VideoWindowWidth;
+    surface.rect.Height = VideoWindowHeight;
+    surface.color.R = 0;
+    surface.color.G = 0;
+    surface.color.B = 0;
+    surface.color.A = 0;
+    surface.z_order = 0.0;
+
+	// Map/share the buffer
+	struct ion_fd_data ionData = { 0 };
+	ionData.handle = allocation_data.handle;
+
+	io = ioctl(ion_fd, ION_IOC_SHARE, &ionData);
+	if (io != 0)
+	{
+		printf("ION_IOC_SHARE failed.\n");
+		return false;
+	}
+
+	printf("ion map=%d\n", ionData.fd);
+
+	void* result = mmap(NULL,
+			allocation_data.len,
+			PROT_READ | PROT_WRITE,
+			MAP_FILE | MAP_SHARED,
+			ionData.fd,
+			0);
+
+	if (result == MAP_FAILED)
+	{
+		printf("mmap failed.\n");
+		return false;
+	}
+
+	// Assignment
+	handle1 = allocation_data.handle;
+	//exportHandle = ionData.fd;
+	//length = allocation_data.len;
+	//physicalAddress = physData.phys_addr;
+
+	// Configure GE2D
+	struct config_para_ex_ion_s configex = { 0 };
+
+	configex.src_para.format = GE2D_FORMAT_S32_ABGR;
+	configex.src_para.mem_type = CANVAS_OSD0;
+	configex.src_para.left = 0;
+	configex.src_para.top = 0;
+	configex.src_para.width = vw; //VideoWindowWidth;
+	configex.src_para.height = vh; //VideoWindowHeight;
+
+	configex.src2_para.mem_type = CANVAS_TYPE_INVALID;
+
+	configex.dst_para.mem_type = CANVAS_ALLOC;
+	configex.dst_para.format = GE2D_FORMAT_S32_ABGR;
+	configex.dst_para.left = 0;
+	configex.dst_para.top = 0;
+	configex.dst_para.width = VideoWindowWidth;
+	configex.dst_para.height = VideoWindowHeight;
+	//configex.dst_planes[0].addr = physData.phys_addr;
+	configex.dst_planes[0].shared_fd = ionData.fd;
+	configex.dst_planes[0].w = VideoWindowWidth;
+	configex.dst_planes[0].h = VideoWindowHeight;
+	
+
+	io = ioctl(ge2d_fd, GE2D_CONFIG_EX_ION, &configex);
+	if (io < 0)
+	{
+		printf("GE2D_CONFIG_EX failed.\n");
+		return false;
+	}
+
+	//  Blit rectangle
+	struct ge2d_para_s blitRect = { 0 };
+
+	blitRect.src1_rect.x = 0;
+	blitRect.src1_rect.y = 0;
+	blitRect.src1_rect.w = vw*2; //VideoWindowWidth;
+	blitRect.src1_rect.h = vh*3; //VideoWindowHeight;
+
+	blitRect.dst_rect.x = 0;
+	blitRect.dst_rect.y = 0;
+	blitRect.dst_rect.w = width;
+	blitRect.dst_rect.h = height;
+
+	// Color conversion
+	io = ioctl(ge2d_fd, GE2D_STRETCHBLIT, &blitRect);
+	if (io < 0)
+	{
+		printf("GE2D_STRETCHBLIT_NOALPHA failed.\n");
+		return false;
+	}
+
+	// Copy to base
+	memcpy(base, result, width * height * 4);
+
+	munmap(result,allocation_data.len);
+
+	// Free resources
+    close(ionData.fd);
+
+	// Free buffer
+	struct ion_handle_data ionHandleData = { 0 };
+	ionHandleData.handle = handle1;
+
+	io = ioctl(ion_fd, ION_IOC_FREE, &ionHandleData);
+	if (io != 0)
+	{
+		printf("ION_IOC_FREE failed.\n");
+	}
+
+	return true;
+#endif
+}
+
+
+///
+/// Grab output surface already locked.
+///
+/// @param ret_size[out]    size of allocated surface copy
+/// @param ret_width[in,out]    width of output
+/// @param ret_height[in,out]   height of output
+///
+uint8_t *VideoGrab(int *ret_size, int *ret_width, int *ret_height, int mitosd)
+{
+    uint32_t size;
+    uint32_t width;
+    uint32_t height;
+    uint8_t *base;
+    VdpRect source_rect;
+
+    if (!isOpen)                // no video aktiv
+        return NULL;
+
+    // get real surface size
+
+    width = VideoWindowWidth;
+    height = VideoWindowHeight;
+
+    // Debug(3, "video/cuvid: grab %dx%d\n", width, height);
+
+    source_rect.x0 = 0;
+    source_rect.y0 = 0;
+    source_rect.x1 = width;
+    source_rect.y1 = height;
+
+    if (ret_width && ret_height) {
+        if (*ret_width <= -64) {        // this is an Atmo grab service request
+            int overscan;
+
+            // calculate aspect correct size of analyze image
+            width = *ret_width * -1;
+            height = (width * source_rect.y1) / source_rect.x1;
+
+            // calculate size of grab (sub) window
+            overscan = *ret_height;
+
+            if (overscan > 0 && overscan <= 200) {
+                source_rect.x0 = source_rect.x1 * overscan / 1000;
+                source_rect.x1 -= source_rect.x0;
+                source_rect.y0 = source_rect.y1 * overscan / 1000;
+                source_rect.y1 -= source_rect.y0;
+            }
+        } else {
+            if (*ret_width > 0 && (unsigned)*ret_width < width) {
+                width = *ret_width;
+            }
+            if (*ret_height > 0 && (unsigned)*ret_height < height) {
+                height = *ret_height;
+            }
+        }
+
+        printf("video/cuvid: grab source  dim %dx%d\n", width, height);
+
+        size = width * height * sizeof(uint32_t);
+
+        base = malloc(size);
+
+        if (!base) {
+            Debug(3,"video/cuvid: out of memory\n");
+            return NULL;
+        }
+        
+		if (!GrabVideo(base,width,height)) {
+			free(base);
+			return NULL;
+		}
+
+        // Debug(3,"got grab data\n");
+
+        if (ret_size) {
+            *ret_size = size;
+        }
+        if (ret_width) {
+            *ret_width = width;
+        }
+        if (ret_height) {
+            *ret_height = height;
+        }
+        return base;
+    }
+
+    return NULL;
+}
+
 
 /// Get decoder statistics.
  void VideoGetStats(VideoHwDecoder *i, int *j, int *k, int *l, int *m, float *n, int *o, int *p, int *q, int *r) {};
@@ -379,42 +636,7 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 
 	InternalClose();
 
-	fd_m = open("/dev/fb0", O_RDWR);
-	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
-	info.reserved[0] = 0;
-	info.reserved[1] = 0;
-	info.reserved[2] = 0;
-	info.xoffset = 0;
-	info.yoffset = 0;
-	info.activate = FB_ACTIVATE_NOW;
-	info.red.offset = 16;
-	info.red.length = 8;
-	info.green.offset = 8;
-	info.green.length = 8;
-	info.blue.offset = 0;
-	info.blue.length = 8;
-	info.transp.offset = 24;
-	info.transp.length = 0;
-	info.nonstd = 1;
-	info.yres_virtual = info.yres * 2;
-	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
-	close(fd_m);
-
-	close (ge2d_fd);
-
-#if 0
-	char vid60hz[] = "1080p60hz";
-	if (ScreenResolution) {
-		fd = open("/sys/class/display/mode",O_RDWR);
-		write(fd,vid60hz,sizeof(vid60hz));
-		close(fd);
-	}
-#endif
-
-	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
-	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
-
-	// Set text mode
+// Set text mode
 	int ttyfd = open("/dev/tty0", O_RDWR);
 	if (ttyfd < 0)
 	{
@@ -429,6 +651,37 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 		}
 		close(ttyfd);
 	}
+
+	fd_m = open("/dev/fb0", O_RDWR);
+	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
+	info.reserved[0] = 0;
+	info.reserved[1] = 0;
+	info.reserved[2] = 0;
+	info.xoffset = 0;
+	info.yoffset = 0;
+	info.activate = FB_ACTIVATE_ALL;
+	info.red.offset = 16;
+	info.red.length = 8;
+	info.green.offset = 8;
+	info.green.length = 8;
+	info.blue.offset = 0;
+	info.blue.length = 8;
+	info.transp.offset = 24;
+	info.transp.length = 0;
+	info.nonstd = 1;
+	info.xres = VideoWindowWidth;
+	info.yres = VideoWindowHeight;
+	info.xres_virtual = VideoWindowWidth;
+	info.yres_virtual = VideoWindowHeight*2;
+	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
+	close(fd_m);
+
+	close (ge2d_fd);
+
+	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
+
+	
  };            ///< Cleanup and exit video module.
 
 
@@ -585,13 +838,14 @@ void ClearDisplay(void)
     fill_config.src_para.x_rev = 0;
     fill_config.src_para.y_rev = 0;
 
-    fill_config.dst_para = fill_config.src_para;
+	fill_config.dst_para = fill_config.src_para;
     
 
     io = ioctl(ge2d_fd, GE2D_CONFIG_EX_ION, &fill_config);
     if (io < 0)
     {
-        printf("GE2D_CONFIG failed. Clear Display");
+        printf("GE2D_CONFIG failed. Clear Display\n");
+		return;
     }
 
 
@@ -602,6 +856,7 @@ void ClearDisplay(void)
     fillRect.src1_rect.y = 0;
     fillRect.src1_rect.w = VideoWindowWidth;
     fillRect.src1_rect.h = VideoWindowHeight; 
+	
 	fillRect.color = 0;
 
     io = ioctl(ge2d_fd, GE2D_FILLRECTANGLE, &fillRect);
@@ -953,7 +1208,7 @@ void VideoInit(const char *i)
     {
         printf("open /dev/ge2d failed.");
     }
-
+	ClearDisplay();
 	amlGetString("/sys/class/display/mode",mode);
 	getResolution(mode);
 
@@ -979,8 +1234,14 @@ void VideoInit(const char *i)
 	info.transp.offset = 24;
 	info.transp.length = 8;
 	info.bits_per_pixel = 32;
+	Debug(3,"Initial Screen %d-%d\n",info.xres,info.yres);
+	info.xres = VideoWindowWidth-1;
+	info.yres = VideoWindowHeight;
+	info.xres_virtual = VideoWindowWidth-1;
+	info.yres_virtual = VideoWindowHeight*2;
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
+
 	if (ioctl(fd, FBIOGET_OSD_DMABUF, &h) < 0) {
 	  	DmaBufferHandle = -1;
 	} else {
@@ -1014,9 +1275,6 @@ void VideoInit(const char *i)
 		OsdHeight = 1080;
 	}
 
-	if (VideoWindowWidth > 1920)
-		DmaBufferHandle = -1;			// disable dma for UHD  FIXME
-
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};
 
@@ -1029,10 +1287,9 @@ void VideoInit(const char *i)
 	amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
 	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
-
 	GetApiLevel();
-	Debug(3,"aml ApiLevel = %d  usiing OSD dma: %s\n",apiLevel,(DmaBufferHandle >= 0) ? "yes": "no");
-	ClearDisplay();
+	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no");
+	
 };    
  
 ///< Setup video module.

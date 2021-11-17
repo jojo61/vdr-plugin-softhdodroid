@@ -64,34 +64,9 @@ typedef struct fbdev_window
 	unsigned short height;
 } fbdev_window;
 
-struct Rectangle
-{
-public:
-	float X;
-	float Y;
-	float Width;
-	float Height;
-};
 
-struct PackedColor
-{
-	unsigned char R;
-	unsigned char G;
-	unsigned char B;
-	unsigned char A;
-};
 
-struct IonSurface
-{
-	size_t length;
-	int stride;
-	ion_user_handle_t ion_handle;
-	int share_fd;
-	//void* map_ptr;
-	Rectangle rect;
-	float z_order;
-	PackedColor color;
-};
+
 
 //int fd = -1;
 int ge2d_fd = -1;
@@ -103,7 +78,7 @@ static EGLContext eglContext;
 
 int MyOsdWidth, MyOsdHeight;
 
-#define ALIGN(val, align)	(((val) + (align) - 1) & ~((align) - 1))
+
 
 extern "C" void ClearDisplay();
 extern "C" void WaitVsync();;
@@ -799,6 +774,10 @@ void cOglOutputFb::BindWrite(void)
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb);
 }
 
+void cOglOutputFb::BindRead(void)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, fb);
+}
 void cOglOutputFb::Unbind(void)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1079,11 +1058,11 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         oFb->BindWrite();
         fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
         oFb->Unbind();
+        fb->BindRead();
         return true;
     }
 
     fb->BindRead();
-  
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     if (posd)

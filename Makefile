@@ -108,7 +108,7 @@ SOFILE = libvdr-$(PLUGIN).so
 LIBS += -lMali  -ldl  -lGLU   
 ### Includes and Defines (add further entries here):
 
-#INCLUDES += -I/usr/src/vdr/include
+INCLUDES += -I/usr/src/vdr/include
 
 DEFINES += -DPLUGIN_NAME_I18N='"$(PLUGIN)"' -D_GNU_SOURCE $(CONFIG) \
 	$(if $(GIT_REV), -DGIT_REV='"$(GIT_REV)"')
