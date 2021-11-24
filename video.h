@@ -46,7 +46,8 @@ typedef struct _odroid_decoder_
 
 
  //   xcb_window_t Window;                ///< output window
-
+    int pip;                            // 0 = main Video  1 = PIP
+    int handle;                         // device handle
     int VideoX;                         ///< video base x coordinate
     int VideoY;                         ///< video base y coordinate
     int VideoWidth;                     ///< video base width
@@ -187,13 +188,14 @@ struct __video_stream__
 //----------------------------------------------------------------------------
 
 
-
 #define ALIGN(val, align)	(((val) + (align) - 1) & ~((align) - 1))
+
 
 //----------------------------------------------------------------------------
 //  Variables
 //----------------------------------------------------------------------------
 extern int ge2d_fd, ion_fd;
+extern int VideoWindowWidth,VideoWindowHeight;
 extern signed char VideoHardwareDecoder;    ///< flag use hardware decoder
 extern char VideoIgnoreRepeatPict;      ///< disable repeat pict warning
 extern int VideoAudioDelay;             ///< audio/video delay

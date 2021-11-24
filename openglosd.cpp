@@ -774,10 +774,6 @@ void cOglOutputFb::BindWrite(void)
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb);
 }
 
-void cOglOutputFb::BindRead(void)
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, fb);
-}
 void cOglOutputFb::Unbind(void)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

@@ -38,8 +38,9 @@
 #include "softhddevice.h"
 #include "softhddevice_service.h"
 
+#ifdef USE_OPENGLOSD
 #include "openglosd.h"
-
+#endif
 
 extern "C"
 {
@@ -58,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "1.1.0"
+static const char *const VERSION = "1.3.0"
 #ifdef GIT_REV
     "-GIT" GIT_REV
 #endif
@@ -1512,6 +1513,363 @@ cSoftHdControl::~cSoftHdControl()
     dsyslog("[softhddev]%s: dummy player stopped\n", __FUNCTION__);
 }
 
+#ifdef USE_PIP
+
+extern "C" void DelPip(void);           ///< remove PIP
+static int PipAltPosition;              ///< flag alternative position
+
+//////////////////////////////////////////////////////////////////////////////
+//  cReceiver
+//////////////////////////////////////////////////////////////////////////////
+
+#include <vdr/receiver.h>
+
+/**
+**  Receiver class for PIP mode.
+*/
+class cSoftReceiver:public cReceiver
+{
+  protected:
+    virtual void Activate(bool);
+    virtual void Receive(const uchar *, int);
+  public:
+     cSoftReceiver(const cChannel *);   ///< receiver constructor
+     virtual ~ cSoftReceiver();         ///< receiver destructor
+};
+
+/**
+**  Receiver constructor.
+**
+**  @param channel  channel to receive
+*/
+cSoftReceiver::cSoftReceiver(const cChannel * channel):cReceiver(NULL, MINPRIORITY)
+{
+    // cReceiver::channelID not setup, this can cause trouble
+    // we want video only
+   
+    AddPid(channel->Vpid());
+}
+
+/**
+**  Receiver destructor.
+*/
+cSoftReceiver::~cSoftReceiver()
+{
+    Detach();
+}
+
+/**
+**  Called before the receiver gets attached or detached.
+**
+**  @param on   flag attached, detached
+*/
+extern int PIP_allowed;
+void cSoftReceiver::Activate(bool on)
+{
+    printf("Pip activate %d\n",on);
+    if (on && PIP_allowed) {
+        int width;
+        int height;
+        double video_aspect;
+
+        GetOsdSize(&width, &height, &video_aspect);
+        if (PipAltPosition) {
+            PipStart((ConfigPipAltVideoX * width) / 100, (ConfigPipAltVideoY * height) / 100,
+                ConfigPipAltVideoWidth ? (ConfigPipAltVideoWidth * width) / 100 : width,
+                ConfigPipAltVideoHeight ? (ConfigPipAltVideoHeight * height) / 100 : height,
+                (ConfigPipAltX * width) / 100, (ConfigPipAltY * height) / 100,
+                ConfigPipAltWidth ? (ConfigPipAltWidth * width) / 100 : width,
+                ConfigPipAltHeight ? (ConfigPipAltHeight * height) / 100 : height);
+        } else {
+            PipStart((ConfigPipVideoX * width) / 100, (ConfigPipVideoY * height) / 100,
+                ConfigPipVideoWidth ? (ConfigPipVideoWidth * width) / 100 : width,
+                ConfigPipVideoHeight ? (ConfigPipVideoHeight * height) / 100 : height, (ConfigPipX * width) / 100,
+                (ConfigPipY * height) / 100, ConfigPipWidth ? (ConfigPipWidth * width) / 100 : width,
+                ConfigPipHeight ? (ConfigPipHeight * height) / 100 : height);
+        }
+    } else {
+        PipStop();
+    }
+}
+
+///
+/// Parse packetized elementary stream.
+///
+/// @param data payload data of transport stream
+/// @param size number of payload data bytes
+/// @param is_start flag, start of pes packet
+///
+static void PipPesParse(const uint8_t * data, int size, int is_start)
+{
+    static uint8_t *pes_buf;
+    static int pes_size;
+    static int pes_index;
+
+    // FIXME: quick&dirty
+
+    if (!pes_buf) {
+        pes_size = 500 * 1024 * 1024;
+        pes_buf = (uint8_t *) malloc(pes_size);
+        if (!pes_buf) {                 // out of memory, should never happen
+            return;
+        }
+        pes_index = 0;
+    }
+    if (is_start) {                     // start of pes packet
+        if (pes_index) {
+            if (0) {
+                fprintf(stderr, "pip: PES packet %8d %02x%02x\n", pes_index, pes_buf[2], pes_buf[3]);
+            }
+            if (pes_buf[0] || pes_buf[1] || pes_buf[2] != 0x01) {
+                // FIXME: first should always fail
+                esyslog(tr("[softhddev]pip: invalid PES packet %d\n"), pes_index);
+            } else {
+                PipPlayVideo(pes_buf, pes_index);
+                // FIXME: buffer full: pes packet is dropped
+            }
+            pes_index = 0;
+        }
+    }
+
+    if (pes_index + size > pes_size) {
+        esyslog(tr("[softhddev]pip: pes buffer too small\n"));
+        pes_size *= 2;
+        if (pes_index + size > pes_size) {
+            pes_size = (pes_index + size) * 2;
+        }
+        pes_buf = (uint8_t *) realloc(pes_buf, pes_size);
+        if (!pes_buf) {                 // out of memory, should never happen
+            return;
+        }
+    }
+    memcpy(pes_buf + pes_index, data, size);
+    pes_index += size;
+}
+
+    /// Transport stream packet size
+#define TS_PACKET_SIZE  188
+    /// Transport stream packet sync byte
+#define TS_PACKET_SYNC  0x47
+
+/**
+**  Receive TS packet from device.
+**
+**  @param data ts packet
+**  @param size size (#TS_PACKET_SIZE=188) of tes packet
+*/
+void cSoftReceiver::Receive(const uchar * data, int size)
+{
+    const uint8_t *p;
+
+    p = data;
+    while (size >= TS_PACKET_SIZE) {
+        int payload;
+
+        if (p[0] != TS_PACKET_SYNC) {
+            esyslog(tr("[softhddev]tsdemux: transport stream out of sync\n"));
+            // FIXME: kill all buffers
+            return;
+        }
+        if (p[1] & 0x80) {              // error indicatord
+            dsyslog("[softhddev]tsdemux: transport error\n");
+            // FIXME: kill all buffers
+            goto next_packet;
+        }
+        if (0) {
+            int pid;
+
+            pid = (p[1] & 0x1F) << 8 | p[2];
+            fprintf(stderr, "tsdemux: PID: %#04x%s%s\n", pid, p[1] & 0x40 ? " start" : "",
+                p[3] & 0x10 ? " payload" : "");
+        }
+        // skip adaptation field
+        switch (p[3] & 0x30) {          // adaption field
+            case 0x00:                 // reserved
+            case 0x20:                 // adaptation field only
+            default:
+                goto next_packet;
+            case 0x10:                 // only payload
+                payload = 4;
+                break;
+            case 0x30:                 // skip adapation field
+                payload = 5 + p[4];
+                // illegal length, ignore packet
+                if (payload >= TS_PACKET_SIZE) {
+                    dsyslog("[softhddev]tsdemux: illegal adaption field length\n");
+                    goto next_packet;
+                }
+                break;
+        }
+
+        PipPesParse(p + payload, TS_PACKET_SIZE - payload, p[1] & 0x40);
+
+      next_packet:
+        p += TS_PACKET_SIZE;
+        size -= TS_PACKET_SIZE;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+static cSoftReceiver *PipReceiver;      ///< PIP receiver
+static int PipChannelNr = 0;            ///< last PIP channel number
+static const cChannel *PipChannel;      ///< current PIP channel
+
+/**
+**  Stop PIP.
+*/
+extern "C" void DelPip(void)
+{
+    delete PipReceiver;
+
+    PipReceiver = NULL;
+    PipChannel = NULL;
+}
+
+/**
+**  Prepare new PIP.
+**
+**  @param channel_nr   channel number
+*/
+static void NewPip(int channel_nr)
+{
+    const cChannel *channel;
+    cDevice *device;
+    cSoftReceiver *receiver;
+
+#ifdef DEBUG
+    // is device replaying?
+    if (cDevice::PrimaryDevice()->Replaying() && cControl::Control()) {
+        dsyslog("[softhddev]%s: replay active\n", __FUNCTION__);
+        // FIXME: need to find PID
+    }
+#endif
+
+    if (!channel_nr) {
+        channel_nr = cDevice::CurrentChannel();
+    }
+    LOCK_CHANNELS_READ;
+    if (channel_nr && (channel = Channels->GetByNumber(channel_nr))
+        && (device = cDevice::GetDevice(channel, 0, false, false))) {
+
+        DelPip();
+
+        device->SwitchChannel(channel, false);
+        receiver = new cSoftReceiver(channel);
+        device->AttachReceiver(receiver);
+        PipReceiver = receiver;
+        PipChannel = channel;
+        PipChannelNr = channel_nr;
+    }
+}
+
+/**
+**  Toggle PIP on/off.
+*/
+static void TogglePip(void)
+{
+    if (PipReceiver) {
+        int attached;
+
+        attached = PipReceiver->IsAttached();
+        DelPip();
+        if (attached) {                 // turn off only if last PIP was on
+            return;
+        }
+    }
+    NewPip(PipChannelNr);
+}
+
+/**
+**  Switch PIP to next available channel.
+**
+**  @param direction    direction of channel switch
+*/
+static void PipNextAvailableChannel(int direction)
+{
+    const cChannel *channel;
+    const cChannel *first;
+
+    channel = PipChannel;
+    first = channel;
+
+    DelPip();                           // disable PIP to free the device
+
+    LOCK_CHANNELS_READ;
+    while (channel) {
+        bool ndr;
+        cDevice *device;
+
+        channel = direction > 0 ? Channels->Next(channel)
+            : Channels->Prev(channel);
+        if (!channel && Setup.ChannelsWrap) {
+            channel = direction > 0 ? Channels->First() : Channels->Last();
+        }
+        if (channel && !channel->GroupSep()
+            && (device = cDevice::GetDevice(channel, 0, false, true))
+            && device->ProvidesChannel(channel, 0, &ndr) && !ndr) {
+
+            NewPip(channel->Number());
+            return;
+        }
+        if (channel == first) {
+            Skins.Message(mtError, tr("Channel not available!"));
+            break;
+        }
+    }
+}
+
+/**
+**  Swap PIP channels.
+*/
+static void SwapPipChannels(void)
+{
+    const cChannel *channel;
+
+    channel = PipChannel;
+
+    DelPip();
+    NewPip(0);
+
+    if (channel) {
+        LOCK_CHANNELS_READ;
+
+        Channels->SwitchTo(channel->Number());
+    }
+}
+
+/**
+**  Swap PIP position.
+*/
+static void SwapPipPosition(void)
+{
+    int width;
+    int height;
+    double video_aspect;
+
+    PipAltPosition ^= 1;
+    if (!PipReceiver) {                 // no PIP visible, no update needed
+        return;
+    }
+
+    GetOsdSize(&width, &height, &video_aspect);
+    if (PipAltPosition) {
+        PipSetPosition((ConfigPipAltVideoX * width) / 100, (ConfigPipAltVideoY * height) / 100,
+            ConfigPipAltVideoWidth ? (ConfigPipAltVideoWidth * width) / 100 : width,
+            ConfigPipAltVideoHeight ? (ConfigPipAltVideoHeight * height) / 100 : height, (ConfigPipAltX * width) / 100,
+            (ConfigPipAltY * height) / 100, ConfigPipAltWidth ? (ConfigPipAltWidth * width) / 100 : width,
+            ConfigPipAltHeight ? (ConfigPipAltHeight * height) / 100 : height);
+    } else {
+        PipSetPosition((ConfigPipVideoX * width) / 100, (ConfigPipVideoY * height) / 100,
+            ConfigPipVideoWidth ? (ConfigPipVideoWidth * width) / 100 : width,
+            ConfigPipVideoHeight ? (ConfigPipVideoHeight * height) / 100 : height, (ConfigPipX * width) / 100,
+            (ConfigPipY * height) / 100, ConfigPipWidth ? (ConfigPipWidth * width) / 100 : width,
+            ConfigPipHeight ? (ConfigPipHeight * height) / 100 : height);
+    }
+}
+
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 //  cOsdMenu
 //////////////////////////////////////////////////////////////////////////////
@@ -1590,32 +1948,9 @@ void cSoftHdMenu::Create(void)
     Add(new cOsdItem(hk(tr("PIP close")), osUser8));
 
 #endif
-    Add(new cOsdItem(NULL, osUnknown, false));
-    Add(new cOsdItem(NULL, osUnknown, false));
-    GetStats(&missed, &duped, &dropped, &counter, &frametime, &width, &height, &color, &eotf);
-    switch (color) {
-        case AVCOL_SPC_RGB:
-            colorstr = strdup("BT 601");
-            eotfstr = strdup("BT 1886");
-            break;
-        case AVCOL_SPC_BT709:
-        case AVCOL_SPC_UNSPECIFIED:    //  comes with UHD
-            colorstr = strdup("BT 709");
-            eotfstr = strdup("BT 1886");
-            break;
-        case AVCOL_SPC_BT2020_NCL:
-            colorstr = strdup("BT 2020");
-            eotfstr = strdup("HDR-HLG");
-            break;
-        default:                       // fallback
-            colorstr = strdup("Fallback BT 709");
-            eotfstr = strdup("BT 1886");
-            break;
-    }
-    Add(new cOsdItem(cString::sprintf(tr(" Frames missed(%d) duped(%d) dropped(%d) total(%d)"), missed, duped, dropped,
-                counter), osUnknown, false));
-    Add(new cOsdItem(cString::sprintf(tr(" Video %dx%d Color: %s Gamma: %s"), width, height, colorstr, eotfstr),
-            osUnknown, false));
+    //Add(new cOsdItem(NULL, osUnknown, false));
+    //Add(new cOsdItem(NULL, osUnknown, false));
+    
     //   Add(new cOsdItem(cString::sprintf(tr(" Frame Process time %2.2fms"), frametime), osUnknown, false));
     SetCurrent(Get(current));           // restore selected menu entry
     Display();                          // display build menu
@@ -1793,16 +2128,35 @@ eOSState cSoftHdMenu::ProcessKey(eKeys key)
                     Suspend(ConfigSuspendClose, ConfigSuspendClose,0);
                     SuspendMode = SUSPEND_NORMAL;
                 }
-#ifdef USE_OPENGLOSD
                 dsyslog("[softhddev]stopping Ogl Thread osUser1");
                 cSoftOsdProvider::StopOpenGlThread();
-#endif
                 if (ShutdownHandler.GetUserInactiveTime()) {
                     dsyslog("[softhddev]%s: set user inactive\n", __FUNCTION__);
                     ShutdownHandler.SetUserInactive();
                 }
             }
+            return osEnd; 
+#ifdef USE_PIP
+        case osUser3:
+            TogglePip();
             return osEnd;
+        case osUser4:
+            PipNextAvailableChannel(1);
+            return osEnd;
+        case osUser5:
+            PipNextAvailableChannel(-1);
+            return osEnd;
+        case osUser6:
+            SwapPipChannels();
+            return osEnd;
+        case osUser7:
+            SwapPipPosition();
+            return osEnd;
+        case osUser8:
+            DelPip();
+            PipChannelNr = 0;
+            return osEnd;
+#endif
         default:
             Create();
             break;

@@ -100,6 +100,14 @@ extern "C"
     /// C plugin scale video
     extern void ScaleVideo(int, int, int, int);
 
+    /// Set Pip position
+    extern void PipSetPosition(int, int, int, int, int, int, int, int);
+    /// Pip start
+    extern void PipStart(int, int, int, int, int, int, int, int);
+    /// Pip stop
+    extern void PipStop(void);
+    /// Pip play video packet
+    extern int PipPlayVideo(const uint8_t *, int);
     #ifdef __cplusplus
 }
 #endif

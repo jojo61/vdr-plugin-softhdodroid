@@ -697,7 +697,7 @@ static void CodecAudioSetClock(AudioDecoder * audio_decoder, int64_t pts)
         }
     }
 #endif
-    if (1) {
+    if (0) {
         static int c;
 
         if (!(c++ % 10)) {

@@ -1498,7 +1498,7 @@ static void VideoNextPacket(VideoStream * stream, int codec_id)
 
     // intialize next package to use
     VideoResetPacket(stream);
-    VideoDecodeInput(stream);
+    //VideoDecodeInput(stream);
 }
 
 #if 1
@@ -1745,7 +1745,6 @@ static void FixPacketForFFMpeg(VideoDecoder * vdecoder, AVPacket * avpkt)
 */
 static void VideoStreamOpen(VideoStream * stream)
 {
-    
     stream->SkipStream = 1;
     stream->CodecID = AV_CODEC_ID_NONE;
     stream->LastCodecID = AV_CODEC_ID_NONE;
@@ -1885,29 +1884,6 @@ int VideoDecodeInput(VideoStream * stream)
     if (!filled) {
         return -1;
     }
-#if 0
-    // clearing for normal channel switch has no advantage
-    if (stream->ClearClose || stream->ClosingStream) {
-        int f;
-
-        // FIXME: during replay all packets are always checked
-
-        // flush buffers, if close is in the queue
-        for (f = 0; f < filled; ++f) {
-            if (stream->CodecIDRb[(stream->PacketRead + f) % VIDEO_PACKET_MAX] == AV_CODEC_ID_NONE) {
-                if (f) {
-                    Debug(3, "video: cleared upto close\n");
-                    atomic_sub(f, &stream->PacketsFilled);
-                    stream->PacketRead = (stream->PacketRead + f) % VIDEO_PACKET_MAX;
-                    stream->ClearClose = 0;
-                }
-                break;
-            }
-        }
-        stream->ClosingStream = 0;
-    }
-#endif
-
     //
     //  handle queued commands
     //
@@ -2702,7 +2678,7 @@ void StillPicture(const uint8_t * data, int size)
     
     amlFreerun(1);
     amlTrickMode(1);
-    amlClearVBuf();
+    //amlClearVBuf();
     
     for (i = 0; i < 4; ++i) {
         const uint8_t *split;
@@ -3381,4 +3357,115 @@ void ScaleVideo(int x, int y, int width, int height)
         VideoSetOutputPosition(MyVideoStream->HwDecoder, x, y, width, height);
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////
+//  PIP
+//////////////////////////////////////////////////////////////////////////////
+
+#ifdef USE_PIP
+
+/**
+**  Set PIP position.
+**
+**  @param x        video window x coordinate OSD relative
+**  @param y        video window y coordinate OSD relative
+**  @param width        video window width OSD relative
+**  @param height       video window height OSD relative
+**  @param pip_x        pip window x coordinate OSD relative
+**  @param pip_y        pip window y coordinate OSD relative
+**  @param pip_width    pip window width OSD relative
+**  @param pip_height   pip window height OSD relative
+*/
+void PipSetPosition(int x, int y, int width, int height, int pip_x, int pip_y, int pip_width, int pip_height)
+{
+    if (!MyVideoStream->HwDecoder) {    // video not running
+        return;
+    }
+    ScaleVideo(x, y, width, height);
+
+    if (!PipVideoStream->HwDecoder) {   // pip not running
+        return;
+    }
+    VideoSetOutputPosition(PipVideoStream->HwDecoder, pip_x, pip_y, pip_width, pip_height);
+}
+
+/**
+**  Start PIP stream.
+**
+**  @param x        video window x coordinate OSD relative
+**  @param y        video window y coordinate OSD relative
+**  @param width        video window width OSD relative
+**  @param height       video window height OSD relative
+**  @param pip_x        pip window x coordinate OSD relative
+**  @param pip_y        pip window y coordinate OSD relative
+**  @param pip_width    pip window width OSD relative
+**  @param pip_height   pip window height OSD relative
+*/
+void PipStart(int x, int y, int width, int height, int pip_x, int pip_y, int pip_width, int pip_height)
+{
+
+    if (!MyVideoStream->HwDecoder) {    // video not running
+        return;
+    }
+
+    if (!PipVideoStream->Decoder) {
+        VideoStreamOpen(PipVideoStream);
+    }
+    PipSetPosition(x, y, width, height, pip_x, pip_y, pip_width, pip_height);
+    mwx = x; mwy = y; mww = width; mwh = height;
+    PiPActive = 1;
+    
+}
+
+/**
+**  Stop PIP.
+*/
+void InternalClose(int *);
+int amlSetString(char *, char *);
+extern int isPIP;
+extern OdroidDecoder *OdroidDecoders[];
+amlSetVideoAxis(int , int , int , int , int );
+void PipStop(void)
+{
+    int i;
+printf("pip stop\n");
+    if (!MyVideoStream->HwDecoder) {    // video not running
+        return;
+    }
+    amlSetVideoAxis(1, 0,0,0,0);
+    
+    mwx = 0; mwy = 0; mww = 0; mwh = 0;
+    amlSetVideoAxis(0, 0,0,VideoWindowWidth,VideoWindowHeight);
+    PipVideoStream->Close = 1;
+#if 0
+    sleep(1);
+    InternalClose(OdroidDecoders[1]->pip);
+    amlSetString("/sys/class/vfm/map","rm vdec-map-1");
+    isPIP = 0;
+    DelPip();
+#endif
+    for (i = 0; PipVideoStream->Close && i < 50; ++i) {
+        usleep(1 * 1000);
+    }
+
+    PiPActive = 0;
+    Debug(3,"[softhddev]%s: pip close %d\n", __FUNCTION__,i);
+}
+
+/**
+**  PIP play video packet.
+**
+**  @param data data of exactly one complete PES packet
+**  @param size size of PES packet
+**
+**  @return number of bytes used, 0 if internal buffer are full.
+*/
+
+
+int PipPlayVideo(const uint8_t * data, int size)
+{
+    return PlayVideo3(PipVideoStream, data, size);
+}
+
+#endif
 
