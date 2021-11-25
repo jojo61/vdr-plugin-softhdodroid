@@ -355,14 +355,19 @@ struct meson_phys_data {
 };
 
 #define AMVIDEOCAP_IOC_MAGIC 'V'
+#define AMVIDEOCAP_IOW_SET_WANTFRAME_FORMAT _IOW(AMVIDEOCAP_IOC_MAGIC, 0x01, int)
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_WIDTH  _IOW(AMVIDEOCAP_IOC_MAGIC, 0x02, int)
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_HEIGHT _IOW(AMVIDEOCAP_IOC_MAGIC, 0x03, int)
+#define AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS _IOW(AMVIDEOCAP_IOC_MAGIC, 0x05, uint64_t)
+#define AMVIDEOCAP_IOW_GET_STATE            _IOR(AMVIDEOCAP_IOC_MAGIC, 0x31, int)
+#define AMVIDEOCAP_IOW_SET_START_CAPTURE    _IOW(AMVIDEOCAP_IOC_MAGIC, 0x32, int)
+
 
 uint8_t GrabVideo(char *base, int width, int height) {
 
 	
 // If the device is not open, attempt to open it
-	
+	//printf("capture Video %d %d\n",width,height);
 	
 	int _amlogicCaptureDev = open("/dev/amvideocap0", O_RDONLY, 0);
 
@@ -372,39 +377,60 @@ uint8_t GrabVideo(char *base, int width, int height) {
 		Debug(3,"No Capture device found");
 		return false;
 	}
+
+	int stride = ALIGN(width, 16) * 4;
+	int format = GE2D_FORMAT_S32_ARGB;
 	
-	if (ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WIDTH,  width)  == -1 ||
-		ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_HEIGHT, height) == -1)
+	if (ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WIDTH,  stride / 4)  == -1 ||
+		ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_HEIGHT, height) == -1 ||
+		ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_FORMAT, format) == -1 )
 	{
 		// Failed to configure frame width
 		Debug(3,"Failed to configure capture size %d %d\n",width,height);
 		close(_amlogicCaptureDev);
 		return false;
 	}
-
-	// Read the snapshot into the memory
+	int state;
+	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_GET_STATE, &state);
+	//printf("Got Cap State %d\n",state);
+	uint64_t waitms = 5000;
+	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS, waitms);
+	//WaitVsync();
+	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_START_CAPTURE, 1);
 	
-	const ssize_t bytesToRead = width * height * 3;
+	// Read the snapshot into the memory
+	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_GET_STATE, &state);
+	//printf("Got Cap State %d\n",state);
+	
+	const ssize_t bytesToRead = stride * height;
 
 	const ssize_t bytesRead   = pread(_amlogicCaptureDev, base, bytesToRead, 0);
+	close(_amlogicCaptureDev);
+
 	if (bytesRead == -1)
 	{
 		Debug(3,"Read of capture device failed");
-		close(_amlogicCaptureDev);
 		return false;
 	}
 	else if (bytesToRead != bytesRead)
 	{
 		// Read of snapshot failed
 		Debug(3,"Capture failed to grab entire image [bytesToRead(%d) != bytesRead(%d)]",bytesToRead,bytesRead);
-		close(_amlogicCaptureDev);
 		return false;
 	}
 
+	if (stride / 4 != width) {     // we need to shift it together
+		char *dst = base + width;
+		char *src = base + stride  ;
+		for (int i=1; i < height ;i++) {
+			memcpy(dst,src,width);
+			dst += width;
+			src += stride / 4;
+		}
+
+	}
 	// For now we always close the device now and again
 
-	close(_amlogicCaptureDev);
-		
 	return true;
 }
 
@@ -467,7 +493,9 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
                 source_rect.y0 = source_rect.y1 * overscan / 1000;
                 source_rect.y1 -= source_rect.y0;
             }
-        } else {
+        }
+#if 0 
+		else {
             if (*ret_width > 0 && (unsigned)*ret_width < width) {
                 width = *ret_width;
             }
@@ -475,7 +503,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
                 height = *ret_height;
             }
         }
-
+#endif
         //printf("video/cuvid: grab source  dim %dx%d\n", width, height);
 
         size = width * height * sizeof(uint32_t);
@@ -509,9 +537,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 
 uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 {
-    Debug(3, "video: grab\n");
-
-	uint8_t *data;
+   	uint8_t *data;
 	uint8_t *rgb;
 	char buf[64];
 	int i;
@@ -528,7 +554,9 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 	scale_width = *width;
 	scale_height = *height;
 	n = 0;
+	
 	data = OdroidVideoGrab(size, width, height, 1);
+	
 	if (data == NULL)
 		return NULL;
 
@@ -540,6 +568,7 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 	}
 	// hardware didn't scale for us, use simple software scaler
 	if (scale_width != *width && scale_height != *height) {
+
 		if (write_header) {
 			n = snprintf(buf, sizeof(buf), "P6\n%d\n%d\n255\n", scale_width, scale_height);
 		}
@@ -592,9 +621,9 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 		memcpy(rgb, buf, n);        // header
 
 		for (i = 0; i < *size / 4; ++i) {   // convert bgra -> rgb
-			rgb[n + i * 3 + 0] = data[i * 3 + 2];
-			rgb[n + i * 3 + 1] = data[i * 3 + 1];
-			rgb[n + i * 3 + 2] = data[i * 3 + 0];
+			rgb[n + i * 3 + 0] = data[i * 4 + 2];
+			rgb[n + i * 3 + 1] = data[i * 4 + 1];
+			rgb[n + i * 3 + 2] = data[i * 4 + 0];
 		}
 
 		*size = *width * *height * 3 + n;
@@ -879,15 +908,17 @@ void ClearDisplay(void)
     }
 }
 
-#if 0
+
 void WaitVsync() {
-extern int fd;   
-if (ioctl(fd, FBIO_WAITFORVSYNC, 0) < 0)
+   
+	int fd = open("/dev/fb0", O_RDWR);
+	if (ioctl(fd, FBIO_WAITFORVSYNC, 1) < 0)
 	{
 		printf("FBIO_WAITFORVSYNC failed.\n");
 	}
-}
-#endif
+	close(fd);
+}	
+	
 
 void ClearCursor(int blank) {
 int fd = open("/dev/tty1", O_RDWR);
