@@ -362,6 +362,34 @@ struct meson_phys_data {
 #define AMVIDEOCAP_IOW_GET_STATE            _IOR(AMVIDEOCAP_IOC_MAGIC, 0x31, int)
 #define AMVIDEOCAP_IOW_SET_START_CAPTURE    _IOW(AMVIDEOCAP_IOC_MAGIC, 0x32, int)
 
+int8_t GrabVideo1(char *base, int width, int height) {
+
+	struct fb_var_screeninfo vinfo;
+	unsigned capSize, bytesPerPixel;
+	int pixelFormat;
+
+	int _fbfd = open("/dev/fb0", O_RDONLY);
+
+	/* get variable screen information */
+	ioctl (_fbfd, FBIOGET_VSCREENINFO, &vinfo);
+
+	bytesPerPixel = vinfo.bits_per_pixel / 8;
+
+	capSize = ALIGN(vinfo.xres,16) * vinfo.yres * bytesPerPixel;
+	
+	printf("Resolution %d %d Wand %d %d Bytes per pixel %d  Bits %d\n",vinfo.xres, vinfo.yres,width,height,bytesPerPixel,vinfo.bits_per_pixel);
+
+	
+	
+			
+	/* map the device to memory */
+	char *_fbp = (unsigned char*)mmap(0, capSize, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, _fbfd, 0);	
+
+	memcpy(base,_fbp,capSize);
+	munmap(_fbp, capSize);
+	close(_fbfd);
+	return true;
+}
 
 uint8_t GrabVideo(char *base, int width, int height) {
 
@@ -494,7 +522,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
                 source_rect.y1 -= source_rect.y0;
             }
         }
-#if 0 
+#if 1 
 		else {
             if (*ret_width > 0 && (unsigned)*ret_width < width) {
                 width = *ret_width;
@@ -708,7 +736,7 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
 
-	close (ge2d_fd);
+	//close (ge2d_fd);
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
@@ -868,7 +896,10 @@ void ClearDisplay(void)
 {
 	int io;
    extern int ge2d_fd;
+	amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
+    return;
 
+#if 0
 	// Configure src/dst
     struct config_para_ex_ion_s fill_config = { 0 };
     fill_config.alu_const_color = 0xffffffff;
@@ -906,6 +937,7 @@ void ClearDisplay(void)
     {
         printf("GE2D_FILLRECTANGLE failed.\n");
     }
+#endif
 }
 
 
@@ -1268,12 +1300,14 @@ bool getResolution(char *mode) {
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
+#if 0
 	ge2d_fd = open("/dev/ge2d", O_RDWR);
     if (ge2d_fd < 0)
     {
         printf("open /dev/ge2d failed.");
     }
-	
+#endif
+
 	// Control device
 	cntl_handle = open(CODEC_CNTL_DEVICE, O_RDWR);
 	if (cntl_handle < 0)
@@ -1319,6 +1353,7 @@ bool getResolution(char *mode) {
 
 	if (ioctl(fd, FBIOGET_OSD_DMABUF, &h) < 0) {
 	  	DmaBufferHandle = -1;
+		Fatal("Unable to get DMABUF");
 	} else {
 		DmaBufferHandle = h[1];
 	}
@@ -1535,6 +1570,15 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
 #endif
 			break;
+		case Mpeg2:
+			
+#ifdef USE_PIP_MPEG2
+			PIP_allowed = true;
+			hwdecoder->handle = open("/dev/amstream_vframe", flags);
+#else
+			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+#endif
+			break;
 		default:
 				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
 			break;
@@ -1661,14 +1705,16 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	}
 
 #ifdef USE_PIP
-	if (apiLevel >= S905 && format == Avc) // S905
+	if (apiLevel >= S905 && PIP_allowed) // S905
 	{
 		if (!pip)
-		   codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,
-		    FRAME_BASE_PATH_TUNNEL_MODE);
+		   codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
 		else {
 			isPIP = true;
-		    amlSetString("/sys/class/vfm/map","add pip vdec.h264.01 videosync.0 videopip");
+		    if (format == Avc)
+		       amlSetString("/sys/class/vfm/map","add pip vdec.h264.01 videosync.0 videopip");
+			else
+			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videosync.0 videopip");
 		}
 	}
 #endif
@@ -1722,12 +1768,12 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		}
 	}
 
-#if 0
+#if 1
 	// Restore settings that Kodi tramples
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_DISABLE, (unsigned long)VIDEO_DISABLE_NONE);
 	if (r != 0)
 	{
-		printf("AMSTREAM_IOC_SET_VIDEO_DISABLE VIDEO_DISABLE_NONE failed.\n");
+		//printf("AMSTREAM_IOC_SET_VIDEO_DISABLE VIDEO_DISABLE_NONE failed.\n");
 	}
 
 #endif
@@ -2272,6 +2318,9 @@ void InternalClose(int pip)
 		uint32_t nMode = 1;
 		ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
 		amlSetString("/sys/class/vfm/map","rm pip");
+#ifdef USE_PIP_MPEG12
+		amlSetString("/sys/class/vfm/map","rm pip1");
+#endif
 		amlSetString("/sys/class/vfm/map","rm vdec-map-1");
 	}
 
@@ -2290,7 +2339,7 @@ void amlSetVideoAxis(int pip, int x, int y, int width, int height)
 		return;
 	}
 
-	int params[4] = { x, y, width, height };
+	int params[4] = { x, y, width-1, height-1 };
 	if (!pip) {
 		ret = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_AXIS, &params);
 	} else {
@@ -2352,7 +2401,7 @@ void amlTrickMode(int val)  // unused
 
 int amlSetString(char *path, char *valstr)
 {
-  int fd = open(path, O_RDWR, 0644);
+  int fd = open(path, O_WRONLY, 0644);
   int ret = 0;
   if (fd >= 0)
   {
@@ -2391,7 +2440,7 @@ int amlGetString(char *path, char *valstr)
 
 int amlSetInt(char *path, int val)
 {
-  int fd = open(path, O_RDWR, 0644);
+  int fd = open(path, O_WRONLY, 0644);
   int ret = 0;
   if (fd >= 0)
   {

@@ -1057,14 +1057,15 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         fb->BindRead();
         return true;
     }
-
+    return true;
+    
+#if 0
     fb->BindRead();
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     if (posd)
         glReadPixels(0, 0, fb->Width(), fb->Height(), GL_RGBA, GL_UNSIGNED_BYTE, posd);
     glFlush();
-   
 
      // Allocate a buffer
     int stride = ALIGN(fb->Width() * 4, 64);
@@ -1203,6 +1204,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
   //  eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, eglContext);
     //ActivateOsd(oFb->texture, x, y, fb->Width(), fb->Height());
     return true;
+#endif
 }
 
 //------------------ cOglCmdFill --------------------
@@ -2057,14 +2059,6 @@ bool cOglThread::InitOpenGL(void)
     
     EGLNativeDisplayType nativeDisplay=EGL_DEFAULT_DISPLAY;
     
-#if 0
-   	ge2d_fd = open("/dev/ge2d", O_RDWR);
-    if (ge2d_fd < 0)
-    {
-        printf("open /dev/ge2d failed.");
-    }
-#endif
-
 	ion_fd = open("/dev/ion", O_RDWR);
 	if (ion_fd < 0)
 	{
