@@ -1043,12 +1043,12 @@ cOglCmdCopyBufferToOutputFb::cOglCmdCopyBufferToOutputFb(cOglFb * fb, cOglOutput
     this->y = y;
 }
 
-unsigned char posd[3840*2160*4];
-
+//unsigned char posd[3840*2160*4];
+extern int OsdShown;
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
-
+    OsdShown = 1;
     if (DmaBufferHandle >= 0) {
         fb->BindRead();
         oFb->BindWrite();

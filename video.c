@@ -72,6 +72,7 @@ static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
 static int OsdHeight;                   ///< osd height
+int OsdShown = 0;
 static void (*VideoEventCallback)(void) = NULL; /// callback function to notify
 
 
@@ -362,29 +363,31 @@ struct meson_phys_data {
 #define AMVIDEOCAP_IOW_GET_STATE            _IOR(AMVIDEOCAP_IOC_MAGIC, 0x31, int)
 #define AMVIDEOCAP_IOW_SET_START_CAPTURE    _IOW(AMVIDEOCAP_IOC_MAGIC, 0x32, int)
 
-int8_t GrabVideo1(char *base, int width, int height) {
+int GrabOsd(char *base, int width, int height) {
 
 	struct fb_var_screeninfo vinfo;
 	unsigned capSize, bytesPerPixel;
 	int pixelFormat;
 
 	int _fbfd = open("/dev/fb0", O_RDONLY);
+	if (_fbfd < 0) {
+		printf("Unable to open fd0\n");
+		return false;
+	}
 
 	/* get variable screen information */
 	ioctl (_fbfd, FBIOGET_VSCREENINFO, &vinfo);
 
 	bytesPerPixel = vinfo.bits_per_pixel / 8;
 
-	capSize = ALIGN(vinfo.xres,16) * vinfo.yres * bytesPerPixel;
-	
-	printf("Resolution %d %d Wand %d %d Bytes per pixel %d  Bits %d\n",vinfo.xres, vinfo.yres,width,height,bytesPerPixel,vinfo.bits_per_pixel);
-
-	
-	
-			
+	capSize = VideoWindowWidth * VideoWindowHeight * bytesPerPixel;
+		
 	/* map the device to memory */
-	char *_fbp = (unsigned char*)mmap(0, capSize, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, _fbfd, 0);	
-
+	char *_fbp = (unsigned char*)mmap(0, capSize, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, _fbfd, 0);
+	if (!_fbp)	{
+		printf("Unable to MMAP fb0\n");
+		return false;
+	}
 	memcpy(base,_fbp,capSize);
 	munmap(_fbp, capSize);
 	close(_fbfd);
@@ -494,8 +497,10 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 	//printf("Video is %d-%d\n",width,height);
     // get real surface size
 
-    //width = VideoWindowWidth;
-    //height = VideoWindowHeight;
+	if (mitosd & OsdShown) {
+		width = OsdWidth;
+		height = OsdHeight;
+	}
 
     // Debug(3, "video/cuvid: grab %dx%d\n", width, height);
 
@@ -522,7 +527,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
                 source_rect.y1 -= source_rect.y0;
             }
         }
-#if 1 
+#if 0 
 		else {
             if (*ret_width > 0 && (unsigned)*ret_width < width) {
                 width = *ret_width;
@@ -546,6 +551,37 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 		if (!GrabVideo(base,width,height)) {
 			free(base);
 			return NULL;
+		}
+
+		if (mitosd && OsdShown) {
+			char *osd = malloc(VideoWindowWidth * VideoWindowHeight * 4);
+			if (!GrabOsd(osd,OsdWidth,OsdHeight)) {
+				free(osd);
+				return NULL;
+			}
+			int stride = VideoWindowWidth * 4;
+			char *sb = base;
+			for (int y = 0; y < OsdHeight; ++y)
+			{
+				unsigned char *videoPtr = osd + y * stride;
+				
+				for (int x = 0; x < OsdWidth; ++x, base += 4, videoPtr += 4)
+				{
+					float alpha = videoPtr[3] / (float)255;
+
+					//B
+					base[0] = (1 -alpha) * (float)base[0] + alpha * (float)videoPtr[0];
+					//G
+					base[1] = (1 -alpha) * (float)base[1] + alpha * (float)videoPtr[1];
+					//R
+					base[2] = (1- alpha) * (float)base[2] + alpha * (float)videoPtr[2];
+					//A
+					base[3] = 0xff;// we are solid now
+					
+				}	
+			}
+			free(osd);
+			base = sb;
 		}
 
         if (ret_size) {
@@ -897,6 +933,7 @@ void ClearDisplay(void)
 	int io;
    extern int ge2d_fd;
 	amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
+	OsdShown = 0;
     return;
 
 #if 0
@@ -1345,9 +1382,9 @@ bool getResolution(char *mode) {
 	info.bits_per_pixel = 32;
 	Debug(3,"Initial Screen %d-%d\n",info.xres,info.yres);
 	info.xres = VideoWindowWidth-1;
-	info.yres = VideoWindowHeight;
+	info.yres = VideoWindowHeight-1;
 	info.xres_virtual = VideoWindowWidth-1;
-	info.yres_virtual = VideoWindowHeight*2;
+	info.yres_virtual = (VideoWindowHeight*2)-1;
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
 
