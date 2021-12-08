@@ -3428,7 +3428,7 @@ amlSetVideoAxis(int , int , int , int , int );
 void PipStop(void)
 {
     int i;
-printf("pip stop\n");
+
     if (!MyVideoStream->HwDecoder) {    // video not running
         return;
     }
@@ -3449,6 +3449,7 @@ printf("pip stop\n");
     }
 
     PiPActive = 0;
+    amlSetVideoAxis(0, 0,0,VideoWindowWidth,VideoWindowHeight);
     Debug(3,"[softhddev]%s: pip close %d\n", __FUNCTION__,i);
 }
 

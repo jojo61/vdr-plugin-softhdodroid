@@ -355,11 +355,15 @@ struct meson_phys_data {
 	unsigned int size;
 };
 
+#define CAP_FLAG_AT_CURRENT		0
+#define CAP_FLAG_AT_TIME_WINDOW	1
+#define CAP_FLAG_AT_END			2
 #define AMVIDEOCAP_IOC_MAGIC 'V'
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_FORMAT _IOW(AMVIDEOCAP_IOC_MAGIC, 0x01, int)
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_WIDTH  _IOW(AMVIDEOCAP_IOC_MAGIC, 0x02, int)
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_HEIGHT _IOW(AMVIDEOCAP_IOC_MAGIC, 0x03, int)
 #define AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS _IOW(AMVIDEOCAP_IOC_MAGIC, 0x05, uint64_t)
+#define AMVIDEOCAP_IOW_SET_WANTFRAME_AT_FLAGS _IOR(AMVIDEOCAP_IOC_MAGIC, 0x06, int)
 #define AMVIDEOCAP_IOW_GET_STATE            _IOR(AMVIDEOCAP_IOC_MAGIC, 0x31, int)
 #define AMVIDEOCAP_IOW_SET_START_CAPTURE    _IOW(AMVIDEOCAP_IOC_MAGIC, 0x32, int)
 
@@ -426,6 +430,7 @@ uint8_t GrabVideo(char *base, int width, int height) {
 	//printf("Got Cap State %d\n",state);
 	uint64_t waitms = 5000;
 	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS, waitms);
+	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_AT_FLAGS, CAP_FLAG_AT_TIME_WINDOW);
 	//WaitVsync();
 	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_START_CAPTURE, 1);
 	
@@ -847,20 +852,25 @@ void VideoSetDenoise(int i)
 void VideoDelHwDecoder(VideoHwDecoder * decoder)
 {
 	if (decoder->pip) {
+		isPIP = false;
 		InternalClose(1);
 	}
+
 	for (int i = 0; i < OdroidDecoderN; ++i) {
         if (OdroidDecoders[i] == decoder) {
             OdroidDecoders[i] = NULL;
+			
             // copy last slot into empty slot
+		
             if (i < --OdroidDecoderN) {
                 OdroidDecoders[i] = OdroidDecoders[OdroidDecoderN];
             }
 			          
-             //  free(decoder);
+            free(decoder);
             return;
         }
     }
+
 }
 
 
@@ -1438,42 +1448,34 @@ bool getResolution(char *mode) {
 	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no");
 	
 };    
- 
+extern void DelPip(void);
 ///< Setup video module.
 // Open video codec.
  void CodecVideoOpen(VideoDecoder *decoder, int codec_id, AVPacket *avpkt)
  {
-
+	int pip = decoder->HwDecoder->pip;
 	switch (codec_id)
 	{
 	case AV_CODEC_ID_MPEG2VIDEO:
 			videoFormat = Mpeg2;
-		break;
-
-	case AV_CODEC_ID_MSMPEG4V3:
-		
-			videoFormat = Mpeg4V3;
-		break;
-
-	case AV_CODEC_ID_MPEG4:
-		
-			videoFormat = Mpeg4;
+#ifndef USE_PIP_MPEG2
+		if (!pip && isPIP) {
+			InternalClose(1);
+		}
+#endif
 		break;
 
 	case AV_CODEC_ID_H264:
-		
 			videoFormat = Avc;
-
 		break;
 
 	case AV_CODEC_ID_HEVC:
-		
 			videoFormat = Hevc;
-		break;
-
-	case AV_CODEC_ID_VC1:
-		
-			videoFormat = VC1;
+#ifdef USE_PIP
+		if (!pip && isPIP) {
+			InternalClose(1);
+		}
+#endif
 		break;
 
 	default:
@@ -1481,8 +1483,7 @@ bool getResolution(char *mode) {
 			return;
 		
 	}
-	int pip = decoder->HwDecoder->pip;
-
+	
 	isAnnexB = false;
 	isFirstVideoPacket = true;
 
@@ -1497,6 +1498,7 @@ bool getResolution(char *mode) {
 		amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
 	}
 };
+
 
 int codec_h_ioctl_set(int h, int subcmd, unsigned long  paramter)
 {
@@ -1582,6 +1584,7 @@ const char* CODEC_VIDEO_ES_HEVC_DEVICE = "/dev/amstream_hevc";
 const char* CODEC_VIDEO_ES_DEVICE_SCHED = "/dev/amstream_vframe";
 const char* CODEC_VIDEO_ES_HEVC_DEVICE_SCHED = "/dev/amstream_hevc_sched";
 
+
 void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 {
     
@@ -1598,6 +1601,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		case Hevc:
 			hwdecoder->handle = open("/dev/amstream_hevc", flags);
+			if (!pip && isPIP) {
+				DelPip();
+			}
 			break;
 		case Avc:
 			PIP_allowed = true;
@@ -1614,10 +1620,13 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			hwdecoder->handle = open("/dev/amstream_vframe", flags);
 #else
 			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+			if (!pip && isPIP) {
+				DelPip();
+			}		
 #endif
 			break;
 		default:
-				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
 			break;
 	}
 
@@ -2340,18 +2349,19 @@ void InternalClose(int pip)
 {
 	int r;
 	int handle = OdroidDecoders[pip]->handle;
+	if (handle == -1)
+		return;
 	//amlClearVideo();
 
 	r = close(handle);
 	if (r < 0)
 	{
 		//codecMutex.Unlock();
-		printf("close handle failed.");
+		printf("close handle failed PIP %d\n.",pip);
 		return;
 	}
 	if (pip) {
-		printf("Internalclose pip\n");
-		isPIP = false;
+		
 		uint32_t nMode = 1;
 		ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
 		amlSetString("/sys/class/vfm/map","rm pip");

@@ -1566,7 +1566,7 @@ cSoftReceiver::~cSoftReceiver()
 extern int PIP_allowed;
 void cSoftReceiver::Activate(bool on)
 {
-    printf("Pip activate %d\n",on);
+    
     if (on && PIP_allowed) {
         int width;
         int height;
@@ -1736,6 +1736,11 @@ static void NewPip(int channel_nr)
     const cChannel *channel;
     cDevice *device;
     cSoftReceiver *receiver;
+    
+    if (!PIP_allowed) {
+        return;
+    }
+
 
 #ifdef DEBUG
     // is device replaying?
@@ -1745,9 +1750,9 @@ static void NewPip(int channel_nr)
     }
 #endif
 
-    if (!channel_nr) {
+    //if (!channel_nr) {
         channel_nr = cDevice::CurrentChannel();
-    }
+    //}
     LOCK_CHANNELS_READ;
     if (channel_nr && (channel = Channels->GetByNumber(channel_nr))
         && (device = cDevice::GetDevice(channel, 0, false, false))) {
@@ -1766,7 +1771,7 @@ static void NewPip(int channel_nr)
 /**
 **  Toggle PIP on/off.
 */
-static void TogglePip(void)
+void TogglePip(void)
 {
     if (PipReceiver) {
         int attached;
