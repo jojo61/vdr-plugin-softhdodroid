@@ -1799,7 +1799,7 @@ void AudioEnqueue(const void *samples, int count)
         // forced start or enough video + audio buffered
         // for some exotic channels * 4 too small
 
-        if (AudioStartThreshold * 6 < n || (AudioVideoIsReady
+        if (AudioStartThreshold * 3 < n || (AudioVideoIsReady
                 //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back
@@ -1827,6 +1827,10 @@ void AudioVideoReady(int64_t pts)
 {
     int64_t audio_pts;
     size_t used;
+
+    if (AudioVideoIsReady) {
+        return;
+    }
 
     if (pts == (int64_t) AV_NOPTS_VALUE) {
         Debug(3, "audio: a/v start, no valid video\n");

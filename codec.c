@@ -620,7 +620,7 @@ static void CodecAudioSetClock(AudioDecoder * audio_decoder, int64_t pts)
         audio_decoder->LastDelay = delay;
         audio_decoder->Drift = 0;
         audio_decoder->DriftFrac = 0;
-        Debug(3, "codec/audio: inital drift delay %" PRId64 "ms\n", delay / 90);
+        Debug(4, "codec/audio: inital drift delay %" PRId64 "ms\n", delay / 90);
         return;
     }
     // collect over some time
@@ -647,7 +647,7 @@ static void CodecAudioSetClock(AudioDecoder * audio_decoder, int64_t pts)
     // underruns and av_resample have the same time :(((
     if (abs(drift) > 10 * 90) {
         // drift too big, pts changed?
-        Debug(3, "codec/audio: drift(%6d) %3dms reset\n", audio_decoder->DriftCorr, drift / 90);
+        Debug(4, "codec/audio: drift(%6d) %3dms reset\n", audio_decoder->DriftCorr, drift / 90);
         audio_decoder->LastDelay = 0;
 #ifdef DEBUG
         corr = 0;                       // keep gcc happy

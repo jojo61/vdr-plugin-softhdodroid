@@ -1990,7 +1990,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 		//amlCodec.SetSyncThreshold(pts);
 
 		isFirstVideoPacket = false;
-
+		
 		//printf("isAnnexB=%u\n", isAnnexB);
 		//printf("isShortStartCode=%u\n", isShortStartCode);
 	}
