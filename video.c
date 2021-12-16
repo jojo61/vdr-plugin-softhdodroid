@@ -1601,9 +1601,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		case Hevc:
 			hwdecoder->handle = open("/dev/amstream_hevc", flags);
+#ifdef USE_PIP
 			if (!pip && isPIP) {
 				DelPip();
 			}
+#endif
 			break;
 		case Avc:
 			PIP_allowed = true;
@@ -1620,9 +1622,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			hwdecoder->handle = open("/dev/amstream_vframe", flags);
 #else
 			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+#ifdef USE_PIP
 			if (!pip && isPIP) {
 				DelPip();
 			}		
+#endif
 #endif
 			break;
 		default:

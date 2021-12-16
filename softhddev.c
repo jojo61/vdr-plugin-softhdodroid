@@ -2720,6 +2720,10 @@ void StillPicture(const uint8_t * data, int size)
 
             VideoNextPacket(MyVideoStream, MyVideoStream->CodecID); // terminate last packet
         } else {                        // ES packet
+            if (MyVideoStream->CodecID != AV_CODEC_ID_MPEG2VIDEO) {
+                VideoNextPacket(MyVideoStream, AV_CODEC_ID_NONE);   // close last stream
+                MyVideoStream->CodecID = AV_CODEC_ID_MPEG2VIDEO;
+            }
             VideoEnqueue(MyVideoStream, AV_NOPTS_VALUE, AV_NOPTS_VALUE, data, size);
         }
         if (MyVideoStream->CodecID == AV_CODEC_ID_H264) {
