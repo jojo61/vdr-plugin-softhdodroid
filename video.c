@@ -429,10 +429,10 @@ uint8_t GrabVideo(char *base, int width, int height) {
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_GET_STATE, &state);
 	//printf("Got Cap State %d\n",state);
 	uint64_t waitms = 5000;
-	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS, waitms);
+	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WAIT_MAX_MS, waitms);
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_AT_FLAGS, CAP_FLAG_AT_TIME_WINDOW);
 	//WaitVsync();
-	ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_START_CAPTURE, 1);
+	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_START_CAPTURE, 1);
 	
 	// Read the snapshot into the memory
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_GET_STATE, &state);
@@ -502,10 +502,10 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 	//printf("Video is %d-%d\n",width,height);
     // get real surface size
 
-	if (mitosd & OsdShown) {
+//	if ( (mitosd & OsdShown)) {
 		width = OsdWidth;
 		height = OsdHeight;
-	}
+//	}
 
     // Debug(3, "video/cuvid: grab %dx%d\n", width, height);
 
@@ -517,7 +517,6 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
     if (ret_width && ret_height) {
         if (*ret_width <= -64) {        // this is an Atmo grab service request
             int overscan;
-
             // calculate aspect correct size of analyze image
             width = *ret_width * -1;
             height = (width * source_rect.y1) / source_rect.x1;
@@ -532,7 +531,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
                 source_rect.y1 -= source_rect.y0;
             }
         }
-#if 0 
+#if 0
 		else {
             if (*ret_width > 0 && (unsigned)*ret_width < width) {
                 width = *ret_width;
@@ -752,7 +751,7 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 		}
 		close(ttyfd);
 	}
-
+#if 0
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -776,11 +775,11 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 	info.yres_virtual = VideoWindowHeight*2;
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
-
-	//close (ge2d_fd);
+#endif
+	close (ge2d_fd);
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
-	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
+//	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
 
 	
  };            ///< Cleanup and exit video module.
@@ -943,6 +942,7 @@ void ClearDisplay(void)
 	int io;
    extern int ge2d_fd;
 	amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
+
 	OsdShown = 0;
     return;
 
@@ -958,7 +958,8 @@ void ClearDisplay(void)
     fill_config.src_para.width = VideoWindowWidth;
     fill_config.src_para.height = VideoWindowHeight; 
     fill_config.src_para.x_rev = 0;
-    fill_config.src_para.y_rev = 0;
+
+    fill_config.src_para.y_rev = 0; 
 
     fill_config.dst_para = fill_config.src_para;
     
@@ -977,7 +978,7 @@ void ClearDisplay(void)
     fillRect.src1_rect.y = 0;
     fillRect.src1_rect.w = VideoWindowWidth;
     fillRect.src1_rect.h = VideoWindowHeight; 
-    fillRect.color = 0;
+    fillRect.color = 0x00000000;
 
     io = ioctl(ge2d_fd, GE2D_FILLRECTANGLE, &fillRect);
     if (io < 0)
@@ -1347,7 +1348,7 @@ bool getResolution(char *mode) {
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-#if 0
+#if 1
 	ge2d_fd = open("/dev/ge2d", O_RDWR);
     if (ge2d_fd < 0)
     {
@@ -1364,9 +1365,10 @@ bool getResolution(char *mode) {
 		return;
 	}
 	
-	ClearDisplay();
+	
 	amlGetString("/sys/class/display/mode",mode);
 	getResolution(mode);
+	ClearDisplay();
 
 	// enable alpha setting
 
@@ -1404,9 +1406,9 @@ bool getResolution(char *mode) {
 	} else {
 		DmaBufferHandle = h[1];
 	}
-
+	
 	close(fd);
-
+#if 1
 	// Set graphics mode
 	int ttyfd = open("/dev/tty0", O_RDWR);	
 	if (ttyfd < 0)
@@ -1423,7 +1425,7 @@ bool getResolution(char *mode) {
 
 		close(ttyfd);
 	}
-	
+#endif
 	if (VideoWindowWidth < 1920) {    // is screen is only 1280 or smaller
 		OsdWidth = VideoWindowWidth;
 		OsdHeight = VideoWindowHeight;
@@ -1597,6 +1599,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		PIP_allowed = false;
 	}
 
+	if (!pip)
+ 	    amlSetInt("/sys/class/video/disable_video",0);
+	
 	switch (format)
 	{
 		case Hevc:
@@ -1778,7 +1783,6 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	}
 
 
-	
 
 	/*
 	if (pcodec->vbuf_size > 0)
@@ -1818,7 +1822,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		}
 	}
 
-#if 1
+#if 0
 	// Restore settings that Kodi tramples
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_DISABLE, (unsigned long)VIDEO_DISABLE_NONE);
 	if (r != 0)
@@ -1827,6 +1831,8 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	}
 
 #endif
+	//amlSetInt("/sys/class/video/disable_video",0);
+	
 	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_NORMAL;
 	if (!pip) {
 		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
