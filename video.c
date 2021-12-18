@@ -491,7 +491,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
         return NULL;
 
 	char vdec_status[512];
-	amlGetString("/sys/class/vdec/vdec_status",vdec_status);
+	amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status));
 	
 	if(strstr(vdec_status,"No vdec")) {
 		return NULL;
@@ -708,12 +708,11 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_num, int *aspect_den) {
 	char vdec_status[512];
 
-	amlGetString("/sys/class/vdec/vdec_status",vdec_status);
-	
-	if(strstr(vdec_status,"No vdec")) {
+	if (amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status)) < 0 ||
+          !*vdec_status || strstr(vdec_status,"No vdec")) {
 		*width = *height = 0;
 		*aspect_num = *aspect_den = 1;
-		return ;
+		return;
 	}
 	char r;
 	sscanf(strstr(vdec_status,"width"),"width : %d",width);
@@ -1387,8 +1386,8 @@ bool getResolution(char *mode) {
 		return;
 	}
 	
+	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 	
-	amlGetString("/sys/class/display/mode",mode);
 	getResolution(mode);
 	ClearDisplay();
 
@@ -2494,26 +2493,22 @@ int amlSetString(char *path, char *valstr)
   return ret;
 }
 
-int amlGetString(char *path, char *valstr)
+int amlGetString(char *path, char *valstr, size_t size)
 {
   int len;
-  char buf[256] = {0};
 
   int fd = open(path, O_RDONLY);
   if (fd >= 0)
   {
-    *valstr = 0;
-    while ((len = read(fd, buf, 256)) > 0)
-      strncat(valstr,buf,len);
+    len = read(fd, valstr, size);
     close(fd);
-
-    //StringUtils::Trim(valstr);
-
-    return 0;
+    if (len > 0) {
+       return 0;
+    }
   }
-
   Debug(3, "%s: error reading %s",__FUNCTION__, path);
-  valstr = "fail";
+  if (valstr)
+     *valstr = 0;
   return -1;
 }
 
