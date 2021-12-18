@@ -705,7 +705,29 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
  void VideoGetStats(VideoHwDecoder *i, int *j, int *k, int *l, int *m, float *n, int *o, int *p, int *q, int *r) {};
 
 /// Get video stream size
- void VideoGetVideoSize(VideoHwDecoder *i, int *j, int *k, int *l, int *m) {};
+void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_num, int *aspect_den) {
+	char vdec_status[512];
+
+	amlGetString("/sys/class/vdec/vdec_status",vdec_status);
+	
+	if(strstr(vdec_status,"No vdec")) {
+		*width = *height = 0;
+		*aspect_num = *aspect_den = 1;
+		return ;
+	}
+	char r;
+	sscanf(strstr(vdec_status,"width"),"width : %d",width);
+	sscanf(strstr(vdec_status,"height"),"height : %d",height);
+	sscanf(strstr(vdec_status,"ratio_control"),"ratio_control : %c",&r);
+	if (r == '9') {
+		*aspect_num = 16;
+		*aspect_den = 9;
+	}
+	else {
+		*aspect_num = 4;
+		*aspect_den = 3;
+	}
+};
 
  void VideoOsdInit(void) {
 
@@ -751,7 +773,7 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 		}
 		close(ttyfd);
 	}
-#if 0
+#if 1
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -945,7 +967,7 @@ void ClearDisplay(void)
 
 	OsdShown = 0;
     return;
-
+	
 #if 0
 	// Configure src/dst
     struct config_para_ex_ion_s fill_config = { 0 };

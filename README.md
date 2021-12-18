@@ -46,7 +46,7 @@ Install:
 
 	I use ubuntu 20.04 for Odroid-n2 with kernel 4.9 from here:	https://odroid.in/ubuntu_20.04lts/n2/
 
-	In oder to compile the vdr you need to prepare the following.
+	In order to compile the vdr you need to prepare the following.
 	# apt build-dep vdr
 	# apt install libgl-dev libglu-dev libgles2-mesa-dev freeglut3-dev libglm-dev libavcodec-dev libdrm-dev
 	

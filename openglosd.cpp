@@ -2211,7 +2211,7 @@ bool cOglThread::InitOpenGL(void)
 #endif
 
     VertexBuffers[vbText]->EnableBlending();
-
+    
     glDisable(GL_DEPTH_TEST);
     GlxCheck();
     OsdClose();
