@@ -102,7 +102,7 @@ extern void CodecVideoDelDecoder(VideoDecoder *);
 extern void CodecVideoOpen(VideoDecoder *, int, AVPacket *);
 
 /// Close video codec.
-extern void CodecVideoClose(VideoDecoder *);
+extern void CodecVideoClose(VideoHwDecoder *);
 
 /// Flush video buffers.
 extern void CodecVideoFlushBuffers(VideoDecoder *);

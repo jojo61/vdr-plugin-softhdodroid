@@ -148,6 +148,7 @@ static volatile char AudioPaused;       ///< audio paused
 static volatile char AudioVideoIsReady; ///< video ready start early
 static int AudioSkip;                   ///< skip audio to sync to video
 
+
 static const int AudioBytesProSample = 2;   ///< number of bytes per sample
 
 static int AudioBufferTime = 336;       ///< audio buffer time in ms
@@ -1529,6 +1530,7 @@ static void *AudioPlayHandlerThread(void *dummy)
         Debug(3, "audio: wait on start condition\n");
         pthread_mutex_lock(&AudioMutex);
         AudioRunning = 0;
+        
         do {
             pthread_cond_wait(&AudioStartCond, &AudioMutex);
             // cond_wait can return, without signal!
@@ -1591,7 +1593,7 @@ static void *AudioPlayHandlerThread(void *dummy)
 
                 // underrun, and no new ring buffer, goto sleep.
                 if (!atomic_read(&AudioRingFilled)) {
-                    Debug(3, "audio: HandlerThread Underrun with no new data\n");
+                    Debug(4, "audio: HandlerThread Underrun with no new data\n");
                     break;
                 }
 
@@ -1703,6 +1705,8 @@ void AudioDelayms(int delayms)
     }
 }
 
+extern unsigned long FirstVPTS;
+extern int SetCurrentPCR(int , double );
 /**
 **	Place samples in audio output queue.
 **
@@ -1777,16 +1781,28 @@ void AudioEnqueue(const void *samples, int count)
     }
 
     if (!AudioRunning) {                // check, if we can start the thread
-        int skip;
+        int skip = 0;
 
         n = RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
-        skip = AudioSkip;
-        // FIXME: round to packet size
+        unsigned long vpts = FirstVPTS;
 
-        Debug(4, "audio: start? %4zdms skip %dms\n", (n * 1000)
+        if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
+            skip = n;   // Clear all audio until viteo is avail
+        }
+        else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
+            skip = n;    // Clear Audio until Video PTS
+        } else  {
+            SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay));
+        }
+
+        //        skip = AudioSkip;
+        // FIXME: round to packet size
+        
+        Debug(3, "audio: start? %4zdms skip %dms vpts: %04lx apts %04lx\n", (n * 1000)
             / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
             (skip * 1000)
-            / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample));
+            / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
+            vpts,AudioRing[AudioRingWrite].PTS);
 
         if (skip) {
             if (n < (unsigned)skip) {
@@ -1799,13 +1815,13 @@ void AudioEnqueue(const void *samples, int count)
         // forced start or enough video + audio buffered
         // for some exotic channels * 4 too small
 
-        if (AudioStartThreshold * 3 < n || (AudioVideoIsReady
+        if (AudioStartThreshold * 1.8  < n || (AudioVideoIsReady
                 //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back
             // no lock needed, can wakeup next time
             AudioRunning = 1;
-            
+            FirstVPTS = 0;
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "Start on AudioEnque Threshold %d n %d\n", AudioStartThreshold, n);
         }

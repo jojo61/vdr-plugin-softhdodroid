@@ -84,7 +84,7 @@ static volatile char StreamFreezed;     ///< stream freezed
 
 static volatile char NewAudioStream;    ///< new audio stream
 static volatile char SkipAudio;         ///< skip audio stream
-static AudioDecoder *MyAudioDecoder;    ///< audio decoder
+AudioDecoder *MyAudioDecoder;    ///< audio decoder
 static enum AVCodecID AudioCodecID;     ///< current codec id
 static int AudioChannelID;              ///< current audio channel id
 static VideoStream *AudioSyncStream;    ///< video stream for audio/video sync
@@ -1776,7 +1776,7 @@ static void VideoStreamClose(VideoStream * stream, int delhw)
         pthread_mutex_lock(&stream->DecoderLockMutex);
         stream->Decoder = NULL;         // lock read thread
         pthread_mutex_unlock(&stream->DecoderLockMutex);
-        CodecVideoClose(decoder);
+        CodecVideoClose(stream->HwDecoder);
         CodecVideoDelDecoder(decoder);
     }
     if (stream->HwDecoder) {
@@ -1850,9 +1850,6 @@ int VideoDecodeInput(VideoStream * stream)
     int saved_size;
 
     if (!stream->Decoder) {             // closing
-#ifdef DEBUG
-        printf( "no decoder\n");
-#endif
         return -1;
     }
 
@@ -1894,7 +1891,7 @@ int VideoDecodeInput(VideoStream * stream)
             if (stream->LastCodecID != AV_CODEC_ID_NONE) {
                 Debug(3, "in VideoDecode make close\n");
                 stream->LastCodecID = AV_CODEC_ID_NONE;
-                CodecVideoClose(stream->Decoder);
+                CodecVideoClose(stream->HwDecoder);
                 // FIXME: CodecVideoClose calls/uses hw decoder
                 goto skip;
             }
@@ -1986,6 +1983,7 @@ static void StartVideo(void)
     if (!MyVideoStream->Decoder) {
         VideoStreamOpen(MyVideoStream);
         AudioSyncStream = MyVideoStream;
+        MyVideoStream->HwDecoder->pip = 0;
     }
 }
 
@@ -1995,34 +1993,14 @@ static void StartVideo(void)
 static void StopVideo(void)
 {
     VideoOsdExit();
+    VideoStreamClose(MyVideoStream, 0);
     VideoExit();
     AudioSyncStream = NULL;
-#if 1
+#if 0
     // FIXME: done by exit: VideoDelHwDecoder(MyVideoStream->HwDecoder);
     VideoStreamClose(MyVideoStream, 0);
-#else
-    MyVideoStream->SkipStream = 1;
-    if (MyVideoStream->Decoder) {
-        VideoDecoder *decoder;
-
-        decoder = MyVideoStream->Decoder;
-        pthread_mutex_lock(&MyVideoStream->DecoderLockMutex);
-        MyVideoStream->Decoder = NULL;  // lock read thread
-        pthread_mutex_unlock(&MyVideoStream->DecoderLockMutex);
-        // FIXME: this can crash, hw decoder released by video exit
-        Debug(3, "in Stop Video");
-        CodecVideoClose(decoder);
-        CodecVideoDelDecoder(decoder);
-    }
-    if (MyVideoStream->HwDecoder) {
-        // done by exit: VideoDelHwDecoder(MyVideoStream->HwDecoder);
-        MyVideoStream->HwDecoder = NULL;
-    }
-    VideoPacketExit(MyVideoStream);
-
-    MyVideoStream->NewStream = 1;
-    MyVideoStream->InvalidPesCounter = 0;
 #endif
+   
 }
 
 #ifdef DEBUG
@@ -3382,6 +3360,7 @@ void ScaleVideo(int x, int y, int width, int height)
 */
 void PipSetPosition(int x, int y, int width, int height, int pip_x, int pip_y, int pip_width, int pip_height)
 {
+    Debug(3,"PIP SET Position Main %d:%d-%d:%d  PIP %d:%d-%d:%d",x,y,width, height,  pip_x,  pip_y,  pip_width,  pip_height);
     if (!MyVideoStream->HwDecoder) {    // video not running
         return;
     }
@@ -3391,6 +3370,7 @@ void PipSetPosition(int x, int y, int width, int height, int pip_x, int pip_y, i
         return;
     }
     VideoSetOutputPosition(PipVideoStream->HwDecoder, pip_x, pip_y, pip_width, pip_height);
+    
 }
 
 /**
@@ -3415,6 +3395,7 @@ void PipStart(int x, int y, int width, int height, int pip_x, int pip_y, int pip
     if (!PipVideoStream->Decoder) {
         VideoStreamOpen(PipVideoStream);
     }
+    PipVideoStream->HwDecoder->pip = 1;
     PipSetPosition(x, y, width, height, pip_x, pip_y, pip_width, pip_height);
     mwx = x; mwy = y; mww = width; mwh = height;
     PiPActive = 1;

@@ -205,6 +205,10 @@ extern char MyConfigDir[];
 //  Prototypes
 //----------------------------------------------------------------------------
 
+extern int codec_h_ioctl_set(int , int , unsigned long  );
+extern void CheckinPts(int , unsigned long );
+int amlSetInt(char *, int );
+
 #ifdef USE_OPENGLOSD
 /// Set callback funktion to notify VDR about VideoEvents
 extern void VideoSetVideoEventCallback(void (*)(void));

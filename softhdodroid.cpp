@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "1.3.0"
+static const char *const VERSION = "2.0.0"
 #ifdef GIT_REV
     "-GIT" GIT_REV
 #endif
@@ -1297,6 +1297,29 @@ cMenuSetupSoft::cMenuSetupSoft(void)
     AudioStereoDescent = ConfigAudioStereoDescent;
     AudioBufferTime = ConfigAudioBufferTime;
     AudioAutoAES = ConfigAudioAutoAES;
+    
+#ifdef USE_PIP
+    //
+    //  PIP
+    //
+    Pip = 0;
+    PipX = ConfigPipX;
+    PipY = ConfigPipY;
+    PipWidth = ConfigPipWidth;
+    PipHeight = ConfigPipHeight;
+    PipVideoX = ConfigPipVideoX;
+    PipVideoY = ConfigPipVideoY;
+    PipVideoWidth = ConfigPipVideoWidth;
+    PipVideoHeight = ConfigPipVideoHeight;
+    PipAltX = ConfigPipAltX;
+    PipAltY = ConfigPipAltY;
+    PipAltWidth = ConfigPipAltWidth;
+    PipAltHeight = ConfigPipAltHeight;
+    PipAltVideoX = ConfigPipAltVideoX;
+    PipAltVideoY = ConfigPipAltVideoY;
+    PipAltVideoWidth = ConfigPipAltVideoWidth;
+    PipAltVideoHeight = ConfigPipAltVideoHeight;
+#endif
 
     Create();
 }
@@ -1724,6 +1747,7 @@ extern "C" void DelPip(void)
 
     PipReceiver = NULL;
     PipChannel = NULL;
+   
 }
 
 /**
@@ -1750,9 +1774,9 @@ static void NewPip(int channel_nr)
     }
 #endif
 
-    //if (!channel_nr) {
+    if (!channel_nr) {
         channel_nr = cDevice::CurrentChannel();
-    //}
+    }
     LOCK_CHANNELS_READ;
     if (channel_nr && (channel = Channels->GetByNumber(channel_nr))
         && (device = cDevice::GetDevice(channel, 0, false, false))) {
@@ -1850,12 +1874,18 @@ static void SwapPipPosition(void)
 {
     int width;
     int height;
+    int channel;
     double video_aspect;
 
     PipAltPosition ^= 1;
     if (!PipReceiver) {                 // no PIP visible, no update needed
         return;
     }
+
+    channel = PipChannelNr;
+
+    DelPip();
+    NewPip(channel);
 
     GetOsdSize(&width, &height, &video_aspect);
     if (PipAltPosition) {

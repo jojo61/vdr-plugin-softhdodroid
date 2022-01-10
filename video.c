@@ -139,6 +139,7 @@ bool isFirstVideoPacket = true;
 bool isAnnexB = false;
 bool isShortStartCode = false;
 bool isExtraDataSent = false;
+unsigned long FirstVPTS;
 int64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
@@ -745,9 +746,20 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	int fd_m;
 	struct fb_var_screeninfo info;
 
-	InternalClose(OdroidDecoders[0]->pip);
+	Debug(3,"VideoExit");
+
+	//InternalClose(OdroidDecoders[0]->pip);
 
 	VideoThreadExit();
+	sleep(1);
+
+	for (int i = 0; i < OdroidDecoderN; ++i) {
+        if (OdroidDecoders[i]) {
+            VideoDelHwDecoder(OdroidDecoders[i]);
+            OdroidDecoders[i] = NULL;
+        }
+    }
+    OdroidDecoderN = 0;
 
 	int r = close(cntl_handle);
 	if (r < 0)
@@ -797,7 +809,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
 #endif
-	close (ge2d_fd);
+	//close (ge2d_fd);
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 //	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
@@ -817,10 +829,15 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 
 /// Deallocate a video decoder context.
- void CodecVideoDelDecoder(VideoDecoder *i){};
+void CodecVideoDelDecoder(VideoDecoder *decoder){
+	free(decoder);
+};
 
 /// Close video codec.
- void CodecVideoClose(VideoDecoder *decoder){};
+ void CodecVideoClose(VideoHwDecoder *HwDecoder) {
+	Debug(3,"CodecVideoClose Pip %d Handle %d\n",HwDecoder->pip,HwDecoder->handle);
+	InternalClose(HwDecoder->pip);
+ };
 
 extern void amlClearVBuf();
 /// Flush video buffers.
@@ -871,7 +888,8 @@ void VideoSetDenoise(int i)
 
 void VideoDelHwDecoder(VideoHwDecoder * decoder)
 {
-	if (decoder->pip) {
+	Debug(3,"DelHWDecoder PIP %d ",decoder->pip);
+	if (decoder->pip && OdroidDecoders[1]->handle != -1) {
 		isPIP = false;
 		InternalClose(1);
 	}
@@ -893,18 +911,20 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 
 }
 
-
 extern int64_t AudioGetClock(void);
-extern int64_t GetCurrentPts(int);
-extern void SetCurrentPts(int, double );
+extern int64_t GetCurrentVPts(int);
+extern int64_t GetCurrentAPts(int);
+extern int SetCurrentPCR(int, double );
+extern int AHandle;
 void ProcessClockBuffer(int handle)
 	{
+
 		// truncate to 32bit
 		uint64_t apts;
-		uint64_t pts = apts = (uint64_t)AudioGetClock();
+		uint64_t pts = apts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ; 
 		pts &= 0xffffffff;
 
-		uint64_t vpts = (uint64_t)GetCurrentPts(handle) ;
+		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;
 		vpts &= 0xffffffff;
 
 		if (!pts || !vpts) {
@@ -925,7 +945,7 @@ void ProcessClockBuffer(int handle)
 		{
 			{
 				
-				SetCurrentPts(handle,apts);
+				SetCurrentPCR(handle,apts);
 
 				//printf("AmlVideoSink: Adjust PTS - pts=%f vpts=%f drift=%f (%f frames)\n", pts / (double)PTS_FREQ, vpts / (double)PTS_FREQ, drift, driftFrames);
 			}
@@ -946,7 +966,7 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		ProcessClockBuffer(handle);
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
-			SetCurrentPts(handle,avpkt->pts);
+			SetCurrentPCR(handle,avpkt->pts);
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
@@ -1013,6 +1033,7 @@ void ClearDisplay(void)
 void WaitVsync() {
    
 	int fd = open("/dev/fb0", O_RDWR);
+	
 	if (ioctl(fd, FBIO_WAITFORVSYNC, 1) < 0)
 	{
 		printf("FBIO_WAITFORVSYNC failed.\n");
@@ -1214,7 +1235,9 @@ OdroidDecoder *VideoNewHwDecoder(VideoStream * stream)
     decoder->Closing = -300 - 1;
     decoder->PTS = AV_NOPTS_VALUE;
 
-	decoder->pip = OdroidDecoderN;
+	decoder->pip = 0;
+
+	decoder->handle = -1;
 
     OdroidDecoders[OdroidDecoderN++] = decoder;
 
@@ -1369,7 +1392,7 @@ bool getResolution(char *mode) {
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-#if 1
+#if 0
 	ge2d_fd = open("/dev/ge2d", O_RDWR);
     if (ge2d_fd < 0)
     {
@@ -1389,7 +1412,6 @@ bool getResolution(char *mode) {
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 	
 	getResolution(mode);
-	ClearDisplay();
 
 	// enable alpha setting
 
@@ -1469,7 +1491,7 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no");
-	
+	ClearDisplay();
 };    
 extern void DelPip(void);
 ///< Setup video module.
@@ -1507,8 +1529,11 @@ extern void DelPip(void);
 		
 	}
 	
-	isAnnexB = false;
-	isFirstVideoPacket = true;
+	if (!pip) {
+		FirstVPTS = AV_NOPTS_VALUE;
+		isAnnexB = false;
+		isFirstVideoPacket = true;
+	}
 
 	if (isOpen && !pip) {
 		InternalClose(pip);
@@ -1516,10 +1541,12 @@ extern void DelPip(void);
 	
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
-		SetCurrentPts(decoder->HwDecoder->handle,avpkt->pts);
+		SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
 		amlResume();
-		amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
+		if (!isPIP)
+			amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
 	}
+	ProcessBuffer(decoder->HwDecoder,avpkt);
 };
 
 
@@ -1787,11 +1814,15 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		   codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
 		else {
 			isPIP = true;
-		    if (format == Avc)
+		    if (format == Avc) {
+			   //codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_AMLVIDEO1_AMVIDEO2);
 		       amlSetString("/sys/class/vfm/map","add pip vdec.h264.01 videosync.0 videopip");
+			}
 			else
 			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videosync.0 videopip");
 		}
+		amlSetInt("/sys/class/video/blackout_policy", 0);
+		
 	}
 #endif
 
@@ -1867,11 +1898,76 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		printf("AMSTREAM_IOC_SET_SCREEN_MODE VIDEO_WIDEOPTION_NORMAL failed");
 		return;
 	}
+#if 0
+	if (pip) {
+		int res;
+		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_GET_VIDEO_OUTPUT, &res);
+		printf("Videooutput %d\n",res);
+		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_SET_VIDEOPIP_OUTPUT, 1);
+		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_GET_VIDEOPIP_OUTPUT, &res);
+		printf("VideoPIPoutput %d\n",res);
+		ioctl(cntl_handle, AMSTREAM_IOC_GET_PIP_ZORDER, &res);
+		printf("VideoPIPZorder %d\n",res);
+	}
+#endif
 
 	isOpen = true;
 }
 
-int64_t GetCurrentPts(int handle)
+int64_t GetCurrentVPts(int handle)
+{
+	//codecMutex.Lock();
+
+	if (!isOpen)
+	{
+		//codecMutex.Unlock();
+		printf("The codec is not open.");
+		return 0;
+	}
+
+    handle = OdroidDecoders[0]->handle;
+
+	unsigned int vpts;
+	int ret;
+	if (apiLevel >= S905)	// S905
+	{
+		//int vpts = codec_get_vpts(&codec);
+		//unsigned int vpts;
+		struct am_ioctl_parm parm = { 0 };
+
+		parm.cmd = AMSTREAM_GET_VPTS;
+		//parm.data_32 = &vpts;
+
+		ret = ioctl(handle, AMSTREAM_IOC_GET, (unsigned long)&parm);
+		if (ret < 0)
+		{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_GET_VPTS failed.\n");
+			return 0;
+		}
+
+		vpts = parm.data_32;
+		unsigned long vpts = parm.data_64;
+
+		
+	}
+	else	// S805
+	{
+		ret = ioctl(handle, AMSTREAM_IOC_VPTS, (unsigned long)&vpts);
+		if (ret < 0)
+		{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_IOC_VPTS failed.\n");
+			return 0;
+		}
+	}
+
+	//codecMutex.Unlock();
+
+	return vpts; // / (double)PTS_FREQ;
+}
+
+int64_t GetCurrentAPts(int handle)
 {
 	//codecMutex.Lock();
 
@@ -1891,30 +1987,28 @@ int64_t GetCurrentPts(int handle)
 		//unsigned int vpts;
 		struct am_ioctl_parm parm = { 0 };
 
-		parm.cmd = AMSTREAM_GET_VPTS;
+		parm.cmd = AMSTREAM_GET_APTS;
 		//parm.data_32 = &vpts;
 
 		ret = ioctl(handle, AMSTREAM_IOC_GET, (unsigned long)&parm);
 		if (ret < 0)
 		{
 			//codecMutex.Unlock();
-			printf("AMSTREAM_GET_VPTS failed.");
+			printf("AMSTREAM_GET_APTS failed.");
 			return 0;
 		}
 
 		vpts = parm.data_32;
 		unsigned long vpts = parm.data_64;
 
-		//printf("AmlCodec::GetCurrentPts() parm.data_32=%u parm.data_64=%llu\n",
-		//	parm.data_32, parm.data_64);
 	}
 	else	// S805
 	{
-		ret = ioctl(handle, AMSTREAM_IOC_VPTS, (unsigned long)&vpts);
+		ret = ioctl(handle, AMSTREAM_IOC_APTS, (unsigned long)&vpts);
 		if (ret < 0)
 		{
 			//codecMutex.Unlock();
-			printf("AMSTREAM_IOC_VPTS failed.");
+			printf("AMSTREAM_IOC_APTS failed.");
 			return 0;
 		}
 	}
@@ -1923,15 +2017,22 @@ int64_t GetCurrentPts(int handle)
 
 	return vpts; // / (double)PTS_FREQ;
 }
-void SetCurrentPts(int handle, double value)
+
+int SetCurrentPCR(int handle, double value)
 {
 	// codecMutex.Lock();
 
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open.\n");
-		return;
+		//printf("The codec is not open.\n");
+		return 1;
+	}
+
+	handle = OdroidDecoders[0]->handle;
+	if (handle == -1) {
+		Debug(3,"SetPCR Invalide handle");
+		return 1;
 	}
 
 	//unsigned int pts = value * PTS_FREQ;
@@ -1946,10 +2047,18 @@ void SetCurrentPts(int handle, double value)
 	unsigned long pts = (unsigned long)(value); // * PTS_FREQ);
 	pts &= 0xffffffff;
 
+	//Debug(3,"set SCR %04lx",pts);
+
+
 	if (apiLevel >= S905)	// S905
 	{
-		codec_h_ioctl_set(handle,AMSTREAM_SET_PCRSCR,pts);
-
+		int ret = codec_h_ioctl_set(handle,AMSTREAM_SET_PCRSCR,pts);
+		if (ret < 0)
+		{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
+			return 1;
+		}
 	}
 	else	// S805
 	{
@@ -1958,9 +2067,11 @@ void SetCurrentPts(int handle, double value)
 		{
 			//codecMutex.Unlock();
 			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
-			return;
+			return 1;
 		}
 	}
+
+	return 0;
 
 	//codecMutex.Unlock();
 }
@@ -2015,6 +2126,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			isShortStartCode = false;
 		}
 
+		FirstVPTS = pkt->pts;
+
 		//double timeStamp = av_q2d(buffer->TimeBase()) * pkt->pts;
 		//unsigned long pts = (unsigned long)(timeStamp * PTS_FREQ);
 
@@ -2022,8 +2135,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 
 		isFirstVideoPacket = false;
 		
-		//printf("isAnnexB=%u\n", isAnnexB);
-		//printf("isShortStartCode=%u\n", isShortStartCode);
 	}
 
 
@@ -2174,7 +2285,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 	//playPauseMutex.Unlock();
 }
 
-CheckinPts(int handle, unsigned long pts)
+void CheckinPts(int handle, unsigned long pts)
 {
 	//codecMutex.Lock();
 
@@ -2213,38 +2324,15 @@ int WriteData(int handle, unsigned char* data, int length)
 	if (data == NULL) {
 		return;
 	}
-
 	if (length < 1) {
 		return;
 	}
 	
-	// This is done unlocked because it blocks
-	// int written = 0;
-	// while (written < length)
-	// {
-		int ret = write(handle, data, length);
-		if (ret == length) {
-			usleep(2000);
-		}
-	// 	if (ret < 0)
-	// 	{
-	// 		if (errno == EAGAIN)
-	// 		{
-	// 			//printf("EAGAIN.\n");
-	// 			sleep(0);
-
-	// 			ret = 0;
-	// 		}
-	// 		else
-	// 		{
-	// 			printf("write failed. (%d)(%d)\n", ret, errno);
-	// 			abort();
-	// 		}
-	// 	}
-
-	// 	written += ret;
-	// }
-
+	int ret = write(handle, data, length);
+	if (ret == length) {
+		usleep(2000);
+	}
+	
 	return ret; //written;
 }
 
@@ -2380,8 +2468,10 @@ void InternalClose(int pip)
 {
 	int r;
 	int handle = OdroidDecoders[pip]->handle;
-	if (handle == -1)
+	if (handle == -1 || handle == 0) {
+		Debug(3,"Internal Close mit Handle %d\n",handle);
 		return;
+	}
 	//amlClearVideo();
 
 	r = close(handle);
@@ -2403,6 +2493,11 @@ void InternalClose(int pip)
 	}
 
 	OdroidDecoders[pip]->handle = -1;
+
+	if(!pip)
+		isOpen = false;
+
+	Debug(3,"internal close pip %d",pip);
 }
 
 void amlSetVideoAxis(int pip, int x, int y, int width, int height)

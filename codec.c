@@ -75,6 +75,8 @@
 #endif
 #include <pthread.h>
 
+#include "amports/aformat.h"
+#include "amports/amstream.h"
 #include "iatomic.h"
 #include "misc.h"
 #include "video.h"
@@ -185,7 +187,10 @@ struct _audio_decoder_
     int Drift;                          ///< accumulated audio drift
     int DriftCorr;                      ///< audio drift correction value
     int DriftFrac;                      ///< audio drift fraction for ac3
+    int handle;                         /// Audio Device Handle
 };
+
+int AHandle;
 
 ///
 /// IEC Data type enumeration.
@@ -247,8 +252,65 @@ void CodecAudioDelDecoder(AudioDecoder * decoder)
 void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 {
     AVCodec *audio_codec;
+    int aFormat;
+#if 0
+    switch (codec_id) {
+	case AV_CODEC_ID_MP2:
+			aFormat = AFORMAT_MPEG2;
+		break;
+	case AV_CODEC_ID_AC3:
+			aFormat = AFORMAT_AC3;
+		break;
+    case AV_CODEC_ID_EAC3:
+			aFormat = AFORMAT_EAC3;
+		break;
+    case AV_CODEC_ID_AAC_LATM:
+			aFormat = AFORMAT_AAC_LATM;
+		break;
+	case AV_CODEC_ID_AAC:
+			aFormat = AFORMAT_AAC;
+		break;
+	default:
+			Debug(3,"Unknown Audio Codec\n");
+			return;
+    }
+    AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
+    if (audio_decoder->handle < 0)
+	{	
+		Debug(3,"AmlAudio open failed. %d\n",audio_decoder->handle);
+        return;
+	}
+    int r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_AFORMAT, aFormat);
+    if (r < 0) {
+        Debug(3,"AmlAudio unable to set Audio Codec %d\n",aFormat);
+        return;
+    }
+    r = codec_h_ioctl_set(audio_decoder->handle,AMSTREAM_PORT_INIT,0);
+    if (r < 0) {
+        Debug(3,"AmlAudio unable to Init PORT \n");
+        return;
+    }
+    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_ACHANNEL, 2);
+    if (r < 0) {
+        Debug(3,"AmlAudio unable to set Audio Channels to 2\n");
+        return;
+    }
+    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_SAMPLERATE, 48000);
+    if (r < 0) {
+        Debug(3,"AmlAudio unable to set Audio Samplerate\n");
+        return;
+    }
+    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_DATAWIDTH, 16);
+    if (r < 0) {
+        Debug(3,"AmlAudio unable to set Audio Datawidth\n");
+        return;
+    }
+    
+    //return;
+#endif
 
     Debug(3, "codec: using audio codec ID %#06x (%s)\n", codec_id, avcodec_get_name(codec_id));
+
     if (!(audio_codec = avcodec_find_decoder(codec_id))) {
         // if (!(audio_codec = avcodec_find_decoder(codec_id))) {
         Fatal(_("codec: codec ID %#06x not found\n"), codec_id);
@@ -297,6 +359,11 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 void CodecAudioClose(AudioDecoder * audio_decoder)
 {
     // FIXME: output any buffered data
+
+    if (audio_decoder->handle > 0) {
+        close(audio_decoder->handle);
+        audio_decoder->handle = -1;
+    }
 
 #ifdef USE_SWRESAMPLE
     if (audio_decoder->Resample) {
@@ -769,7 +836,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
     }
 #endif
 }
-
+#endif
 /**
 **  Decode an audio packet.
 **
@@ -784,7 +851,15 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 void CodecAudioDecode(AudioDecoder * audio_decoder, const AVPacket * avpkt)
 {
     AVCodecContext *audio_ctx = audio_decoder->AudioCtx;
+#if 0
+    int ret = write(audio_decoder->handle, avpkt->data, avpkt->size);
 
+    if (avpkt->pts != (int64_t) AV_NOPTS_VALUE) {
+        CheckinPts(audio_decoder->handle, avpkt->pts);
+        printf("pts %lx\n",avpkt->pts);
+    }
+    //return;
+#endif 
     if (audio_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
         int ret;
         AVPacket pkt[1];
@@ -833,14 +908,15 @@ void CodecAudioDecode(AudioDecoder * audio_decoder, const AVPacket * avpkt)
                             audio_decoder->HwChannels);
                     }
                     AudioEnqueue(outbuf, ret * 2 * audio_decoder->HwChannels);
-                }
+                    //write(audio_decoder->handle,outbuf, ret * 2 * audio_decoder->HwChannels );
+                }   
                 return;
             }
         }
     }
 }
 
-#endif
+
 
 /**
 **  Flush the audio decoder.
