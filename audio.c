@@ -1786,7 +1786,7 @@ void AudioEnqueue(const void *samples, int count)
 
         n = RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
 
-        if (isRadio < 50) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
+        if (isRadio < 75) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
             
             vpts = FirstVPTS;
 
