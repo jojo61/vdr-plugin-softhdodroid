@@ -360,10 +360,12 @@ void CodecAudioClose(AudioDecoder * audio_decoder)
 {
     // FIXME: output any buffered data
 
+#if 0
     if (audio_decoder->handle > 0) {
         close(audio_decoder->handle);
         audio_decoder->handle = -1;
     }
+#endif
 
 #ifdef USE_SWRESAMPLE
     if (audio_decoder->Resample) {

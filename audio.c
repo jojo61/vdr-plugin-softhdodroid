@@ -1717,7 +1717,8 @@ void AudioEnqueue(const void *samples, int count)
 {
     size_t n;
     int16_t *buffer;
-
+    static int isRadio = 0;
+    unsigned long vpts;
 #ifdef noDEBUG
     static uint32_t last_tick;
     uint32_t tick;
@@ -1784,15 +1785,20 @@ void AudioEnqueue(const void *samples, int count)
         int skip = 0;
 
         n = RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
-        unsigned long vpts = FirstVPTS;
 
-        if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
-            skip = n;   // Clear all audio until viteo is avail
-        }
-        else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
-            skip = n;    // Clear Audio until Video PTS
-        } else  {
-            SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay));
+        if (isRadio < 50) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
+            
+            vpts = FirstVPTS;
+
+            if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
+                skip = n;   // Clear all audio until viteo is avail
+            }
+            else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
+                skip = n;    // Clear Audio until Video PTS
+            } else  {
+                SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay));
+            }
+            isRadio++;
         }
 
         //        skip = AudioSkip;
@@ -1822,6 +1828,7 @@ void AudioEnqueue(const void *samples, int count)
             // no lock needed, can wakeup next time
             AudioRunning = 1;
             FirstVPTS = 0;
+            isRadio = 0;
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "Start on AudioEnque Threshold %d n %d\n", AudioStartThreshold, n);
         }
