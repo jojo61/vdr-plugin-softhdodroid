@@ -2158,6 +2158,7 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
     // hard limit buffer full: needed for replay
     if (atomic_read(&stream->PacketsFilled) >= VIDEO_PACKET_MAX - 10) {
         // Debug(3, "video: video buffer full\n");
+        usleep(20000);
         return 0;
     }
 
@@ -2549,7 +2550,6 @@ void TrickSpeed(int speed)
 void Clear(void)
 {
     int i;
-    amlReset();
     VideoResetPacket(MyVideoStream);    // terminate work
     MyVideoStream->ClearBuffers = 1;
     if (!SkipAudio) {
@@ -2562,8 +2562,9 @@ void Clear(void)
     // wait for empty buffers
     // FIXME: without softstart sync VideoDecode isn't called.
     for (i = 0; MyVideoStream->ClearBuffers && i < 20; ++i) {
-        usleep(1 * 100);
+        usleep(1 * 1000);
     }
+    amlReset();
     Debug(3, "[softhddev]%s: %dms buffers %d\n", __FUNCTION__, i, VideoGetBuffers(MyVideoStream));
 }
 
@@ -2583,7 +2584,6 @@ void Play(void)
 **  Sets the device into "freeze frame" mode.
 */
 extern amlResume();
-extern amlClearVBuf();
 extern amlPause();
 extern amlFreerun(int);
 extern amlTrickMode(int);
@@ -2657,7 +2657,7 @@ void StillPicture(const uint8_t * data, int size)
     amlFreerun(1);
     amlTrickMode(1);
     //amlClearVBuf();
-    
+    usleep(10000);
     for (i = 0; i < 4; ++i) {
         const uint8_t *split;
         int n;

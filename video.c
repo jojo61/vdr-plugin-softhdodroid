@@ -471,6 +471,20 @@ uint8_t GrabVideo(char *base, int width, int height) {
 	return true;
 }
 
+static int scan_str(const char* buf, const char* pattern)
+{
+       int res = 0;
+       if (buf && pattern) {
+               const char* ptr = strstr(buf, pattern);
+               if (ptr != NULL) {
+                       char format[strlen(pattern)+5];
+                       strcpy(format,pattern);
+                       strcat(format,"%d");
+                       sscanf(ptr, format, &res);
+               }
+       }
+       return res;
+}
 
                       
 ///
@@ -497,9 +511,10 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 	if(strstr(vdec_status,"No vdec")) {
 		return NULL;
 	}
-
-	sscanf(strstr(vdec_status,"width"),"width : %d",&width);
-	sscanf(strstr(vdec_status,"height"),"height : %d",&height);
+	
+    width = scan_str(vdec_status,"width : ");
+	height = scan_str(vdec_status,"height : ");
+	
 	//printf("Video is %d-%d\n",width,height);
     // get real surface size
 
@@ -715,11 +730,11 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		*aspect_num = *aspect_den = 1;
 		return;
 	}
-	char r;
-	sscanf(strstr(vdec_status,"width"),"width : %d",width);
-	sscanf(strstr(vdec_status,"height"),"height : %d",height);
-	sscanf(strstr(vdec_status,"ratio_control"),"ratio_control : %c",&r);
-	if (r == '9') {
+	
+	*width  = scan_str(vdec_status,"width : ");
+    *height = scan_str(vdec_status,"height : ");
+    int r   = scan_str(vdec_status,"ratio_control : ");
+    if (r == 9000) {
 		*aspect_num = 16;
 		*aspect_den = 9;
 	}
@@ -947,7 +962,7 @@ void ProcessClockBuffer(int handle)
 				
 				SetCurrentPCR(handle,apts);
 
-				//printf("AmlVideoSink: Adjust PTS - pts=%f vpts=%f drift=%f (%f frames)\n", pts / (double)PTS_FREQ, vpts / (double)PTS_FREQ, drift, driftFrames);
+				//printf("AmlVideoSink: Adjust PTS - apts=%04lx vpts=%04lx  (%f frames)\n", pts , vpts , driftFrames);
 			}
 		}
 
@@ -1541,7 +1556,7 @@ extern void DelPip(void);
 	
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
-		SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
+		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
 		amlResume();
 		if (!isPIP)
 			amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
@@ -2126,7 +2141,13 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			isShortStartCode = false;
 		}
 
-		FirstVPTS = pkt->pts;
+		if (!pip) {
+			FirstVPTS = pkt->pts;
+			double dpts = pkt->pts & 0xffffffff;
+			SetCurrentPCR(hwdecoder->handle,dpts);
+		}
+
+		//Debug(3,"First Video Paket with pts %04lx Size %d\n",pkt->pts,pkt->size);
 
 		//double timeStamp = av_q2d(buffer->TimeBase()) * pkt->pts;
 		//unsigned long pts = (unsigned long)(timeStamp * PTS_FREQ);
@@ -2453,13 +2474,15 @@ amlReset()
 	//amlPause();
 ;
 	InternalClose(0);
+	FirstVPTS = AV_NOPTS_VALUE;
+	isFirstVideoPacket = true;
 	InternalOpen(OdroidDecoders[0], videoFormat,FrameRate);
 
 	//amlSetVideoDelayLimit(1000);
 
 	amlSetInt("/sys/class/video/blackout_policy", blackout_policy);
 	
-	printf("amlReset\n");
+	//printf("amlReset\n");
 	
 	//codecMutex.Unlock();
 }
@@ -2494,8 +2517,9 @@ void InternalClose(int pip)
 
 	OdroidDecoders[pip]->handle = -1;
 
-	if(!pip)
+	if (!pip) {
 		isOpen = false;
+	}
 
 	Debug(3,"internal close pip %d",pip);
 }
@@ -2570,6 +2594,30 @@ void amlTrickMode(int val)  // unused
 		printf("AMSTREAM_TRICKMODE failed. %d",val);
 		return;
 	}	
+}
+
+void amlClearVbuf()  
+{
+	//codecMutex.Lock();
+	Debug(3,"clear vbuf\n");
+	if (!isOpen)
+	{
+		//codecMutex.Unlock();
+		printf("The codec is not open. %s\n",__FUNCTION__);
+		return;
+	}
+		
+	int r = ioctl(cntl_handle,AMSTREAM_IOC_CLEAR_VBUF  ,0);
+	//codecMutex.Unlock();
+
+	if (r < 0)
+	{
+		printf("AMSTREAM_CLEAR_VBUF failed.");
+		return;
+	}	
+	CheckinPts(OdroidDecoders[0]->handle,0);
+	SetCurrentPCR(0,0);
+
 }
 
 int amlSetString(char *path, char *valstr)
