@@ -1791,12 +1791,16 @@ void AudioEnqueue(const void *samples, int count)
             vpts = FirstVPTS;
 
             if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
+                usleep(1000);
                 skip = n;   // Clear all audio until viteo is avail
             }
             else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
                 skip = n;    // Clear Audio until Video PTS
             } else  {
-                SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay));
+                int i = 10;
+                while (SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay)) == 2 && i--) {
+                    usleep(5000);
+                }
             }
             isRadio++;
         }

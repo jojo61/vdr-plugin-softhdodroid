@@ -48,6 +48,7 @@ typedef struct _odroid_decoder_
  //   xcb_window_t Window;                ///< output window
     int pip;                            // 0 = main Video  1 = PIP
     int handle;                         // device handle
+    int Format;                         // Video Format
     int VideoX;                         ///< video base x coordinate
     int VideoY;                         ///< video base y coordinate
     int VideoWidth;                     ///< video base width

@@ -2253,7 +2253,7 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
 
     // PES start code 0x00 0x00 0x01 0x00|0xb3
     //if (z > 1 && check[0] == 0x01 && (!check[1] || check[1] == 0xb3)) {
-    if (z > 1 && check[0] == 0x01 && (check[1] == 0xb3)) {
+    if (z > 1 && check[0] == 0x01 && (!check[1] || check[1] == 0xb3)) {
         if (stream->CodecID == AV_CODEC_ID_MPEG2VIDEO) {
             VideoNextPacket(stream, AV_CODEC_ID_MPEG2VIDEO);
         } else {
@@ -2427,12 +2427,14 @@ uint8_t *GrabImage(int *size, int jpeg, int quality, int width, int height)
 **
 **  @param play_mode    play mode (none, video+audio, audio-only, ...)
 */
+//extern void amlClearVideo();
 int SetPlayMode(int play_mode)
 {
     Debug(3, "Set Playmode %d\n", play_mode);
     switch (play_mode) {
         case 0:                        // audio/video from decoder
             // tell video parser we get new stream
+            //amlClearVideo();
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                 // clear buffers on close configured always or replay only
                 if (MyVideoStream->ClearClose) {

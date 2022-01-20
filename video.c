@@ -1164,11 +1164,12 @@ void VideoThreadInit(void)
 ///
 /// Handle a Odroid display.
 ///
+int amlGetBufferFree(int);
 void OdroidDisplayHandlerThread(void)
 {
     int i;
     int err = 0;
-    int allfull;
+    int free;
     int decoded;
     int64_t filled;
     struct timespec nowtime;
@@ -1176,20 +1177,20 @@ void OdroidDisplayHandlerThread(void)
 	
 	int64_t akt_pts, new_pts;
 
-    allfull = 1;
     decoded = 0;
 
-
-    
 	for (i = 0; i < OdroidDecoderN; ++i) { 
 		filled = 0;
 		decoder = OdroidDecoders[i];
 		if (!decoder)
 			continue;
-		if (filled < 60) {
+
+		free = amlGetBufferFree(decoder->pip);	
+		//printf("Free in Prozent: %d\n",free);
+
+		if (free > 60) {
 			// FIXME: hot polling
 			// fetch+decode or reopen
-			allfull = 0;
 			err = VideoDecodeInput(decoder->Stream);
 		} else {
 			err = VideoPollInput(decoder->Stream);
@@ -1704,10 +1705,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 	if (hwdecoder->handle < 0)
 	{	
-		printf("AmlCodec open failed. %d\n",hwdecoder->handle);
+		Debug(3,"AmlCodec open failed. %d\n",hwdecoder->handle);
         return;
 	}
 	handle = hwdecoder->handle;
+	hwdecoder->Format = format;
 
 	// Set video format
 	vformat_t amlFormat = (vformat_t)0;
@@ -2041,7 +2043,7 @@ int SetCurrentPCR(int handle, double value)
 	{
 		//codecMutex.Unlock();
 		//printf("The codec is not open.\n");
-		return 1;
+		return 2;
 	}
 
 	handle = OdroidDecoders[0]->handle;
@@ -2072,7 +2074,7 @@ int SetCurrentPCR(int handle, double value)
 		{
 			//codecMutex.Unlock();
 			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
-			return 1;
+			return 2;
 		}
 	}
 	else	// S805
@@ -2082,7 +2084,7 @@ int SetCurrentPCR(int handle, double value)
 		{
 			//codecMutex.Unlock();
 			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
-			return 1;
+			return 2;
 		}
 	}
 
@@ -2096,7 +2098,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 {
 	//playPauseMutex.Lock();
 
-	
+	int len,b2;
 	int pip = hwdecoder->pip;
 	if (doResumeFlag)
 	{
@@ -2108,6 +2110,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 
 
 	unsigned char* nalHeader = (unsigned char*)pkt->data;
+	len = pkt->size - 4;
 
 #if 0
 	printf("Header (pkt.size=%x):\n", pkt->size);
@@ -2127,6 +2130,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			printf("%02x ", nalHeader[j]);
 		}
 		printf("\n");
+		printf("PTS %04lx\n",pkt->pts);
 #endif
 		if (nalHeader[0] == 0 && nalHeader[1] == 0 &&
 			nalHeader[2] == 1)
@@ -2140,7 +2144,52 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			isAnnexB = true;
 			isShortStartCode = false;
 		}
-
+#if 0
+		switch(hwdecoder->Format) {
+			case Mpeg2:
+				while (len--) {
+					if (nalHeader[0] == 0 && 
+						nalHeader[1] == 0 &&
+						nalHeader[2] == 1 &&
+						nalHeader[3] == 0) {						// Picture Start Code
+						b2 = (nalHeader[5] >> 3) & 0x07;  		// Get Frame Type
+						printf("Got Frame Type %d\n",b2);
+						if (b2 != 1) {
+							nalHeader++;								// not I-Frame
+							continue;
+						}
+						else {
+							
+	for (int j = 0; j < 25; ++j)	//nalHeaderLength  256
+	{
+		printf("%02x ", nalHeader[j]);
+	}
+	printf("\n");
+	
+							if ((nalHeader[7] & 0xc0) == 0x80 || (nalHeader[7] & 0xC0) == 0xc0 ) {
+								pkt->pts =
+									(int64_t) (nalHeader[9] & 0x0E) << 29 | nalHeader[10] << 22 | (nalHeader[11] & 0xFE) << 14 | 
+									nalHeader[12] << 7 | (nalHeader[13] & 0xFE) >> 1;
+							}
+    printf("2.PTS %04lx\n",pkt->pts);
+							break;
+						}
+					}
+					else {
+						nalHeader++;										// wait for I-Frame
+					}
+				}
+				if (len <= 0) {
+					printf("No I-Frame found len %d\n",len);
+					return;
+				}
+				else
+					printf("Found I-Frame len %d b2 %d\n\n",len,b2);
+				break;
+			default:
+				break;
+		}
+#endif		
 		if (!pip) {
 			FirstVPTS = pkt->pts;
 			double dpts = pkt->pts & 0xffffffff;
@@ -2178,7 +2227,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 	{
 		case Mpeg2:
 		{
-			SendCodecData(pip,pts, pkt->data, pkt->size);
+			//SendCodecData(pip,pts, pkt->data, pkt->size);
+			SendCodecData(pip,pts, nalHeader, len+4);
 			break;
 		}
 
@@ -2460,11 +2510,12 @@ amlResume()
 amlReset()
 {
 	// codecMutex.Lock();
-	
+	Debug(3,"amlreset");
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open. %s\n",__FUNCTION__);
+		//Debug(3,"The codec is not open. %s\n",__FUNCTION__);
+		return;
 	}
 	// set the system blackout_policy to leave the last frame showing
 	int blackout_policy;
@@ -2596,29 +2647,59 @@ void amlTrickMode(int val)  // unused
 	}	
 }
 
-void amlClearVbuf()  
+int amlGetBufferFree(int pip)  
 {
 	//codecMutex.Lock();
-	Debug(3,"clear vbuf\n");
+
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open. %s\n",__FUNCTION__);
-		return;
+		//printf("The codec is not open. %s\n",__FUNCTION__);
+		return 100;
 	}
-		
-	int r = ioctl(cntl_handle,AMSTREAM_IOC_CLEAR_VBUF  ,0);
-	//codecMutex.Unlock();
-
-	if (r < 0)
+	int handle = OdroidDecoders[pip]->handle;
+	
+	struct buf_status status;
+	if (apiLevel >= S905)	// S905
 	{
-		printf("AMSTREAM_CLEAR_VBUF failed.");
-		return;
-	}	
-	CheckinPts(OdroidDecoders[0]->handle,0);
-	SetCurrentPCR(0,0);
+		struct am_ioctl_parm_ex parm = { 0 };
+		parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
+		
+		int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
 
+		//codecMutex.Unlock();
+
+		if (r < 0)
+		{
+			//printf("AMSTREAM_GET_EX_VB_STATUS failed.\n");
+			return 100;
+		}
+
+		memcpy(&status, &parm.status, sizeof(status));
+	}
+	else	// S805
+	{
+		struct am_io_param am_io;
+
+		int r = ioctl(handle, AMSTREAM_IOC_VB_STATUS, (unsigned long)&am_io);
+
+		//codecMutex.Unlock();
+
+		if (r < 0)
+		{
+			//printf("AMSTREAM_IOC_VB_STATUS failed.\n");
+			return 100;
+		}
+
+		memcpy(&status, &am_io.status, sizeof(status));
+	}
+	//printf("STatus: write %u read %u free %d size %d data %d\n",status.write_pointer,status.read_pointer,status.free_len,status.size,status.data_len);
+	if (status.size)
+		return (status.free_len * 100) / status.size;
+	else
+		return 0;
 }
+
 
 int amlSetString(char *path, char *valstr)
 {
@@ -2716,7 +2797,29 @@ bool amlHasRW(char *path)
   return false;
 }
 
+
+
+
 #if 0
+void amlClearVideo()  
+{
+	
+	Debug(3,"clear vbuf\n");
+	if (!isOpen)
+	{
+		printf("The codec is not open. %s\n",__FUNCTION__);
+		return;
+	}
+	amlSetInt("/sys/class/video/blackout_policy", 1);
+	int r = ioctl(cntl_handle,AMSTREAM_IOC_CLEAR_VIDEO  ,1);
+	amlSetInt("/sys/class/video/blackout_policy", 0);
+	if (r < 0)
+	{
+		printf("AMSTREAM_CLEAR_VIDEO failed.");
+		return;
+	}	
+}
+
 void amlClearVBuf()   // unused
 {
 	//codecMutex.Lock();
@@ -2779,55 +2882,7 @@ void amlDecReset()  // unused
 		return;
 	}	
 }
-nt amlGetBufferStatus()   // unused
-{
-	//codecMutex.Lock();
 
-	if (!isOpen)
-	{
-		//codecMutex.Unlock();
-		printf("The codec is not open. %s\n",__FUNCTION__);
-		return;
-	}
-
-	
-	struct buf_status status;
-	if (apiLevel >= S905)	// S905
-	{
-		struct am_ioctl_parm_ex parm = { 0 };
-		parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
-		
-		int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
-
-		//codecMutex.Unlock();
-
-		if (r < 0)
-		{
-			printf("AMSTREAM_GET_EX_VB_STATUS failed.");
-			return 0;
-		}
-
-		memcpy(&status, &parm.status, sizeof(status));
-	}
-	else	// S805
-	{
-		struct am_io_param am_io;
-
-		int r = ioctl(handle, AMSTREAM_IOC_VB_STATUS, (unsigned long)&am_io);
-
-		//codecMutex.Unlock();
-
-		if (r < 0)
-		{
-			printf("AMSTREAM_IOC_VB_STATUS failed.");
-			return 0;
-		}
-
-		memcpy(&status, &am_io.status, sizeof(status));
-	}
-	//rintf("STatus: write %u read %u free %d size %d data %d\n",status.write_pointer,status.read_pointer,status.free_len,status.size,status.data_len);
-	return status.data_len;
-}
 
 amlClearVideo()  // unused
 {
