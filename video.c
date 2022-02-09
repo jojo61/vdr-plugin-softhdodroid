@@ -781,7 +781,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	{
 		//codecMutex.Unlock();
 		printf("close cntl_handle failed.");
-		return;
+		//return;
 	}
 
 // Set text mode
@@ -795,11 +795,11 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		int ret = ioctl(ttyfd, KDSETMODE, KD_TEXT);
 		if (ret < 0) {
 			printf("KDSETMODE failed.");
-			return;
+			//return;
 		}
 		close(ttyfd);
 	}
-#if 1
+
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -823,10 +823,18 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	info.yres_virtual = VideoWindowHeight*2;
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
-#endif
+
 	//close (ge2d_fd);
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+
+	// restore vfm mapping
+	amlSetString("/sys/class/vfm/map","rm all");
+	amlSetString("/sys/class/vfm/map","add default decoder amvideo");
+	amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
+	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
+	amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
+	amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
 //	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
 
 	
