@@ -835,6 +835,10 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
 	amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
 	amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
+
+	// reset audio codec to 2 chan
+	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+
 //	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
 
 	

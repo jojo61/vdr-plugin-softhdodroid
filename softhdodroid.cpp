@@ -3176,6 +3176,73 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         AudioSetAutoAES(ConfigAudioAutoAES);
         return true;
     }
+    
+#ifdef USE_PIP
+    if (!strcasecmp(name, "pip.X")) {
+        ConfigPipX = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Y")) {
+        ConfigPipY = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Width")) {
+        ConfigPipWidth = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Height")) {
+        ConfigPipHeight = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.VideoX")) {
+        ConfigPipVideoX = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.VideoY")) {
+        ConfigPipVideoY = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.VideoWidth")) {
+        ConfigPipVideoWidth = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.VideoHeight")) {
+        ConfigPipVideoHeight = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.X")) {
+        ConfigPipAltX = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.Y")) {
+        ConfigPipAltY = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.Width")) {
+        ConfigPipAltWidth = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.Height")) {
+        ConfigPipAltHeight = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.VideoX")) {
+        ConfigPipAltVideoX = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.VideoY")) {
+        ConfigPipAltVideoY = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.VideoWidth")) {
+        ConfigPipAltVideoWidth = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "pip.Alt.VideoHeight")) {
+        ConfigPipAltVideoHeight = atoi(value);
+        return true;
+    }
+#endif
 
     return false;
 }

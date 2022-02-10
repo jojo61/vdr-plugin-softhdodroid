@@ -35,48 +35,7 @@
 
 #define AVCODEC_MAX_AUDIO_FRAME_SIZE 192000
 
-enum HWAccelID
-{
-    HWACCEL_NONE = 0,
-    HWACCEL_AUTO,
-    HWACCEL_VDPAU,
-    HWACCEL_DXVA2,
-    HWACCEL_VDA,
-    HWACCEL_VIDEOTOOLBOX,
-    HWACCEL_QSV,
-    HWACCEL_VAAPI,
-    HWACCEL_CUVID,
-};
-#if 0
-///
-/// Video decoder structure.
-struct _video_decoder_
-{
-    VideoHwDecoder *HwDecoder;          ///< video hardware decoder
 
-    int GetFormatDone;                  ///< flag get format called!
-    AVCodec *VideoCodec;                ///< video codec
-    AVCodecContext *VideoCtx;           ///< video codec context
-    // #ifdef FFMPEG_WORKAROUND_ARTIFACTS
-    int FirstKeyFrame;                  ///< flag first frame
-    // #endif
-    // AVFrame *Frame;             ///< decoded video frame
-    int64_t PTS;
-    int filter;                         // flag for deint filter
-};
-
-
-
-//----------------------------------------------------------------------------
-//  Typedefs
-//----------------------------------------------------------------------------
-
-/// Video decoder typedef.
-typedef struct _video_decoder_ VideoDecoder;
-
-/// Audio decoder typedef.
-typedef struct _audio_decoder_ AudioDecoder;
-#endif
 //----------------------------------------------------------------------------
 //  Variables
 //----------------------------------------------------------------------------

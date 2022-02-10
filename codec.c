@@ -249,31 +249,43 @@ void CodecAudioDelDecoder(AudioDecoder * decoder)
 **  @param audio_decoder    private audio decoder
 **  @param codec_id audio   codec id
 */
+extern int amlSetInt(char *, int );
 void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 {
     AVCodec *audio_codec;
     int aFormat;
-#if 0
-    switch (codec_id) {
-	case AV_CODEC_ID_MP2:
-			aFormat = AFORMAT_MPEG2;
-		break;
-	case AV_CODEC_ID_AC3:
-			aFormat = AFORMAT_AC3;
-		break;
-    case AV_CODEC_ID_EAC3:
-			aFormat = AFORMAT_EAC3;
-		break;
-    case AV_CODEC_ID_AAC_LATM:
-			aFormat = AFORMAT_AAC_LATM;
-		break;
-	case AV_CODEC_ID_AAC:
-			aFormat = AFORMAT_AAC;
-		break;
-	default:
-			Debug(3,"Unknown Audio Codec\n");
-			return;
+    if (CodecPassthrough) {
+        switch (codec_id) {
+        case AV_CODEC_ID_MP2:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        case AV_CODEC_ID_AC3:
+                aFormat = AFORMAT_AC3;
+                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+            break;
+        case AV_CODEC_ID_EAC3:
+                aFormat = AFORMAT_EAC3;
+                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+            break;
+        case AV_CODEC_ID_AAC_LATM:
+                aFormat = AFORMAT_AAC_LATM;
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        case AV_CODEC_ID_AAC:
+                aFormat = AFORMAT_AAC;
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        default:
+                Debug(3,"Unknown Audio Codec\n");
+                return;
+        }
     }
+    else {
+        amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+    }
+
+    
+#if 0  
     AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
     if (audio_decoder->handle < 0)
 	{	
