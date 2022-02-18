@@ -48,7 +48,7 @@ Install:
 
 	In order to compile the vdr you need to prepare the following.
 	# apt build-dep vdr
-	# apt install libgl-dev libglu-dev libgles2-mesa-dev freeglut3-dev libglm-dev libavcodec-dev libdrm-dev
+	# apt install libgl-dev libglu-dev libgles2-mesa-dev freeglut3-dev libglm-dev libavcodec-dev libdrm-dev libasound2-dev
 	
 	Install from git
 
