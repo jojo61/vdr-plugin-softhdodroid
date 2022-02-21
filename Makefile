@@ -64,7 +64,7 @@ TMPDIR ?= /tmp
 
 ### The compiler options:
 
-export CFLAGS	= $(call PKGCFG,cflags) 
+export CFLAGS	= $(call PKGCFG,cflags) -I.
 export CXXFLAGS = $(call PKGCFG,cxxflags)
 
 ifeq ($(CFLAGS),)
