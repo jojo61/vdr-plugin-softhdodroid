@@ -2556,6 +2556,9 @@ cOglOsd::cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > o
         free(posd);
     posd = (unsigned char *)calloc(osdWidth * osdHeight * 4, 1);
 #endif
+  
+    cSize maxPixmapSize_ODROID(oglThread->MaxTextureSize(), oglThread->MaxTextureSize());
+    
     // create output framebuffer
 
     if (!oFb) {
