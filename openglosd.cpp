@@ -2536,6 +2536,7 @@ void cOglPixmap::Pan(const cPoint & Dest, const cRect & Source)
 * cOglOsd
 ******************************************************************************/
 cOglOutputFb *cOglOsd::oFb = NULL;
+cSize cOglOsd::maxPixmapSize_ODROID(8192,8192);
 
 cOglOsd::cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > oglThread):cOsd(Left, Top, Level)
 {
@@ -2595,6 +2596,11 @@ eOsdError cOglOsd::SetAreas(const tArea * Areas, int NumAreas)
     initiated.Wait();
 
     return cOsd::SetAreas(&area, 1);
+}
+
+const cSize &cOglOsd::MaxPixmapSize(void) const
+{
+  return maxPixmapSize_ODROID;
 }
 
 cPixmap *cOglOsd::CreatePixmap(int Layer, const cRect & ViewPort, const cRect & DrawPort)

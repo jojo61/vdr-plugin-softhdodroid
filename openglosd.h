@@ -706,6 +706,7 @@ class cOglOsd:public cOsd
     std::shared_ptr < cOglThread > oglThread;
     cVector < cOglPixmap * >oglPixmaps;
     bool isSubtitleOsd;
+    static cSize maxPixmapSize_ODROID;
   protected:
   public:
      cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > oglThread);
@@ -716,6 +717,7 @@ class cOglOsd:public cOsd
     virtual void Flush(void);
     virtual void DrawScaledBitmap(int x, int y, const cBitmap & Bitmap, double FactorX, double FactorY,
         bool AntiAlias = false);
+    virtual const cSize &MaxPixmapSize(void) const;
     static cOglOutputFb *oFb;
 };
 
