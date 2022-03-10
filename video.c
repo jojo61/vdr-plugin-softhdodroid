@@ -40,9 +40,27 @@
 
 #include "codec_type.h"
 #include "amports/amstream.h"
-#define VIDEO_WIDEOPTION_NORMAL (0)
-#define VIDEO_DISABLE_NONE    (0)
 
+#define VIDEO_DISABLE_NONE    (0)
+enum {
+	VIDEO_WIDEOPTION_NORMAL = 0,
+	VIDEO_WIDEOPTION_FULL_STRETCH = 1,
+	VIDEO_WIDEOPTION_4_3 = 2,
+	VIDEO_WIDEOPTION_16_9 = 3,
+	VIDEO_WIDEOPTION_NONLINEAR = 4,
+	VIDEO_WIDEOPTION_NORMAL_NOSCALEUP = 5,
+	VIDEO_WIDEOPTION_4_3_IGNORE = 6,
+	VIDEO_WIDEOPTION_4_3_LETTER_BOX = 7,
+	VIDEO_WIDEOPTION_4_3_PAN_SCAN = 8,
+	VIDEO_WIDEOPTION_4_3_COMBINED = 9,
+	VIDEO_WIDEOPTION_16_9_IGNORE = 10,
+	VIDEO_WIDEOPTION_16_9_LETTER_BOX = 11,
+	VIDEO_WIDEOPTION_16_9_PAN_SCAN = 12,
+	VIDEO_WIDEOPTION_16_9_COMBINED = 13,
+	VIDEO_WIDEOPTION_CUSTOM = 14,
+	VIDEO_WIDEOPTION_AFD = 15,
+	VIDEO_WIDEOPTION_MAX = 16
+};
 
 #include "video.h"
 #include "codec.h"
@@ -799,7 +817,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		}
 		close(ttyfd);
 	}
-
+#if 1
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -815,15 +833,16 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	info.blue.offset = 0;
 	info.blue.length = 8;
 	info.transp.offset = 24;
-	info.transp.length = 0;
+	info.transp.length = 8;
+	info.bits_per_pixel = 32;
 	info.nonstd = 1;
-	info.xres = VideoWindowWidth;
-	info.yres = VideoWindowHeight;
-	info.xres_virtual = VideoWindowWidth;
-	info.yres_virtual = VideoWindowHeight*2;
+	info.xres = 1920;
+	info.yres = 1079;
+	info.xres_virtual = 1920;
+	info.yres_virtual = (1080*2);
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
-
+#endif
 	//close (ge2d_fd);
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
@@ -1553,6 +1572,7 @@ extern void DelPip(void);
 
 	default:
 			printf("Unknown Video Codec\n");
+		
 			return;
 		
 	}
@@ -1574,7 +1594,6 @@ extern void DelPip(void);
 		if (!isPIP)
 			amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
 	}
-	ProcessBuffer(decoder->HwDecoder,avpkt);
 };
 
 
@@ -1914,7 +1933,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 #endif
 	//amlSetInt("/sys/class/video/disable_video",0);
 	
-	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_NORMAL;
+	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
 	if (!pip) {
 		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
 	} else {
@@ -2109,7 +2128,7 @@ int SetCurrentPCR(int handle, double value)
 void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 {
 	//playPauseMutex.Lock();
-
+	static int test=0;
 	int len,b2;
 	int pip = hwdecoder->pip;
 	if (doResumeFlag)
@@ -2123,15 +2142,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 
 	unsigned char* nalHeader = (unsigned char*)pkt->data;
 	len = pkt->size - 4;
-
-#if 0
-	printf("Header (pkt.size=%x):\n", pkt->size);
-	for (int j = 0; j < 25; ++j)	//nalHeaderLength  256
-	{
-		printf("%02x ", nalHeader[j]);
-	}
-	printf("\n");
-#endif
 
 	if (isFirstVideoPacket)
 	{
@@ -2156,47 +2166,101 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			isAnnexB = true;
 			isShortStartCode = false;
 		}
-#if 0
+
+#if 1		
 		switch(hwdecoder->Format) {
+			case Hevc:
+						{
+							int nal_unit_type;
+							nalHeader = (unsigned char*)pkt->data;
+							test=30;
+							while (len--) {
+								if (nalHeader[0] == 0 && 
+									nalHeader[1] == 0 &&
+									nalHeader[2] == 1) {
+										nal_unit_type = ((nalHeader[3] >>1)  & 0x3f);  		// Get Frame Type
+										//printf("HEVC Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
+										if (nal_unit_type == 32 ) {
+											break;
+											
+										}
+										else {
+											nalHeader++;
+											continue;
+										}
+								}
+								else {
+									nalHeader++;										// wait for I-Frame
+								}
+							}
+							if (len <= 0) {
+								//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+								return;
+							}
+							else {
+								//printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+							}
+						}
+						break;
+			case Avc:
+						{
+							int nal_unit_type;
+							nalHeader = (unsigned char*)pkt->data;
+							test=0;
+							while (len--) {
+								if (nalHeader[0] == 0 && 
+									nalHeader[1] == 0 &&
+									nalHeader[2] == 1) {
+										nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
+										//printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
+										if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
+											break;
+											
+										}
+										else {
+											nalHeader++;
+											continue;
+										}
+								}
+								else {
+									nalHeader++;										// wait for I-Frame
+								}
+							}
+							if (len <= 0) {
+								//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+								return;
+							}
+							else {
+								//printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+							}
+						}
+						break;
 			case Mpeg2:
 				while (len--) {
 					if (nalHeader[0] == 0 && 
 						nalHeader[1] == 0 &&
 						nalHeader[2] == 1 &&
 						nalHeader[3] == 0) {						// Picture Start Code
-						b2 = (nalHeader[5] >> 3) & 0x07;  		// Get Frame Type
-						printf("Got Frame Type %d\n",b2);
-						if (b2 != 1) {
-							nalHeader++;								// not I-Frame
-							continue;
-						}
-						else {
-							
-	for (int j = 0; j < 25; ++j)	//nalHeaderLength  256
-	{
-		printf("%02x ", nalHeader[j]);
-	}
-	printf("\n");
-	
-							if ((nalHeader[7] & 0xc0) == 0x80 || (nalHeader[7] & 0xC0) == 0xc0 ) {
-								pkt->pts =
-									(int64_t) (nalHeader[9] & 0x0E) << 29 | nalHeader[10] << 22 | (nalHeader[11] & 0xFE) << 14 | 
-									nalHeader[12] << 7 | (nalHeader[13] & 0xFE) >> 1;
+							b2 = (nalHeader[5] >> 3) & 0x07;  		// Get Frame Type
+							//printf("Got Frame Type %d\n",b2);
+							if (b2 != 1) {
+								return;
 							}
-    printf("2.PTS %04lx\n",pkt->pts);
-							break;
-						}
+							else {
+								//printf("2.PTS %04lx\n",pkt->pts);
+								break;
+							}
 					}
 					else {
 						nalHeader++;										// wait for I-Frame
 					}
 				}
 				if (len <= 0) {
-					printf("No I-Frame found len %d\n",len);
+					//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,b2);
 					return;
 				}
 				else
-					printf("Found I-Frame len %d b2 %d\n\n",len,b2);
+					//printf("Found I-Frame len %d (%d) b2 %d\n\n",len,pkt->size,b2);
 				break;
 			default:
 				break;
@@ -2208,17 +2272,55 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			SetCurrentPCR(hwdecoder->handle,dpts);
 		}
 
-		//Debug(3,"First Video Paket with pts %04lx Size %d\n",pkt->pts,pkt->size);
-
-		//double timeStamp = av_q2d(buffer->TimeBase()) * pkt->pts;
-		//unsigned long pts = (unsigned long)(timeStamp * PTS_FREQ);
-
 		//amlCodec.SetSyncThreshold(pts);
 
 		isFirstVideoPacket = false;
 		
 	}
 
+#if 0	
+nalHeader = (unsigned char*)pkt->data;
+	len = pkt->size - 4;
+	if (test > 0) {
+	switch(hwdecoder->Format) {
+			case Hevc:
+						{
+							int nal_unit_type;
+							
+							while (len--) {
+								if (nalHeader[0] == 0 && 
+									nalHeader[1] == 0 &&
+									nalHeader[2] == 1) {
+										nal_unit_type = ((nalHeader[3] >> 1)  & 0x3f);  		// Get Frame Type
+										printf("HEVC Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
+										if (nal_unit_type != 0x20) {
+											nalHeader++;
+											continue;
+										}
+										else {
+											break;
+										}
+								}
+								else {
+									nalHeader++;										// wait for I-Frame
+								}
+							}
+							if (len <= 0) {
+								printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+								//return;
+							}
+							else {
+								printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+							}
+						}
+						break;
+			default:
+				break;
+
+	}
+	test--;
+	}
+#endif
 
 	uint64_t pts = 0;
 
@@ -2239,8 +2341,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 	{
 		case Mpeg2:
 		{
-			//SendCodecData(pip,pts, pkt->data, pkt->size);
-			SendCodecData(pip,pts, nalHeader, len+4);
+			SendCodecData(pip,pts, pkt->data, pkt->size);
 			break;
 		}
 
