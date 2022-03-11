@@ -2244,12 +2244,26 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 							b2 = (nalHeader[5] >> 3) & 0x07;  		// Get Frame Type
 							//printf("Got Frame Type %d\n",b2);
 							if (b2 != 1) {
-								return;
+								nalHeader++;
+								continue;
 							}
 							else {
 								//printf("2.PTS %04lx\n",pkt->pts);
 								break;
 							}
+					}
+					else if (nalHeader[0] == 0 && 
+						nalHeader[1] == 0 &&
+						nalHeader[2] == 1 &&
+						nalHeader[3] == 0xb3) {						// Sequence Header
+							int ratio = (nalHeader[7] >> 4) & 0x0f;  		// Get Ratio
+							//printf("Got Ratio %d\n",ratio);
+							if (ratio == 2) {
+								uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3; 
+								ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
+							}
+							nalHeader++;
+							continue;
 					}
 					else {
 						nalHeader++;										// wait for I-Frame
