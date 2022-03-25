@@ -23,14 +23,15 @@
 #ifndef __SOFTHDDEVICE_OPENGLOSD_H
 #define __SOFTHDDEVICE_OPENGLOSD_H
 #define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glext.h>
+//#include <GL/gl.h>
+//#include <GL/glu.h>
+//#include <GL/glext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 //#include <GL/glew.h>
-#include <GL/freeglut.h>
-//#include <GL/gl.h>
+//#include <GL/freeglut.h>
+
+#include <GLES3/gl32.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -281,8 +282,6 @@ class cOglOutputFb:public cOglFb
 {
   protected:
     bool initiated;
-  private:
-     GLvdpauSurfaceNV surface;
   public:
      GLuint fb;
     GLuint texture;

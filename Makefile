@@ -16,8 +16,8 @@
 CONFIG :=  -DDEBUG 		# remove # to enable debug output
 
 
-
-
+# set to 1 if build in Kodi environment
+KODIBUILD?=0
 
 
 #--------------------- no more config needed past this point--------------------------------
@@ -31,12 +31,7 @@ endif # MAKECMDGOALS!=indent
 endif # MAKECMDGOALS!=clean
 #--------------------------
 
-
-
 PLUGIN = softhdodroid
-
-# support OPENGLOSD always needed
-OPENGLOSD=1
 
 CONFIG += -DHAVE_GL			# needed for mpv libs
 CONFIG += -DAV_INFO -DAV_INFO_TIME=3000	# info/debug a/v sync
@@ -44,7 +39,7 @@ CONFIG += -DUSE_MPEG_COMPLETE		# support only complete mpeg packets
 CONFIG += -DH264_EOS_TRICKSPEED		# insert seq end packets for trickspeed
 CONFIG += -DUSE_VDR_SPU			# use VDR SPU decoder.
 CONFIG += -DUSE_PIP
-
+CONFIG += -DUSE_OPENGLOSD 
 
 ### The version number of this plugin (taken from the main source file):
 
@@ -94,8 +89,25 @@ LIBS += $(shell pkg-config --libs alsa)
 _CFLAGS += $(shell pkg-config --cflags freetype2)
 LIBS += $(shell pkg-config --libs freetype2)
 
-ifeq ($(OPENGLOSD),1)
-CONFIG += -DUSE_OPENGLOSD 
+
+
+
+
+ifeq ($(KODIBUILD),1)
+_CFLAGS += $(shell pkg-config --cflags glesv2)
+LIBS += $(shell pkg-config --libs glesv2)
+
+_CFLAGS += $(shell pkg-config --cflags egl)
+LIBS += $(shell pkg-config --libs egl)
+
+_CFLAGS += $(shell pkg-config --cflags glm)
+LIBS += $(shell pkg-config --libs glm)
+
+_CFLAGS += $(shell pkg-config --cflags libdrm)
+LIBS += $(shell pkg-config --libs libdrm)
+LIBS +=  -ldl 
+else
+LIBS += -lMali -ldl -lGLU
 endif
 
 ARCHIVE = $(PLUGIN)-$(VERSION)
@@ -106,7 +118,6 @@ PACKAGE = vdr-$(ARCHIVE)
 SOFILE = libvdr-$(PLUGIN).so
 
 
-LIBS += -lMali  -ldl  -lGLU   
 ### Includes and Defines (add further entries here):
 
 #INCLUDES += -I/usr/src/vdr/include

@@ -58,15 +58,6 @@
 
 #define USE_DRM
 
-typedef struct fbdev_window
-{
-	unsigned short width;
-	unsigned short height;
-} fbdev_window;
-
-
-
-
 
 //int fd = -1;
 int ge2d_fd = -1;
@@ -245,7 +236,7 @@ void main() \
     GLenum err;\
 \
     if ((err = glGetError()) != GL_NO_ERROR) {\
-        esyslog( "video/glx: error %s:%d %d '%s'\n",__FILE__,__LINE__, err, gluErrorString(err));\
+        esyslog( "video/glx: error %s:%d %d \n",__FILE__,__LINE__, err);\
     }\
 }
 
@@ -1785,8 +1776,10 @@ bool cOglCmdStoreImage::Execute(void)
 
     glGenTextures(1, &imageRef->texture);
     glBindTexture(GL_TEXTURE_2D, imageRef->texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageRef->width, imageRef->height, 0, GL_BGRA,
-        GL_UNSIGNED_INT_8_8_8_8_REV, data);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageRef->width, imageRef->height, 0, GL_BGRA,
+    //    GL_UNSIGNED_INT_8_8_8_8_REV, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, imageRef->width, imageRef->height, 0, GL_RGBA,
++        GL_UNSIGNED_BYTE, data);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -2156,27 +2149,6 @@ bool cOglThread::InitOpenGL(void)
         EGL_NONE
     };
 
-#if 0   
-    EGLint windowAttributes[] =
-    {
-        EGL_RENDER_BUFFER,     EGL_BACK_BUFFER,
-        EGL_NONE
-        /*
-         * Uncomment and remove EGL_NONE above to specify EGL_RENDER_BUFFER value to eglCreateWindowSurface.
-         * EGL_RENDER_BUFFER,     EGL_BACK_BUFFER,
-         * EGL_NONE
-         */
-    };
-
-    fbdev_window window;
-    window.height = MyOsdHeight;
-    window.width =  MyOsdWidth;
-    eglSurface = eglCreateWindowSurface(eglDisplay, match, (EGLNativeWindowType)(&window), windowAttributes);
-    GlxCheck();
-    if (eglSurface  == EGL_NO_SURFACE) {
-        printf("no Surface created\n");
-    }
-#endif
 
     if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE)
     {
@@ -2269,11 +2241,6 @@ void cOglThread::Cleanup(void)
     DeleteShaders();
     // glVDPAUFiniNV();
     cOglFont::Cleanup();
-#ifndef USE_DRM
-    glutExit();
-#else
- //   GlxDestroy();
-#endif
    
 }
 

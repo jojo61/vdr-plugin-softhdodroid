@@ -1804,6 +1804,7 @@ void AudioEnqueue(const void *samples, int count)
             }
             isRadio++;
         }
+        usleep(2000);
 
         //        skip = AudioSkip;
         // FIXME: round to packet size

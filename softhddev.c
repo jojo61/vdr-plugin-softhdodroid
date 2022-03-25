@@ -2899,13 +2899,6 @@ int ProcessArgs(int argc, char *const argv[])
 			case 'p':                  // pass-through audio device
                 AudioSetPassthroughDevice(optarg);
                 continue;
-            case 'g':                  // geometry
-                if (VideoSetGeometry(optarg) < 0) {
-                    fprintf(stderr,
-                        _("Bad formated geometry please use: [=][<width>{xX}<height>][{+-}<xoffset>{+-}<yoffset>]\n"));
-                    return 0;
-                }
-                continue;
             case 's':                  // start in suspend mode
                 ConfigStartSuspended = 1;
                 continue;

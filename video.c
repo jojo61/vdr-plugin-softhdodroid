@@ -36,7 +36,7 @@
 #include <time.h>
 #include <signal.h>
 #include <linux/kd.h>
-#include <X11/Xlib.h>
+//#include <X11/Xlib.h>
 
 #include "codec_type.h"
 #include "amports/amstream.h"
@@ -66,6 +66,10 @@ enum {
 #include "codec.h"
 #include "audio.h"
 #include "misc.h"
+
+#define False 0
+#define True 1
+typedef int Bool;
 
 #define false False
 #define true True
@@ -191,14 +195,6 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 
 /// Get video driver name.
  const char *VideoGetDriverName(void) {};
-
-/// Set video geometry.
- int VideoSetGeometry(const char *geometry) {
-
-	XParseGeometry(geometry, &VideoWindowX, &VideoWindowY, &VideoWindowWidth, &VideoWindowHeight);
-
-    return 0;
- };
 
 /// Set 60Hz display mode.
  void VideoSet60HzMode(int i) {};
