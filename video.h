@@ -207,7 +207,7 @@ extern char MyConfigDir[];
 //----------------------------------------------------------------------------
 
 extern int codec_h_ioctl_set(int , int , unsigned long  );
-extern void CheckinPts(int , unsigned long );
+extern void CheckinPts(int , uint64_t );
 int amlSetInt(char *, int );
 
 #ifdef USE_OPENGLOSD

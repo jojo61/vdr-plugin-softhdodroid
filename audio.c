@@ -1705,8 +1705,8 @@ void AudioDelayms(int delayms)
     }
 }
 
-extern unsigned long FirstVPTS;
-extern int SetCurrentPCR(int , double );
+extern uint64_t FirstVPTS;
+extern int SetCurrentPCR(int , uint64_t );
 /**
 **	Place samples in audio output queue.
 **
@@ -1718,7 +1718,7 @@ void AudioEnqueue(const void *samples, int count)
     size_t n;
     int16_t *buffer;
     static int isRadio = 0;
-    unsigned long vpts;
+    uint64_t vpts;
 #ifdef noDEBUG
     static uint32_t last_tick;
     uint32_t tick;
@@ -1798,7 +1798,7 @@ void AudioEnqueue(const void *samples, int count)
                 skip = n;    // Clear Audio until Video PTS
             } else  {
                 int i = 10;
-                while (SetCurrentPCR(0, (double)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay -24000 )) == 2 && i--) {
+                while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay -24000 )) == 2 && i--) {
                     usleep(5000);
                 }
             }
@@ -1809,11 +1809,11 @@ void AudioEnqueue(const void *samples, int count)
         //        skip = AudioSkip;
         // FIXME: round to packet size
         
-        Debug(3, "audio: start? %4zdms skip %dms vpts: %04lx apts %04lx\n", (n * 1000)
+        Debug(3, "audio: start? %4zdms skip %dms vpts: %#012" PRIx64 " apts  %#012" PRIx64 " Referenz %#012" PRIx64 "\n", (n * 1000)
             / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
             (skip * 1000)
             / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
-            vpts,AudioRing[AudioRingWrite].PTS);
+            vpts,AudioRing[AudioRingWrite].PTS,AV_NOPTS_VALUE);
 
         if (skip) {
             if (n < (unsigned)skip) {
@@ -2046,7 +2046,7 @@ void AudioSetClock(int64_t pts)
         Debug(4, "audio: set clock %s -> %s pts\n", Timestamp2String(AudioRing[AudioRingWrite].PTS),
             Timestamp2String(pts));
     }
-//  printf("Audiosetclock                  pts %#012" PRIx64 " %d\n",pts,RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer));
+  //printf("Audiosetclock                  pts %#012" PRIx64 " %d\n",pts,RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer));
     AudioRing[AudioRingWrite].PTS = pts;
 }
 
@@ -2055,7 +2055,7 @@ void AudioSetClock(int64_t pts)
 **
 **	@returns the audio clock in time stamps.
 */
-int64_t AudioGetClock(void)
+uint64_t AudioGetClock(void)
 {
     // (cast) needed for the evil gcc
     if (AudioRing[AudioRingRead].PTS != (int64_t) AV_NOPTS_VALUE) {
@@ -2071,7 +2071,7 @@ int64_t AudioGetClock(void)
     }
     return AV_NOPTS_VALUE;
 }
-int64_t AudioGetwClock(void)
+uint64_t AudioGetwClock(void)
 {
     // (cast) needed for the evil gcc
     if (AudioRing[AudioRingWrite].PTS != (int64_t) AV_NOPTS_VALUE) {

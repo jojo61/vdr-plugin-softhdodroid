@@ -161,7 +161,7 @@ bool isFirstVideoPacket = true;
 bool isAnnexB = false;
 bool isShortStartCode = false;
 bool isExtraDataSent = false;
-unsigned long FirstVPTS;
+uint64_t FirstVPTS;
 int64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
@@ -799,6 +799,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	}
 
 // Set text mode
+#if 0
 	int ttyfd = open("/dev/tty0", O_RDWR);
 	if (ttyfd < 0)
 	{
@@ -813,6 +814,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		}
 		close(ttyfd);
 	}
+#endif
 #if 1
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
@@ -953,10 +955,10 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 
 }
 
-extern int64_t AudioGetClock(void);
-extern int64_t GetCurrentVPts(int);
-extern int64_t GetCurrentAPts(int);
-extern int SetCurrentPCR(int, double );
+extern uint64_t AudioGetClock(void);
+extern uint64_t GetCurrentVPts(int);
+
+extern int SetCurrentPCR(int, uint64_t );
 extern int AHandle;
 void ProcessClockBuffer(int handle)
 	{
@@ -966,7 +968,7 @@ void ProcessClockBuffer(int handle)
 		uint64_t pts = apts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ; 
 		pts &= 0xffffffff;
 
-		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;
+		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;	
 		vpts &= 0xffffffff;
 
 		if (!pts || !vpts) {
@@ -989,7 +991,7 @@ void ProcessClockBuffer(int handle)
 				
 				SetCurrentPCR(handle,apts);
 
-				//printf("AmlVideoSink: Adjust PTS - apts=%04lx vpts=%04lx  (%f frames)\n", pts , vpts , driftFrames);
+				//printf("AmlVideoSink: Adjust PTS - apts= %#012" PRIx64 " vpts %#012" PRIx64 "   (%f frames)\n", pts , vpts , driftFrames);
 			}
 		}
 
@@ -1494,7 +1496,7 @@ bool getResolution(char *mode) {
 	}
 	
 	close(fd);
-#if 1
+#if 0
 	// Set graphics mode
 	int ttyfd = open("/dev/tty0", O_RDWR);	
 	if (ttyfd < 0)
@@ -1856,6 +1858,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		if (!pip)
 		   codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
+		   //codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_AMLVIDEO_AMVIDEO);
 		else {
 			isPIP = true;
 		    if (format == Avc) {
@@ -1958,7 +1961,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	isOpen = true;
 }
 
-int64_t GetCurrentVPts(int handle)
+uint64_t GetCurrentVPts(int handle)
 {
 	//codecMutex.Lock();
 
@@ -1971,7 +1974,7 @@ int64_t GetCurrentVPts(int handle)
 
     handle = OdroidDecoders[0]->handle;
 
-	unsigned int vpts;
+	uint64_t vpts;
 	int ret;
 	if (apiLevel >= S905)	// S905
 	{
@@ -1991,7 +1994,7 @@ int64_t GetCurrentVPts(int handle)
 		}
 
 		vpts = parm.data_32;
-		unsigned long vpts = parm.data_64;
+		//vpts = parm.data_64;
 
 		
 	}
@@ -2011,7 +2014,7 @@ int64_t GetCurrentVPts(int handle)
 	return vpts; // / (double)PTS_FREQ;
 }
 
-int64_t GetCurrentAPts(int handle)
+uint64_t GetCurrentAPts(int handle)
 {
 	//codecMutex.Lock();
 
@@ -2023,7 +2026,7 @@ int64_t GetCurrentAPts(int handle)
 	}
 
 
-	unsigned int vpts;
+	uint64_t vpts;
 	int ret;
 	if (apiLevel >= S905)	// S905
 	{
@@ -2042,8 +2045,8 @@ int64_t GetCurrentAPts(int handle)
 			return 0;
 		}
 
-		vpts = parm.data_32;
-		unsigned long vpts = parm.data_64;
+		//vpts = parm.data_32;
+		vpts = parm.data_64;
 
 	}
 	else	// S805
@@ -2062,7 +2065,7 @@ int64_t GetCurrentAPts(int handle)
 	return vpts; // / (double)PTS_FREQ;
 }
 
-int SetCurrentPCR(int handle, double value)
+int SetCurrentPCR(int handle, uint64_t value)
 {
 	// codecMutex.Lock();
 
@@ -2263,7 +2266,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 #endif		
 		if (!pip) {
 			FirstVPTS = pkt->pts;
-			double dpts = pkt->pts & 0xffffffff;
+			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
+			uint64_t dpts = pkt->pts & 0xffffffff;
 			SetCurrentPCR(hwdecoder->handle,dpts);
 		}
 
@@ -2485,7 +2489,7 @@ nalHeader = (unsigned char*)pkt->data;
 	//playPauseMutex.Unlock();
 }
 
-void CheckinPts(int handle, unsigned long pts)
+void CheckinPts(int handle, uint64_t pts)
 {
 	//codecMutex.Lock();
 
@@ -2503,11 +2507,11 @@ void CheckinPts(int handle, unsigned long pts)
 
 	if (apiLevel >= S905)	// S905
 	{
-		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,pts);
+		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
 	}
 	else	// S805
 	{
-		int r = ioctl(handle, AMSTREAM_IOC_TSTAMP, pts);
+		int r = ioctl(handle, AMSTREAM_IOC_TSTAMP, (unsigned long) pts);
 		if (r < 0)
 		{
 			//codecMutex.Unlock();
@@ -2536,7 +2540,7 @@ int WriteData(int handle, unsigned char* data, int length)
 	return ret; //written;
 }
 
-Bool SendCodecData(int pip, unsigned long pts, unsigned char* data, int length)
+Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
 	Bool result = true;
