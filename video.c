@@ -167,6 +167,7 @@ int Hdr2Sdr = 0;
 int NoiseReduction = 1;
 
 const uint64_t PTS_FREQ = 90000;
+int64_t LastPTS;
 
 bool doPauseFlag = false;
 bool doResumeFlag = false;
@@ -304,7 +305,11 @@ void VideoOsdClear(void) {
     ClearDisplay();
  };
 
- int64_t VideoGetClock(const VideoHwDecoder *i) {};
+ int64_t VideoGetClock(const VideoHwDecoder *i) {
+	 
+	 return LastPTS;
+
+ };
 
 
 /// Draw an OSD ARGB image.
@@ -2564,6 +2569,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 
 	if ((pts > 0) && !pip)
 	{
+		LastPTS = pts;
 		CheckinPts(handle, pts);
 	}
 
