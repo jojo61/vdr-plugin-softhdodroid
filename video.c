@@ -2123,7 +2123,7 @@ int SetCurrentPCR(int handle, uint64_t value)
 		if (ret < 0)
 		{
 			//codecMutex.Unlock();
-			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
+			//printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
 			return 2;
 		}
 	}
@@ -2133,7 +2133,7 @@ int SetCurrentPCR(int handle, uint64_t value)
 		if (ret < 0)
 		{
 			//codecMutex.Unlock();
-			printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
+			//printf("AMSTREAM_IOC_SET_PCRSCR failed.\n");
 			return 2;
 		}
 	}
