@@ -1034,7 +1034,7 @@ cOglCmdCopyBufferToOutputFb::cOglCmdCopyBufferToOutputFb(cOglFb * fb, cOglOutput
     this->y = y;
 }
 
-//unsigned char posd[3840*2160*4];
+unsigned char posd[3840*2160*4];
 extern int OsdShown;
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
@@ -1048,9 +1048,9 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         fb->BindRead();
         return true;
     }
-    return true;
+    //return true;
     
-#if 0
+#if 1
     fb->BindRead();
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
