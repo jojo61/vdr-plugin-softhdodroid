@@ -1676,7 +1676,7 @@ int codec_h_ioctl_set(int h, int subcmd, unsigned long  paramter)
     }
 
     if (r < 0) {
-        printf("codec_h_ioctl_set failed,handle=%d,cmd=%x,paramter=%x, t=%x errno=%d\n", h, subcmd, paramter, r, errno);
+        //printf("codec_h_ioctl_set failed,handle=%d,cmd=%x,paramter=%x, t=%x errno=%d\n", h, subcmd, paramter, r, errno);
         return r;
     }
     return 0;
