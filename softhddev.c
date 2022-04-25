@@ -21,7 +21,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 #define noUSE_SOFTLIMIT                 ///< add soft buffer limits to Play..
-#define noUSE_PIP                       ///< include PIP support + new API
+
 #define noDUMP_TRICKSPEED               ///< dump raw trickspeed packets
 
 #include <sys/types.h>
@@ -1334,10 +1334,10 @@ struct __video_stream__
 
 static VideoStream MyVideoStream[1];    ///< normal video stream
 
-#ifdef USE_PIP
+
 static VideoStream PipVideoStream[1];   ///< pip video stream
 static int PiPActive = 0, mwx, mwy, mww, mwh;          ///< main window frame for PiP
-#endif
+
 
 #ifdef DEBUG
 uint32_t VideoSwitch;                   ///< debug video switch ticks
@@ -1676,7 +1676,7 @@ static void VideoMpegEnqueue(VideoStream * stream, int64_t pts, int64_t dts, con
 **  @param avpkt    ffmpeg a/v packet
 */
 
-#ifndef USE_PIP
+#if 0 
 static void FixPacketForFFMpeg(VideoDecoder * vdecoder, AVPacket * avpkt)
 {
     uint8_t *p;
@@ -3092,9 +3092,9 @@ void SoftHdDeviceExit(void)
     }
 
     pthread_mutex_destroy(&SuspendLockMutex);
-#ifdef USE_PIP
+
     pthread_mutex_destroy(&PipVideoStream->DecoderLockMutex);
-#endif
+
     pthread_mutex_destroy(&MyVideoStream->DecoderLockMutex);
 }
 
@@ -3113,9 +3113,9 @@ int Start(void)
     CodecInit();
 
     pthread_mutex_init(&MyVideoStream->DecoderLockMutex, NULL);
-#ifdef USE_PIP
+
     pthread_mutex_init(&PipVideoStream->DecoderLockMutex, NULL);
-#endif
+
     pthread_mutex_init(&SuspendLockMutex, NULL);
 
     if (!ConfigStartSuspended) {
@@ -3224,9 +3224,9 @@ void Suspend(int video, int audio, int dox11)
 
     Debug(3, "[softhddev]%s:\n", __FUNCTION__);
 
-#ifdef USE_PIP
+
     DelPip();                           // must stop PIP
-#endif
+
 
     // FIXME: should not be correct, if not both are suspended!
     // Move down into if (video) ...
@@ -3324,12 +3324,12 @@ void GetStats(int *missed, int *duped, int *dropped, int *counter, float *framet
 */
 void ScaleVideo(int x, int y, int width, int height)
 {
-#ifdef USE_PIP
+
     if (PiPActive && !(x & y & width & height)) {
         Info("[softhddev]%s: fullscreen with PiP active.\n", __FUNCTION__);
         x = mwx; y = mwy; width = mww; height = mwh;
     }
-#endif
+
     if (MyVideoStream->HwDecoder) {
         VideoSetOutputPosition(MyVideoStream->HwDecoder, x, y, width, height);
     }
@@ -3339,7 +3339,6 @@ void ScaleVideo(int x, int y, int width, int height)
 //  PIP
 //////////////////////////////////////////////////////////////////////////////
 
-#ifdef USE_PIP
 
 /**
 **  Set PIP position.
@@ -3448,5 +3447,5 @@ int PipPlayVideo(const uint8_t * data, int size)
     return PlayVideo3(PipVideoStream, data, size);
 }
 
-#endif
+
 

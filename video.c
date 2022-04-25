@@ -165,6 +165,7 @@ uint64_t FirstVPTS;
 int64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
+int use_pip=0,use_pip_mpeg2=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
@@ -1527,6 +1528,16 @@ bool getResolution(char *mode) {
 		OsdHeight = 1080;
 	}
 
+	// Check if H264-PIP is available
+	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
+	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
+	
+	if (fd2 > 0 ) {
+		use_pip = 1;
+		close (fd2);
+	}
+	close(fd1);
+	
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};
 
@@ -1543,9 +1554,11 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
 	GetApiLevel();
-	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no");
+	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip);
 	ClearDisplay();
-};    
+};
+
+
 extern void DelPip(void);
 ///< Setup video module.
 // Open video codec.
@@ -1555,12 +1568,10 @@ extern void DelPip(void);
 	switch (codec_id)
 	{
 	case AV_CODEC_ID_MPEG2VIDEO:
-			videoFormat = Mpeg2;
-#ifndef USE_PIP_MPEG2
-		if (!pip && isPIP) {
+		videoFormat = Mpeg2;
+		if (!use_pip_mpeg2 && !pip && isPIP) {
 			InternalClose(1);
 		}
-#endif
 		break;
 
 	case AV_CODEC_ID_H264:
@@ -1568,12 +1579,10 @@ extern void DelPip(void);
 		break;
 
 	case AV_CODEC_ID_HEVC:
-			videoFormat = Hevc;
-#ifdef USE_PIP
-		if (!pip && isPIP) {
+		videoFormat = Hevc;
+		if (use_pip && !pip && isPIP) {
 			InternalClose(1);
 		}
-#endif
 		break;
 
 	default:
@@ -1713,11 +1722,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 			amlFormat = VFORMAT_HEVC;
 			am_sysinfo.format = VIDEO_DEC_FORMAT_HEVC;
-#ifdef USE_PIP
-			if (!pip && isPIP) {
+			if (use_pip && !pip && isPIP) {
 				DelPip();
 			}
-#endif
 			break;
 		case Avc:
 			
@@ -1725,29 +1732,27 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 			amlFormat = VFORMAT_H264;
 			am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
-#ifdef USE_PIP
-			PIP_allowed = true;
-			hwdecoder->handle = open("/dev/amstream_vframe", flags);
-			
-#else
-			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
-#endif
+			if (use_pip) {
+				PIP_allowed = true;
+				hwdecoder->handle = open("/dev/amstream_vframe", flags);
+			} else {
+				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+			}
+
 			break;
 		case Mpeg2:
 			Debug(3,"AmlVideoSink - VIDEO/MPEG2\n");
 			amlFormat = VFORMAT_MPEG12;
 			am_sysinfo.format = VIDEO_DEC_FORMAT_UNKNOW;
-#ifdef USE_PIP_MPEG2
-			PIP_allowed = true;
-			hwdecoder->handle = open("/dev/amstream_vframe", flags);
-#else
-			hwdecoder->handle = open("/dev/amstream_vbuf", flags);
-#ifdef USE_PIP
-			if (!pip && isPIP) {
-				DelPip();
-			}		
-#endif
-#endif
+			if (use_pip_mpeg2) {
+				PIP_allowed = true;
+				hwdecoder->handle = open("/dev/amstream_vframe", flags);
+			} else {
+				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+				if (use_pip && !pip && isPIP) {
+					DelPip();
+				}		
+			}
 			break;
 		default:
 			Debug(3,"AmlVideoSink - VIDEO/UNKNOWN(%d)\n", (int)format);
@@ -1881,16 +1886,14 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.h264.00  ppmgr deinterlace amvideo");
 			}
-#ifdef USE_PIP_MPEG2 
-			else if (format == Mpeg2) {
+			else if (use_pip_mpeg2 && (format == Mpeg2)) {
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.mpeg12.00 ppmgr deinterlace  amvideo");
-			}
-#endif						
+			}				
 		}
 		//amlSetInt("/sys/class/video/blackout_policy", 0);
 
-#ifdef USE_PIP
-		if (PIP_allowed && pip) {
+
+		if (use_pip && PIP_allowed && pip) {
 			isPIP = true;
 		    if (format == Avc) {
 			   //codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_AMLVIDEO1_AMVIDEO2);
@@ -1900,7 +1903,6 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videosync.0 videopip");
 			}
 		}
-#endif
 	}
 	
 	r = ioctl(handle, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo);

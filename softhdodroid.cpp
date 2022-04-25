@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "2.8"
+static const char *const VERSION = "2.9"
 #ifdef GIT_REV
     "-GIT" GIT_REV
 #endif
@@ -145,7 +145,7 @@ static int ConfigAudioAutoAES;          ///< config automatic AES handling
 static char *ConfigAudioDevice;         ///< config audio stereo device
 static char *ConfigPassthroughDevice;   ///< config audio pass-through device
 
-#ifdef USE_PIP
+
 static int ConfigPipX = 100 - 3 - 18;   ///< config pip pip x in %
 static int ConfigPipY = 100 - 4 - 18;   ///< config pip pip y in %
 static int ConfigPipWidth = 18;         ///< config pip pip width in %
@@ -162,7 +162,7 @@ static int ConfigPipAltVideoX;          ///< config pip alt. video x in %
 static int ConfigPipAltVideoY;          ///< config pip alt. video y in %
 static int ConfigPipAltVideoWidth;      ///< config pip alt. video width in %
 static int ConfigPipAltVideoHeight = 50;    ///< config pip alt. video height in %
-#endif
+
 
 #ifdef USE_SCREENSAVER
 static char ConfigEnableDPMSatBlackScreen;  ///< Enable DPMS(Screensaver) while displaying black screen(radio)
@@ -178,6 +178,8 @@ static volatile int DoMakePrimary;      ///< switch primary device to this
 static signed char SuspendMode;         ///< suspend mode
 
 //////////////////////////////////////////////////////////////////////////////
+
+extern int use_pip;
 
 //////////////////////////////////////////////////////////////////////////////
 //  C Callbacks
@@ -977,7 +979,7 @@ class cMenuSetupSoft:public cMenuSetupPage
     int AudioBufferTime;
     int AudioAutoAES;
 
-#ifdef USE_PIP
+
     int Pip;
     int PipX;
     int PipY;
@@ -995,7 +997,7 @@ class cMenuSetupSoft:public cMenuSetupPage
     int PipAltVideoY;
     int PipAltVideoWidth;
     int PipAltVideoHeight;
-#endif
+
 
     /// @}
   private:
@@ -1129,7 +1131,7 @@ void cMenuSetupSoft::Create(void)
         Add(new cMenuEditIntItem(tr("Audio buffer size (ms)"), &AudioBufferTime, 0, 1000));
         Add(new cMenuEditBoolItem(tr("Enable automatic AES"), &AudioAutoAES, trVDR("no"), trVDR("yes")));
     }
-#ifdef USE_PIP
+    
     //
     //  PIP
     //
@@ -1153,7 +1155,7 @@ void cMenuSetupSoft::Create(void)
         Add(new cMenuEditIntItem(tr("Alternative Video Width (%)"), &PipAltVideoWidth, 0, 100));
         Add(new cMenuEditIntItem(tr("Alternative Video Height (%)"), &PipAltVideoHeight, 0, 100));
     }
-#endif
+
 
     SetCurrent(Get(current));           // restore selected menu entry
     Display();                          // display build menu
@@ -1169,9 +1171,7 @@ eOSState cMenuSetupSoft::ProcessKey(eKeys key)
     int old_video;
     int old_audio;
 
-#ifdef USE_PIP
     int old_pip;
-#endif
     int old_osd_size;
     int old_resolution_shown[RESOLUTIONS];
     int i;
@@ -1181,9 +1181,7 @@ eOSState cMenuSetupSoft::ProcessKey(eKeys key)
     old_video = Video;
     old_audio = Audio;
 	old_pass = AudioPassthroughDefault;
-#ifdef USE_PIP
     old_pip = Pip;
-#endif
     old_osd_size = OsdSize;
     memcpy(old_resolution_shown, ResolutionShown, sizeof(ResolutionShown));
     state = cMenuSetupPage::ProcessKey(key);
@@ -1192,9 +1190,7 @@ eOSState cMenuSetupSoft::ProcessKey(eKeys key)
         // update menu only, if something on the structure has changed
         // this is needed because VDR menus are evil slow
         if (old_general != General || old_video != Video || old_audio != Audio
-#ifdef USE_PIP
             || old_pip != Pip
-#endif
 			|| old_pass != AudioPassthroughDefault
             || old_osd_size != OsdSize) {
             Create();                   // update menu
@@ -1298,7 +1294,7 @@ cMenuSetupSoft::cMenuSetupSoft(void)
     AudioBufferTime = ConfigAudioBufferTime;
     AudioAutoAES = ConfigAudioAutoAES;
     
-#ifdef USE_PIP
+
     //
     //  PIP
     //
@@ -1319,7 +1315,7 @@ cMenuSetupSoft::cMenuSetupSoft(void)
     PipAltVideoY = ConfigPipAltVideoY;
     PipAltVideoWidth = ConfigPipAltVideoWidth;
     PipAltVideoHeight = ConfigPipAltVideoHeight;
-#endif
+
 
     Create();
 }
@@ -1423,7 +1419,7 @@ void cMenuSetupSoft::Store(void)
     SetupStore("AudioAutoAES", ConfigAudioAutoAES = AudioAutoAES);
     AudioSetAutoAES(ConfigAudioAutoAES);
 
-#ifdef USE_PIP
+
     SetupStore("pip.X", ConfigPipX = PipX);
     SetupStore("pip.Y", ConfigPipY = PipY);
     SetupStore("pip.Width", ConfigPipWidth = PipWidth);
@@ -1440,7 +1436,7 @@ void cMenuSetupSoft::Store(void)
     SetupStore("pip.Alt.VideoY", ConfigPipAltVideoY = PipAltVideoY);
     SetupStore("pip.Alt.VideoWidth", ConfigPipAltVideoWidth = PipAltVideoWidth);
     SetupStore("pip.Alt.VideoHeight", ConfigPipAltVideoHeight = PipAltVideoHeight);
-#endif
+
 
 
 }
@@ -1536,7 +1532,7 @@ cSoftHdControl::~cSoftHdControl()
     dsyslog("[softhddev]%s: dummy player stopped\n", __FUNCTION__);
 }
 
-#ifdef USE_PIP
+
 
 extern "C" void DelPip(void);           ///< remove PIP
 static int PipAltPosition;              ///< flag alternative position
@@ -1903,7 +1899,7 @@ static void SwapPipPosition(void)
     }
 }
 
-#endif
+
 
 //////////////////////////////////////////////////////////////////////////////
 //  cOsdMenu
@@ -1962,27 +1958,27 @@ void cSoftHdMenu::Create(void)
         Add(new cOsdItem(hk(tr("Suspend SoftHdDevice")), osUser1));
     }
 
-#ifdef USE_PIP
-    if (PipReceiver) {
-        Add(new cOsdItem(hk(tr("PIP toggle on/off: off")), osUser3));
-    } else {
-        Add(new cOsdItem(hk(tr("PIP toggle on/off: on")), osUser3));
+    if (use_pip) {
+        if (PipReceiver) {
+            Add(new cOsdItem(hk(tr("PIP toggle on/off: off")), osUser3));
+        } else {
+            Add(new cOsdItem(hk(tr("PIP toggle on/off: on")), osUser3));
+        }
+        Add(new cOsdItem(hk(tr("PIP channel +")), osUser4));
+        Add(new cOsdItem(hk(tr("PIP channel -")), osUser5));
+        if (PipReceiver) {
+            Add(new cOsdItem(hk(tr("PIP on/swap channels: swap")), osUser6));
+        } else {
+            Add(new cOsdItem(hk(tr("PIP on/swap channels: on")), osUser6));
+        }
+        if (PipAltPosition) {
+            Add(new cOsdItem(hk(tr("PIP swap position: normal")), osUser7));
+        } else {
+            Add(new cOsdItem(hk(tr("PIP swap position: alternative")), osUser7));
+        }
+        Add(new cOsdItem(hk(tr("PIP close")), osUser8));
     }
-    Add(new cOsdItem(hk(tr("PIP channel +")), osUser4));
-    Add(new cOsdItem(hk(tr("PIP channel -")), osUser5));
-    if (PipReceiver) {
-        Add(new cOsdItem(hk(tr("PIP on/swap channels: swap")), osUser6));
-    } else {
-        Add(new cOsdItem(hk(tr("PIP on/swap channels: on")), osUser6));
-    }
-    if (PipAltPosition) {
-        Add(new cOsdItem(hk(tr("PIP swap position: normal")), osUser7));
-    } else {
-        Add(new cOsdItem(hk(tr("PIP swap position: alternative")), osUser7));
-    }
-    Add(new cOsdItem(hk(tr("PIP close")), osUser8));
 
-#endif
     //Add(new cOsdItem(NULL, osUnknown, false));
     //Add(new cOsdItem(NULL, osUnknown, false));
     
@@ -2061,7 +2057,7 @@ static void HandleHotkey(int code)
             break;
 
         
-#ifdef USE_PIP
+        
         case 102:                      // PIP toggle
             TogglePip();
             break;
@@ -2081,7 +2077,7 @@ static void HandleHotkey(int code)
             DelPip();
             PipChannelNr = 0;
             break;
-#endif
+        
 
         default:
             esyslog(tr("[softhddev]: hot key %d is not supported\n"), code);
@@ -2171,7 +2167,7 @@ eOSState cSoftHdMenu::ProcessKey(eKeys key)
                 }
             }
             return osEnd; 
-#ifdef USE_PIP
+
         case osUser3:
             TogglePip();
             return osEnd;
@@ -2191,7 +2187,7 @@ eOSState cSoftHdMenu::ProcessKey(eKeys key)
             DelPip();
             PipChannelNr = 0;
             return osEnd;
-#endif
+
         default:
             Create();
             break;
@@ -3177,7 +3173,7 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         return true;
     }
     
-#ifdef USE_PIP
+
     if (!strcasecmp(name, "pip.X")) {
         ConfigPipX = atoi(value);
         return true;
@@ -3242,7 +3238,7 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         ConfigPipAltVideoHeight = atoi(value);
         return true;
     }
-#endif
+
 
     return false;
 }
