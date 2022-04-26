@@ -1734,10 +1734,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			am_sysinfo.format = VIDEO_DEC_FORMAT_H264;
 			if (use_pip) {
 				PIP_allowed = true;
-				hwdecoder->handle = open("/dev/amstream_vframe", flags);
-			} else {
-				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
 			}
+			hwdecoder->handle = open("/dev/amstream_vframe", flags);
+			
 
 			break;
 		case Mpeg2:

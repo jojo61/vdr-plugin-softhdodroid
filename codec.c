@@ -265,7 +265,7 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
             break;
         case AV_CODEC_ID_EAC3:
                 aFormat = AFORMAT_EAC3;
-                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+                amlSetInt("/sys/class/audiodsp/digital_codec", 4);
             break;
         case AV_CODEC_ID_AAC_LATM:
                 aFormat = AFORMAT_AAC_LATM;
@@ -283,7 +283,7 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
     else {
         amlSetInt("/sys/class/audiodsp/digital_codec", 0);
     }
-
+    amlSetInt("/sys/class/audiodsp/codec_raw",CodecPassthrough ? 2: 0);
     
 #if 0  
     AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
@@ -334,9 +334,9 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
         Fatal(_("codec: can't allocate audio codec context\n"));
     }
 
-    if (CodecDownmix) {
+    //if (CodecDownmix) {
         audio_decoder->AudioCtx->request_channel_layout = AV_CH_LAYOUT_STEREO;
-    }
+    //}
     pthread_mutex_lock(&CodecLockMutex);
     // open codec
     if (1) {
