@@ -265,7 +265,7 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
             break;
         case AV_CODEC_ID_EAC3:
                 aFormat = AFORMAT_EAC3;
-                amlSetInt("/sys/class/audiodsp/digital_codec", 4);
+                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
             break;
         case AV_CODEC_ID_AAC_LATM:
                 aFormat = AFORMAT_AAC_LATM;
@@ -283,7 +283,7 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
     else {
         amlSetInt("/sys/class/audiodsp/digital_codec", 0);
     }
-    amlSetInt("/sys/class/audiodsp/codec_raw",CodecPassthrough ? 2: 0);
+    amlSetInt("/sys/class/audiodsp/digital_raw",CodecPassthrough ? 2: 0);
     
 #if 0  
     AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
