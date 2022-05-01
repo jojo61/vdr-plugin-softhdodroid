@@ -31,11 +31,6 @@ A software and GPU emulated UHD output device plugin for VDR.
 
 This is a Device driver for Odroid-n2(plus) Hardware.  SD, HD and UHD is working.
 
-Current Status:
-The driver supports SD, HD and UHD Streams. So far I have only tested with SD and HD.
-Video editing is also possible.
-
-
 Good luck
 jojo61
    
@@ -112,6 +107,11 @@ Commandline:
 			support)
 	other		to use alsa audio module (if compiled with alsa
 			support)
+
+	-m disable PIP in mpeg2 streams. 
+	This is needed for standard Ubuntu Kernels. If you use a CE Kernel you do not need it.
+
+
 
 SVDRP:
 ------

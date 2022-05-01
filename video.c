@@ -165,7 +165,7 @@ uint64_t FirstVPTS;
 int64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
-int use_pip=0,use_pip_mpeg2=0;
+int use_pip=0,use_pip_mpeg2=0,force_no_pip2=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
@@ -295,6 +295,11 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 
 /// Set background.
  void VideoSetBackground(uint32_t i) {};
+
+void disable_pip_mpeg2(){
+	force_no_pip2 = 1;
+}
+
 
 /// Set audio delay.
 void VideoSetAudioDelay(int ms) {
@@ -1534,6 +1539,8 @@ bool getResolution(char *mode) {
 	
 	if (fd2 > 0 ) {
 		use_pip = 1;
+		if (!force_no_pip2)
+			use_pip_mpeg2 = 1;
 		close (fd2);
 	}
 	close(fd1);
@@ -1896,11 +1903,12 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			isPIP = true;
 		    if (format == Avc) {
 			   //codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_AMLVIDEO1_AMVIDEO2);
-		       amlSetString("/sys/class/vfm/map","add pip1 vdec.h264.01 videosync.0 videopip");
+		       amlSetString("/sys/class/vfm/map","add pip1 vdec.h264.01 videopip");
 			}
 			else {
-			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videosync.0 videopip");
+			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videopip");
 			}
+			amlSetInt("/sys/class/video/pip_global_output",1);
 		}
 	}
 	
@@ -2716,6 +2724,7 @@ void InternalClose(int pip)
 		ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
 		amlSetString("/sys/class/vfm/map","rm pip1");
 		amlSetString("/sys/class/vfm/map","rm vdec-map-1");
+		amlSetInt("/sys/class/video/pip_global_output",0);
 	} else {
 		amlSetString("/sys/class/vfm/map","rm pip0");
 	}
