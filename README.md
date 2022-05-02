@@ -108,9 +108,7 @@ Commandline:
 	other		to use alsa audio module (if compiled with alsa
 			support)
 
-	-m disable PIP in mpeg2 streams. 
-	This is needed for standard Ubuntu Kernels. If you use a CE Kernel you do not need it.
-
+	
 
 
 SVDRP:

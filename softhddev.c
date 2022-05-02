@@ -2889,7 +2889,7 @@ int ProcessArgs(int argc, char *const argv[])
 #endif
 
     for (;;) {
-        switch (getopt(argc, argv, "-a:c:d:fg:mX:p:S:sv:w:xDX:")) {
+        switch (getopt(argc, argv, "-a:c:d:fg:p:S:sv:w:xDX:")) {
             case 'a':                  // audio device for pcm
                 AudioSetDevice(optarg);
                 continue;
@@ -2898,9 +2898,6 @@ int ProcessArgs(int argc, char *const argv[])
                 continue;
 			case 'p':                  // pass-through audio device
                 AudioSetPassthroughDevice(optarg);
-                continue;
-            case 'm':
-                disable_pip_mpeg2();
                 continue;
             case 's':                  // start in suspend mode
                 ConfigStartSuspended = 1;

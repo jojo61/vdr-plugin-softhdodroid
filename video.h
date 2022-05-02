@@ -392,8 +392,7 @@ extern int VideoRaiseWindow(void);
 /// Set Shaders
 extern int VideoSetShader(char *);
 
-extern void disable_pip_mpeg2(void);
-
+extern int codec_h_ioctl_set(int , int , unsigned long  );
 
 #ifdef GAMMA
 extern void Init_Gamma();

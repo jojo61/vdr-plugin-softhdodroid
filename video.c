@@ -165,7 +165,7 @@ uint64_t FirstVPTS;
 int64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
-int use_pip=0,use_pip_mpeg2=0,force_no_pip2=0;
+int use_pip=0,use_pip_mpeg2=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
@@ -295,10 +295,6 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 
 /// Set background.
  void VideoSetBackground(uint32_t i) {};
-
-void disable_pip_mpeg2(){
-	force_no_pip2 = 1;
-}
 
 
 /// Set audio delay.
@@ -1538,9 +1534,17 @@ bool getResolution(char *mode) {
 	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
 	
 	if (fd2 > 0 ) {
+		vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
+		char vfm_status[512];
 		use_pip = 1;
-		if (!force_no_pip2)
-			use_pip_mpeg2 = 1;
+
+		codec_h_ioctl_set(fd2,AMSTREAM_SET_VFORMAT,amlFormat);
+		codec_h_ioctl_set(fd2,AMSTREAM_PORT_INIT,0);
+		if (amlGetString("/sys/class/vfm/map",vfm_status,sizeof(vfm_status)) == 0) {
+        	if (strstr(vfm_status,"mpeg12")) {
+				use_pip_mpeg2 = 1;
+			}
+		}	
 		close (fd2);
 	}
 	close(fd1);
@@ -1561,7 +1565,7 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
 	GetApiLevel();
-	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip);
+	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d MPEG2 PIP %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip,use_pip_mpeg2);
 	ClearDisplay();
 };
 
