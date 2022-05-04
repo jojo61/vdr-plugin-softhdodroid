@@ -690,7 +690,7 @@ bool cOglFb::BindTexture(void)
 
 void cOglFb::Blit(GLint destX1, GLint destY1, GLint destX2, GLint destY2)
 {
-    glBlitFramebuffer(0, 0, width, height, destX1, destY1, destX2, destY2, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    //glBlitFramebuffer(0, 0, width, height, destX1, destY1, destX2, destY2, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glFlush();
 }
 
@@ -1043,7 +1043,46 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     if (DmaBufferHandle >= 0) {
         fb->BindRead();
         oFb->BindWrite();
+
+#if 1
+    GLfloat x2 = x + (GLfloat)fb->Width();
+    y = oFb->Height() - y;
+    GLfloat y2 = y - (GLfloat)fb->Height();   
+
+    GLfloat texX1 = 0.0f;
+    GLfloat texX2 = 1.0f;
+    GLfloat texY1 = 1.0f;
+    GLfloat texY2 = 0.0f;
+
+    GLfloat quadVertices[] = {
+        // Pos    // TexCoords
+        x ,  y ,  texX1, texY1,          //left top
+        x ,  y2,  texX1, texY2,          //left bottom
+        x2,  y2,  texX2, texY2,          //right bottom
+
+        x ,  y ,  texX1, texY1,          //left top
+        x2,  y2,  texX2, texY2,          //right bottom
+        x2,  y ,  texX2, texY1           //right top
+    };
+
+    VertexBuffers[vbTexture]->ActivateShader();
+    VertexBuffers[vbTexture]->SetShaderAlpha(255);
+    VertexBuffers[vbTexture]->SetShaderProjectionMatrix(oFb->Width(), oFb->Height());
+    VertexBuffers[vbTexture]->DisableBlending();
+    //VertexBuffers[vbTexture]->SetShaderBorderColor(bcolor);
+
+    glViewport(0, 0, oFb->Width(), oFb->Height());
+    if (!fb->BindTexture())
+        return false;
+
+    VertexBuffers[vbTexture]->Bind();
+    VertexBuffers[vbTexture]->SetVertexData(quadVertices);
+    VertexBuffers[vbTexture]->DrawArrays();
+    VertexBuffers[vbTexture]->Unbind();
+#else
         fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
+#endif
+        
         oFb->Unbind();
         fb->BindRead();
         return true;
