@@ -1079,6 +1079,8 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     VertexBuffers[vbTexture]->SetVertexData(quadVertices);
     VertexBuffers[vbTexture]->DrawArrays();
     VertexBuffers[vbTexture]->Unbind();
+    VertexBuffers[vbTexture]->EnableBlending();
+    glFlush();
 #else
         fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
 #endif
