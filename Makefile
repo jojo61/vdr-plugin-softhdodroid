@@ -127,9 +127,9 @@ DEFINES += -DPLUGIN_NAME_I18N='"$(PLUGIN)"' -D_GNU_SOURCE $(CONFIG) \
 ### Make it standard
 
 override CXXFLAGS += $(_CFLAGS) $(DEFINES) $(INCLUDES) \
-    -g  -W -Wextra -Winit-self -Werror=overloaded-virtual  -Wno-unused-parameter -Wmissing-field-initializers
+    -g  -Werror=overloaded-virtual
 override CFLAGS	  += $(_CFLAGS) $(DEFINES) $(INCLUDES) \
-    -g -W  -Wextra -Winit-self  -std=gnu99 -Wmissing-field-initializers
+    -g   -std=gnu99 
 
 #
 # Test and set config for libavutil 

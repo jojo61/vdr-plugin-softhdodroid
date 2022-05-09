@@ -58,7 +58,7 @@
 #include "video.h"
 #include "codec.h"
  
-#ifdef DEBUG
+#if 0
 static int DumpH264(const uint8_t * data, int size);
 static void DumpMpeg(const uint8_t * data, int size);
 #endif
@@ -70,9 +70,6 @@ static void DumpMpeg(const uint8_t * data, int size);
 extern int ConfigAudioBufferTime;       ///< config size ms of audio buffer
 char ConfigStartX11Server;              ///< flag start the x11 server
 static signed char ConfigStartSuspended;    ///< flag to start in suspend mode
-static char ConfigFullscreen;           ///< fullscreen modus
-static const char *X11ServerArguments;  ///< default command arguments
-static char ConfigStillDecoder;         ///< hw/sw decoder for still picture
 
 static pthread_mutex_t SuspendLockMutex;    ///< suspend lock mutex
 
@@ -1501,7 +1498,7 @@ static void VideoNextPacket(VideoStream * stream, int codec_id)
     //VideoDecodeInput(stream);
 }
 
-#if 1
+#if 0
 
 /**
 **  Place mpeg video data in packet ringbuffer.
@@ -2003,7 +2000,7 @@ static void StopVideo(void)
    
 }
 
-#ifdef DEBUG
+#if 0
 
 /**
 **  Dump mpeg video packet.
@@ -2105,7 +2102,7 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
     int n;
     int z;
     int l;
-    static int c = 0;
+    
 
     if (!stream->Decoder) {             // no x11 video started
         return size;
@@ -2546,6 +2543,7 @@ void TrickSpeed(int speed)
     MyVideoStream->Freezed = 0;
 }
 
+
 /**
 **  Clears all video and audio data from the device.
 */
@@ -2585,12 +2583,7 @@ void Play(void)
 /**
 **  Sets the device into "freeze frame" mode.
 */
-extern amlResume();
-extern amlPause();
-extern amlFreerun(int);
-extern amlTrickMode(int);
-extern SetCurrentPts(double);
-extern amlReset();
+
 void Freeze(void)
 {
     StreamFreezed = 1;
@@ -2933,111 +2926,6 @@ int ProcessArgs(int argc, char *const argv[])
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define XSERVER_MAX_ARGS 512            ///< how many arguments support
-
-#ifndef __FreeBSD__
-static const char *X11Server = "/usr/bin/X";    ///< default x11 server
-#else
-static const char *X11Server = LOCALBASE "/bin/X";  ///< default x11 server
-#endif
-static pid_t X11ServerPid;              ///< x11 server pid
-
-/**
-**  USR1 signal handler.
-**
-**  @param sig  signal number
-*/
-static void Usr1Handler(int __attribute__((unused)) sig)
-{
-    ++Usr1Signal;
-
-    Debug(3, "x-setup: got signal usr1\n");
-}
-
-/**
-**  Start the X server
-*/
-static void StartXServer(void)
-{
-    struct sigaction usr1;
-    pid_t pid;
-    const char *sval;
-    const char *args[XSERVER_MAX_ARGS];
-    int argn;
-    char *buf;
-    int maxfd;
-    int fd;
-
-    // X server
-    if (X11Server) {
-        args[0] = X11Server;
-    } else {
-        Error(_("x-setup: No X server configured!\n"));
-        return;
-    }
-
-    argn = 1;
-    if (X11DisplayName) {               // append display name
-        args[argn++] = X11DisplayName;
-        // export display for childs
-        setenv("DISPLAY", X11DisplayName, 1);
-    }
-    // split X server arguments string into words
-    if ((sval = X11ServerArguments)) {
-        char *s;
-
-#ifndef __FreeBSD__
-        s = buf = strdupa(sval);
-#else
-        s = buf = alloca(strlen(sval) + 1);
-        strcpy(buf, sval);
-#endif
-        while ((sval = strsep(&s, " \t"))) {
-            args[argn++] = sval;
-
-            if (argn == XSERVER_MAX_ARGS - 1) { // argument overflow
-                Error(_("x-setup: too many arguments for xserver\n"));
-                // argn = 1;
-                break;
-            }
-        }
-    }
-    // FIXME: auth
-    // FIXME: append VTxx
-    args[argn] = NULL;
-
-    // arm the signal
-    memset(&usr1, 0, sizeof(struct sigaction));
-    usr1.sa_handler = Usr1Handler;
-    sigaction(SIGUSR1, &usr1, NULL);
-
-    Debug(3, "x-setup: Starting X server '%s' '%s'\n", args[0], X11ServerArguments);
-    // fork
-    if ((pid = fork())) {               // parent
-
-        X11ServerPid = pid;
-        Debug(3, "x-setup: Started x-server pid=%d\n", X11ServerPid);
-
-        return;
-    }
-    // child
-    signal(SIGUSR1, SIG_IGN);           // ignore to force answer
-    //setpgid(0,getpid());
-    setpgid(pid, 0);
-
-    // close all open file-handles
-    maxfd = sysconf(_SC_OPEN_MAX);
-    for (fd = 3; fd < maxfd; fd++) {    // keep stdin, stdout, stderr
-        close(fd);                      // vdr should open with O_CLOEXEC
-    }
-
-    // start the X server
-    execvp(args[0], (char *const *)args);
-
-    Error(_("x-setup: Failed to start X server '%s'\n"), args[0]);
-    exit(-1);
-}
-
 /**
 **  Exit + cleanup.
 */
@@ -3058,39 +2946,6 @@ void SoftHdDeviceExit(void)
 
     CodecExit();
 
-    if (ConfigStartX11Server) {
-        Debug(3, "x-setup: Stop x11 server\n");
-
-        if (X11ServerPid) {
-            int waittime;
-            int timeout;
-            pid_t wpid;
-            int status;
-
-            kill(X11ServerPid, SIGTERM);
-            waittime = 0;
-            timeout = 500;              // 0.5s
-            // wait for x11 finishing, with timeout
-            do {
-                wpid = waitpid(X11ServerPid, &status, WNOHANG);
-                if (wpid) {
-                    break;
-                }
-                if (waittime++ < timeout) {
-                    usleep(1 * 1000);
-                    continue;
-                }
-                kill(X11ServerPid, SIGKILL);
-            } while (waittime < timeout);
-            if (wpid && WIFEXITED(status)) {
-                Debug(3, "x-setup: x11 server exited (%d)\n", WEXITSTATUS(status));
-            }
-            if (wpid && WIFSIGNALED(status)) {
-                Debug(3, "x-setup: x11 server killed (%d)\n", WTERMSIG(status));
-            }
-        }
-    }
-
     pthread_mutex_destroy(&SuspendLockMutex);
 
     pthread_mutex_destroy(&PipVideoStream->DecoderLockMutex);
@@ -3107,9 +2962,7 @@ void SoftHdDeviceExit(void)
 */
 int Start(void)
 {
-    if (ConfigStartX11Server) {
-        StartXServer();
-    }
+   
     CodecInit();
 
     pthread_mutex_init(&MyVideoStream->DecoderLockMutex, NULL);
@@ -3161,29 +3014,7 @@ void Stop(void)
 */
 void Housekeeping(void)
 {
-    //
-    //  when starting an own X11 server fails, try to connect to a already
-    //  running X11 server.  This can take some time.
-    //
-    if (X11ServerPid) {                 // check if X11 server still running
-        pid_t wpid;
-        int status;
-
-        wpid = waitpid(X11ServerPid, &status, WNOHANG);
-        if (wpid) {
-            if (WIFEXITED(status)) {
-                Debug(3, "x-setup: x11 server exited (%d)\n", WEXITSTATUS(status));
-            }
-            if (WIFSIGNALED(status)) {
-                Debug(3, "x-setup: x11 server killed (%d)\n", WTERMSIG(status));
-            }
-            X11ServerPid = 0;
-            // video not running
-            if (ConfigStartX11Server > 1 && !MyVideoStream->HwDecoder) {
-                StartVideo();
-            }
-        }
-    }
+    
 }
 
 /**
@@ -3399,11 +3230,12 @@ void PipStart(int x, int y, int width, int height, int pip_x, int pip_y, int pip
 /**
 **  Stop PIP.
 */
-void InternalClose(int *);
-int amlSetString(char *, char *);
+
+
 extern int isPIP;
 extern OdroidDecoder *OdroidDecoders[];
-amlSetVideoAxis(int , int , int , int , int );
+
+
 void PipStop(void)
 {
     int i;

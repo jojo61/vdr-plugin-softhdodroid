@@ -393,19 +393,20 @@ extern int VideoRaiseWindow(void);
 extern int VideoSetShader(char *);
 
 extern int codec_h_ioctl_set(int , int , unsigned long  );
-
-#ifdef GAMMA
-extern void Init_Gamma();
-extern void Exit_Gamma();
-extern void Set_Gamma(float, int);
-extern void Get_Gamma();
-#endif
-
-#if 0
-long int gettid()
-{
-    return (long int)syscall(224);
-}
-#endif
-
+extern void amlSetVideoAxis(int , int , int , int , int );
+extern void amlResume();
+extern void amlPause();
+extern void amlFreerun(int);
+extern void amlTrickMode(int);
+extern void amlReset();
+extern void ClearDisplay(void);
+extern int amlSetString(char *, char *);
+extern int amlGetString(char *, char *, size_t );
+extern int amlGetInt(char *, int *);
+extern int amlSetInt(char *, int );
+extern void VideoThreadExit(void);
+extern void InternalClose(int );
+extern void InternalOpen(VideoHwDecoder *, int, double );
+extern void ProcessBuffer(VideoHwDecoder *, AVPacket* );
+extern int SendCodecData(int , uint64_t , unsigned char* , int );
 /// @}

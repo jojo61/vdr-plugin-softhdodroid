@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.1"
+static const char *const VERSION = "3.2"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -91,7 +91,6 @@ static char ConfigSuspendClose;         ///< suspend should close devices
 static int ConfigOsdWidth;              ///< config OSD width
 static int ConfigOsdHeight;             ///< config OSD height
 static char ConfigVideoStudioLevels;    ///< config use studio levels
-static char ConfigScreenResolution;    ///< config Screen Resolution
 
 static int ConfigVideoBrightness;       ///< config video brightness
 static int ConfigVideoContrast = 100;   ///< config video contrast
@@ -952,7 +951,6 @@ class cMenuSetupSoft:public cMenuSetupPage
     int OsdWidth;
     int OsdHeight;
     int SuspendClose;
-    int SuspendX11;
 
     int Video;
 
@@ -1073,14 +1071,7 @@ void cMenuSetupSoft::Create(void)
         "576i", "720p", "fake 1080", "1080", "2160p"
     };
 
-    static const char *const target_colorspace[] = {
-        "default Monitor", "sRGB Monitor", "HD TV (BT.709)", "UHD-HDR TV (BT.2020)", 
-    };
-#ifdef PLACEBO	
-    static const char *const target_colorblindness[] = {
-        "None", "Protanomaly", "Deuteranomaly", "Tritanomaly", "Monochromacy",
-    };
-#endif
+    
     int current;
     int i;
 
@@ -1103,7 +1094,6 @@ void cMenuSetupSoft::Create(void)
         Add(SeparatorItem(tr("Suspend")));
         Add(new cMenuEditBoolItem(tr("Detach from main menu entry"), &DetachFromMainMenu, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("Suspend closes video+audio"), &SuspendClose, trVDR("no"), trVDR("yes")));
-        Add(new cMenuEditBoolItem(tr("Suspend stops x11"), &SuspendX11, trVDR("no"), trVDR("yes")));
     }
     //
     //  video
@@ -1959,15 +1949,6 @@ class cSoftHdMenu:public cOsdMenu
 void cSoftHdMenu::Create(void)
 {
     int current;
-    int missed;
-    int duped;
-    int dropped;
-    int counter;
-    float frametime;
-    int width, height;
-    int color;
-    int eotf;
-    char *colorstr, *eotfstr;
 
     current = Current();                // get current menu item index
     Clear();                            // clear the menu
@@ -2810,7 +2791,7 @@ cPluginSoftHdDevice::~cPluginSoftHdDevice(void)
 
     ::SoftHdDeviceExit();
 
-    // keep ConfigX11Display ...
+
 }
 
 /**
@@ -3349,17 +3330,12 @@ static const char *SVDRPHelpText[] = {
     "SUSP\n" "\040   Suspend plugin.\n\n" "    The plugin is suspended to save energie. Depending on the setup\n"
         "    'softhddevice.Suspend.Close = 0' only the video and audio output\n"
         "    is stopped or with 'softhddevice.Suspend.Close = 1' the video\n" "    and audio devices are closed.\n"
-        "    If 'softhddevice.Suspend.X11 = 1' is set and the X11 server was\n"
-        "    started by the plugin, the X11 server would also be closed.\n"
-        "    (Stopping X11 while suspended isn't supported yet)\n",
     "RESU\n" "\040   Resume plugin.\n\n" "    Resume the suspended plugin. The plugin could be suspended by\n"
         "    the command line option '-s' or by a previous SUSP command.\n"
-        "    If the x11 server was stopped by the plugin, it will be\n" "    restarted.",
     "DETA\n" "\040   Detach plugin.\n\n" "    The plugin will be detached from the audio, video and DVB\n"
         "    devices.  Other programs or plugins can use them now.\n",
     "ATTA <-d display> <-a audio> <-p pass>\n" "    Attach plugin.\n\n"
         "    Attach the plugin to audio, video and DVB devices. Use:\n"
-        "    -d display\tdisplay of x11 server (fe. :0.0)\n"
         "    -a audio\taudio device (fe. alsa: hw:0,0 oss: /dev/dsp)\n"
         "    -p pass\t\taudio device for pass-through (hw:0,1 or /dev/dsp1)\n",
     "PRIM <n>\n" "    Make <n> the primary device.\n\n"
@@ -3417,10 +3393,10 @@ cString cPluginSoftHdDevice::SVDRPCommand(const char *command, const char *optio
         if (SuspendMode != NOT_SUSPENDED) {
             return "SoftHdDevice already detached";
         }
-#ifdef USE_OPENGLOSD
+
         dsyslog("[softhddev]stopping Ogl Thread svdrp STAT");
         cSoftOsdProvider::StopOpenGlThread();
-#endif
+
         cControl::Launch(new cSoftHdControl);
         cControl::Attach();
         Suspend(ConfigSuspendClose, ConfigSuspendClose, 0);
@@ -3451,10 +3427,10 @@ cString cPluginSoftHdDevice::SVDRPCommand(const char *command, const char *optio
         if (cSoftHdControl::Player) {   // already suspended
             return "can't suspend SoftHdDevice already suspended";
         }
-#ifdef USE_OPENGLOSD
+
         dsyslog("[softhddev]stopping Ogl Thread svdrp DETA");
         cSoftOsdProvider::StopOpenGlThread();
-#endif
+
         cControl::Launch(new cSoftHdControl);
         cControl::Attach();
         Suspend(1, 1, 0);

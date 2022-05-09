@@ -60,6 +60,8 @@ extern void CodecVideoDelDecoder(VideoDecoder *);
 /// Open video codec.
 extern void CodecVideoOpen(VideoDecoder *, int, AVPacket *);
 
+extern void CodecVideoDecode(VideoDecoder * , const AVPacket * ) ;
+
 /// Close video codec.
 extern void CodecVideoClose(VideoHwDecoder *);
 
@@ -68,6 +70,9 @@ extern void CodecVideoFlushBuffers(VideoDecoder *);
 
 /// Allocate a new audio decoder context.
 extern AudioDecoder *CodecAudioNewDecoder(void);
+
+/// Codec Audio Decode
+extern void CodecAudioDecode(AudioDecoder * , const AVPacket * );
 
 /// Deallocate an audio decoder context.
 extern void CodecAudioDelDecoder(AudioDecoder *);

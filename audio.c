@@ -195,7 +195,7 @@ enum _audio_rates
 };
 
 /// table which rates are supported
-static int AudioRatesInHw[AudioRatesMax];
+//static int AudioRatesInHw[AudioRatesMax];
 
 /// input to hardware channel matrix
 static int AudioChannelMatrix[AudioRatesMax][9];
@@ -2319,8 +2319,7 @@ void AudioInit(void)
 {
     unsigned u;
     const char *name;
-    int freq;
-    int chan;
+    //int freq,chan;
 
     name = "noop";
 #ifdef USE_OSS
