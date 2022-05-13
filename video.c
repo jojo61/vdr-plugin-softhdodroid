@@ -854,7 +854,9 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 
 	// restore vfm mapping
+	amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
 	amlSetString("/sys/class/vfm/map","rm all");
+	sleep(1);
 	amlSetString("/sys/class/vfm/map","add default decoder amvideo");
 	amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
 	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
