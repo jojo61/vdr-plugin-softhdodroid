@@ -1906,6 +1906,13 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			printf("AMSTREAM_IOC_SYNCENABLE failed.\n");
 			return;
 		}
+		r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCTHRESH, (unsigned long)1);
+		if (r != 0)
+		{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
+			return;
+		}
 	}
 
 #if 0
