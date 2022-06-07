@@ -1415,6 +1415,9 @@ bool getResolution(char *mode) {
 		printf("open CODEC_CNTL_DEVICE failed.\n");
 		return;
 	}
+
+	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)1);
+	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)0);
 	
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 	
