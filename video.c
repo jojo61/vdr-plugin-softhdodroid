@@ -1416,8 +1416,13 @@ bool getResolution(char *mode) {
 		return;
 	}
 
-	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)1);
-	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)0);
+	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)0);
+	if (r < 0)
+	{
+		//codecMutex.Unlock();
+		printf("Reset FREERUN failed.\n");
+		return;
+	}
 	
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 	
@@ -2640,12 +2645,9 @@ void amlResume()
 
 void amlReset()
 {
-	// codecMutex.Lock();
 	Debug(3,"amlreset");
 	if (!isOpen)
 	{
-		//codecMutex.Unlock();
-		//Debug(3,"The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 	// set the system blackout_policy to leave the last frame showing
@@ -2653,20 +2655,15 @@ void amlReset()
 	amlGetInt("/sys/class/video/blackout_policy", &blackout_policy);
 	amlSetInt("/sys/class/video/blackout_policy", 0);
 
-	//amlPause();
-;
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;
 	InternalOpen(OdroidDecoders[0], videoFormat,FrameRate);
 
-	//amlSetVideoDelayLimit(1000);
-
 	amlSetInt("/sys/class/video/blackout_policy", blackout_policy);
 	
 	//printf("amlReset\n");
-	
-	//codecMutex.Unlock();
+
 }
 
 void InternalClose(int pip)
