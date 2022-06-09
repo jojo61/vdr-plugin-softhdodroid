@@ -2433,6 +2433,7 @@ int SetPlayMode(int play_mode)
             // tell video parser we get new stream
             //amlClearVideo();
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
+                amlSetInt("/sys/class/video/blackout_policy", 1);
                 // clear buffers on close configured always or replay only
                 if (MyVideoStream->ClearClose) {
                     Clear();            // flush all buffers
