@@ -97,6 +97,12 @@ static int OsdHeight;                   ///< osd height
 int OsdShown = 0;
 static void (*VideoEventCallback)(void) = NULL; /// callback function to notify
 
+/// Default cut top and bottom in pixels
+static int VideoCutTopBottom[VideoResolutionMax];
+
+/// Default cut left and right in pixels
+static int VideoCutLeftRight[VideoResolutionMax];
+
 
 static pthread_t VideoThread;           ///< video decode thread
 //static pthread_cond_t VideoWakeupCond;  ///< wakeup condition variable
@@ -290,11 +296,26 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 /// Set sharpen.
  void VideoSetSharpen(int *i) {};
 
-/// Set cut top and bottom.
- void VideoSetCutTopBottom(int *i) {};
+void VideoSetCutTopBottom(int pixels[VideoResolutionMax]) {
+    VideoCutTopBottom[0] = pixels[0];
+    VideoCutTopBottom[1] = pixels[1];
+    VideoCutTopBottom[2] = pixels[2];
+   
+    // FIXME: update output
+}
 
+///
 /// Set cut left and right.
- void VideoSetCutLeftRight(int *i) {};
+///
+/// @param pixels   table with VideoResolutionMax values
+///
+void VideoSetCutLeftRight(int pixels[VideoResolutionMax]) {
+    VideoCutLeftRight[0] = pixels[0];
+    VideoCutLeftRight[1] = pixels[1];
+    VideoCutLeftRight[2] = pixels[2];
+   
+    // FIXME: update output
+}
 
 /// Set studio levels.
  void VideoSetStudioLevels(int i) {};
@@ -871,7 +892,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	// reset audio codec to 2 chan
 	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
 
-//	amlSetInt("/sys/class/graphics/fb1/free_scale", 0);
+	amlSetString("/sys/class/video/crop", "0 0 0 0");
 
 	
  };            ///< Cleanup and exit video module.
@@ -2131,6 +2152,12 @@ int SetCurrentPCR(int handle, uint64_t value)
 	//codecMutex.Unlock();
 }
 
+void SetCrop(int codec) {
+	char s[80];
+	sprintf(s,"%d %d %d %d",VideoCutTopBottom[codec],VideoCutLeftRight[codec],VideoCutTopBottom[codec],VideoCutLeftRight[codec]);
+	amlSetString("/sys/class/video/crop",s);
+	Debug(3,"Set Crop to %s\n",s);
+}
 
 void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 {
@@ -2205,6 +2232,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 								return;
 							}
 							else {
+								SetCrop(2);
 								//printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 							}
 						}
@@ -2237,6 +2265,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 								return;
 							}
 							else {
+								SetCrop(1);
 								//printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 							}
 						}
@@ -2265,8 +2294,10 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 					//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,b2);
 					return;
 				}
-				else
+				else {
+					SetCrop(0);
 					//printf("Found I-Frame len %d (%d) b2 %d\n\n",len,pkt->size,b2);
+				}
 				break;
 			default:
 				break;

@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.5"
+static const char *const VERSION = "3.6"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -76,11 +76,11 @@ static class cSoftHdDevice *MyDevice;
 
 //////////////////////////////////////////////////////////////////////////////
 
-#define RESOLUTIONS 5                   ///< number of resolutions
+#define RESOLUTIONS 3                   ///< number of resolutions
 
 /// resolutions names
 static const char *const Resolution[RESOLUTIONS] = {
-    "576i", "720p", "1080i_fake", "1080i", "UHD"
+    "MPEG-2", "MPEG-4", "H.265"
 };
 
 static char ConfigMakePrimary;          ///< config primary wanted
@@ -1072,7 +1072,7 @@ void cMenuSetupSoft::Create(void)
 {
 
     static const char *const resolution[RESOLUTIONS] = {
-        "576i", "720p", "fake 1080", "1080", "2160p"
+        "MPEG-2", "MPEG-4", "H.265"
     };
 
     
@@ -1402,10 +1402,10 @@ void cMenuSetupSoft::Store(void)
     VideoSetInverseTelecine(ConfigVideoInverseTelecine);
     
     VideoSetSharpen(ConfigVideoSharpen);
-
+#endif
     VideoSetCutTopBottom(ConfigVideoCutTopBottom);
     VideoSetCutLeftRight(ConfigVideoCutLeftRight);
-#endif
+
     SetupStore("AudioDelay", ConfigVideoAudioDelay = AudioDelay);
     VideoSetAudioDelay(ConfigVideoAudioDelay);
    
