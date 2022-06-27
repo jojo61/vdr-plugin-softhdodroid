@@ -107,6 +107,9 @@ pthread_mutex_t OSDMutex;               ///< OSD update mutex
 /// Default audio/video delay
 int VideoAudioDelay;
 
+///< config fast channel switch
+extern int ConfigVideoFastSwitch;
+
 enum ApiLevel
 {
 	UnknownApi = 0,
@@ -205,8 +208,10 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 /// Set soft start audio/video sync.
  void VideoSetSoftStartSync(int i) {};
 
-/// Set show black picture during channel switch.
- void VideoSetBlackPicture(int i) {};
+/// Set fast channel switch.
+ void VideoSetFastSwitch(int ConfigVideoFastSwitch) {
+	amlSetInt("/sys/class/tsync/slowsync_enable",ConfigVideoFastSwitch);
+};
 
 /// Set brightness adjustment.
  void VideoSetBrightness(int i) {};
@@ -1297,7 +1302,6 @@ void VideoResetStart(VideoHwDecoder * hw_decoder)
 {
 
     Debug(3, "video: reset start\n");
-	//amlReset();
 
 }
 
@@ -1423,6 +1427,8 @@ bool getResolution(char *mode) {
 		printf("Reset FREERUN failed.\n");
 		return;
 	}
+	
+	VideoSetFastSwitch(ConfigVideoFastSwitch);
 	
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 	
@@ -2638,7 +2644,7 @@ void amlResume()
 		//codecMutex.Unlock();
 		printf("AMSTREAM_IOC_VPAUSE (0) failed.\n");
 	}
-    isRunning = true;
+	isRunning = true;
 	//codecMutex.Unlock();
 }
 
@@ -2646,24 +2652,15 @@ void amlResume()
 void amlReset()
 {
 	Debug(3,"amlreset");
-	if (!isOpen)
-	{
+	if (!isOpen){
 		return;
 	}
 	// set the system blackout_policy to leave the last frame showing
-	int blackout_policy;
-	amlGetInt("/sys/class/video/blackout_policy", &blackout_policy);
 	amlSetInt("/sys/class/video/blackout_policy", 0);
-
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;
 	InternalOpen(OdroidDecoders[0], videoFormat,FrameRate);
-
-	amlSetInt("/sys/class/video/blackout_policy", blackout_policy);
-	
-	//printf("amlReset\n");
-
 }
 
 void InternalClose(int pip)

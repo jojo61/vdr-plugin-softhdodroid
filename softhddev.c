@@ -68,6 +68,7 @@ static void DumpMpeg(const uint8_t * data, int size);
 //////////////////////////////////////////////////////////////////////////////
 
 extern int ConfigAudioBufferTime;       ///< config size ms of audio buffer
+extern int ConfigVideoBlackPicture;	    ///< config enable black picture mode
 char ConfigStartX11Server;              ///< flag start the x11 server
 static signed char ConfigStartSuspended;    ///< flag to start in suspend mode
 
@@ -1990,6 +1991,9 @@ static void StartVideo(void)
 static void StopVideo(void)
 {
     VideoOsdExit();
+    //restore decoder default settings
+    amlSetInt("/sys/class/video/blackout_policy", 1);   //do this here to avoid freezing the last frame
+    amlSetInt("/sys/class/tsync/slowsync_enable", 1);
     VideoStreamClose(MyVideoStream, 0);
     VideoExit();
     AudioSyncStream = NULL;
@@ -2427,17 +2431,22 @@ uint8_t *GrabImage(int *size, int jpeg, int quality, int width, int height)
 //extern void amlClearVideo();
 int SetPlayMode(int play_mode)
 {
+    int i;
     Debug(3, "Set Playmode %d\n", play_mode);
     switch (play_mode) {
         case 0:                        // audio/video from decoder
             // tell video parser we get new stream
             //amlClearVideo();
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
-                amlSetInt("/sys/class/video/blackout_policy", 1);
-                // clear buffers on close configured always or replay only
-                if (MyVideoStream->ClearClose) {
-                    Clear();            // flush all buffers
-                    MyVideoStream->ClearClose = 0;
+                amlSetInt("/sys/class/video/blackout_policy", ConfigVideoBlackPicture);
+                VideoResetPacket(MyVideoStream);        // terminate work
+                MyVideoStream->ClearBuffers = 1;
+                if (!SkipAudio) {
+                    AudioFlushBuffers();
+                }
+                // wait for empty buffers
+                for (i = 0; MyVideoStream->ClearBuffers && i < 20; ++i) {
+                    usleep(1 * 1000);
                 }
                 if (MyVideoStream->CodecID != AV_CODEC_ID_NONE) {
                     MyVideoStream->NewStream = 1;
@@ -2555,13 +2564,8 @@ void Clear(void)
     MyVideoStream->ClearBuffers = 1;
     if (!SkipAudio) {
         AudioFlushBuffers();
-        //NewAudioStream = 1;
     }
-    
-    // FIXME: audio avcodec_flush_buffers, video is done by VideoClearBuffers
-
     // wait for empty buffers
-    // FIXME: without softstart sync VideoDecode isn't called.
     for (i = 0; MyVideoStream->ClearBuffers && i < 20; ++i) {
         usleep(1 * 1000);
     }

@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.4.1"
+static const char *const VERSION = "3.5"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -90,6 +90,8 @@ static char ConfigSuspendClose;         ///< suspend should close devices
 
 static int ConfigOsdWidth;              ///< config OSD width
 static int ConfigOsdHeight;             ///< config OSD height
+       int ConfigVideoBlackPicture = 1; ///< config enable black picture on channel switch
+       int ConfigVideoFastSwitch = 0;   ///< config enable fast channel switch
 static char ConfigVideoStudioLevels;    ///< config use studio levels
 
 static int ConfigVideoBrightness;       ///< config video brightness
@@ -957,6 +959,8 @@ class cMenuSetupSoft:public cMenuSetupPage
     uint32_t Background;
     uint32_t BackgroundAlpha;
     int StudioLevels;
+    int BlackPicture;
+    int FastSwitch;
 
     int Brightness;
     int Contrast;
@@ -1103,6 +1107,8 @@ void cMenuSetupSoft::Create(void)
     if (Video) {
 
         //Add(new cMenuEditStraItem(tr("Monitor Type"), &TargetColorSpace, 4, target_colorspace));
+        Add(new cMenuEditBoolItem(tr("Black during channel switch"), &BlackPicture, trVDR("no"), trVDR("yes")));
+        Add(new cMenuEditBoolItem(tr("Fast channel switch"), &FastSwitch, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("Noise Reduction"), &Denoise, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("HDR to SDR Mode"), &HDR2SDR, trVDR("no"), trVDR("yes")));
         for (i = 0; i < RESOLUTIONS; ++i) {
@@ -1261,6 +1267,8 @@ cMenuSetupSoft::cMenuSetupSoft(void)
       // no unsigned int menu item supported, split background color/alpha
  
     StudioLevels = ConfigVideoStudioLevels;
+    BlackPicture = ConfigVideoBlackPicture;
+    FastSwitch = ConfigVideoFastSwitch;
  
     Brightness = ConfigVideoBrightness;
     Contrast = ConfigVideoContrast;
@@ -1346,7 +1354,9 @@ void cMenuSetupSoft::Store(void)
     
     SetupStore("StudioLevels", ConfigVideoStudioLevels = StudioLevels);
     VideoSetStudioLevels(ConfigVideoStudioLevels);
-    
+    SetupStore("BlackPicture", ConfigVideoBlackPicture = BlackPicture);
+    SetupStore("FastSwitch", ConfigVideoFastSwitch = FastSwitch);
+    VideoSetFastSwitch(ConfigVideoFastSwitch);
     SetupStore("Brightness", ConfigVideoBrightness = Brightness);
     VideoSetBrightness(ConfigVideoBrightness);
     SetupStore("Contrast", ConfigVideoContrast = Contrast);
@@ -3004,6 +3014,14 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         VideoSetStudioLevels(ConfigVideoStudioLevels = atoi(value));
         return true;
     }
+    if (!strcasecmp(name, "BlackPicture")) {
+        ConfigVideoBlackPicture = atoi(value);
+        return true;
+    }
+    if (!strcasecmp(name, "FastSwitch")) {
+        ConfigVideoFastSwitch = atoi(value);
+        return true;
+    }
     if (!strcasecmp(name, "Brightness")) {
         int i;
 
@@ -3430,7 +3448,6 @@ cString cPluginSoftHdDevice::SVDRPCommand(const char *command, const char *optio
 
         dsyslog("[softhddev]stopping Ogl Thread svdrp DETA");
         cSoftOsdProvider::StopOpenGlThread();
-
         cControl::Launch(new cSoftHdControl);
         cControl::Attach();
         Suspend(1, 1, 0);
@@ -3511,10 +3528,6 @@ cString cPluginSoftHdDevice::SVDRPCommand(const char *command, const char *optio
         DoMakePrimary = primary;
         return "switching primary device requested";
     }
-    
-
-    
-
     return NULL;
 }
 

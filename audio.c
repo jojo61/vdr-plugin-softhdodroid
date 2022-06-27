@@ -176,6 +176,7 @@ static int AudioStereoDescent;          ///< volume descent for stereo
 static int AudioVolume;                 ///< current volume (0 .. 1000)
 
 extern int VideoAudioDelay;             ///< import audio/video delay
+extern int ConfigVideoFastSwitch;      ///< config fast channel switch
 
 /// default ring buffer size ~2s 8ch 16bit (3 * 5 * 7 * 8)
 static const unsigned AudioRingBufferSize = 3 * 5 * 7 * 8 * 2 * 1000;
@@ -1786,26 +1787,27 @@ void AudioEnqueue(const void *samples, int count)
 
         n = RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
 
-        if (isRadio < 75) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
-            
-            vpts = FirstVPTS;
+        if (!ConfigVideoFastSwitch) {
+            if (isRadio < 75) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
 
-            if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
-                usleep(1000);
-                skip = n;   // Clear all audio until video is avail
-            }
-            else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
-                skip = n;    // Clear Audio until Video PTS
-            } else  {
-                int i = 10;
-                while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay -24000 )) == 2 && i--) {
-                    usleep(5000);
+                vpts = FirstVPTS;
+
+                if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
+                    usleep(1000);
+                    skip = n;   // Clear all audio until video is avail
                 }
+                else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
+                    skip = n;    // Clear Audio until Video PTS
+                } else  {
+                    int i = 10;
+                    while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay -24000 )) == 2 && i--) {
+                        usleep(5000);
+                    }
+                }
+                isRadio++;
             }
-            isRadio++;
+            usleep(2000);
         }
-        usleep(2000);
-
         //        skip = AudioSkip;
         // FIXME: round to packet size
         
@@ -1832,8 +1834,10 @@ void AudioEnqueue(const void *samples, int count)
             // restart play-back
             // no lock needed, can wakeup next time
             AudioRunning = 1;
-            FirstVPTS = 0;
-            isRadio = 0;
+            if (!ConfigVideoFastSwitch) {      
+                FirstVPTS = 0;
+                isRadio = 0;
+            }    
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "Start on AudioEnque Threshold %d n %d\n", AudioStartThreshold, n);
         }
