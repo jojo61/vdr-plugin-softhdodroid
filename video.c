@@ -378,8 +378,7 @@ void VideoSetClosing(VideoHwDecoder *decoder) {
 
 /// Set trick play speed.
 void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
-	if (speed > 6)
-		speed = 6;
+
 	decoder->TrickSpeed = speed;
     decoder->TrickCounter = speed;
     if (speed) {
@@ -2153,8 +2152,13 @@ int SetCurrentPCR(int handle, uint64_t value)
 }
 
 void SetCrop(int codec) {
+	static int top=0,left=0;
 	char s[80];
-	sprintf(s,"%d %d %d %d",VideoCutTopBottom[codec],VideoCutLeftRight[codec],VideoCutTopBottom[codec],VideoCutLeftRight[codec]);
+	if (top == VideoCutTopBottom[codec] && left == VideoCutLeftRight[codec])
+		return;
+	top =  VideoCutTopBottom[codec];
+	left = VideoCutLeftRight[codec];
+	sprintf(s,"%d %d %d %d",top,left,top,left);
 	amlSetString("/sys/class/video/crop",s);
 	Debug(3,"Set Crop to %s\n",s);
 }
@@ -2232,7 +2236,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 								return;
 							}
 							else {
-								SetCrop(2);
 								//printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 							}
 						}
@@ -2265,7 +2268,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 								return;
 							}
 							else {
-								SetCrop(1);
 								//printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 							}
 						}
@@ -2295,7 +2297,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 					return;
 				}
 				else {
-					SetCrop(0);
 					//printf("Found I-Frame len %d (%d) b2 %d\n\n",len,pkt->size,b2);
 				}
 				break;
@@ -2400,6 +2401,7 @@ nalHeader = (unsigned char*)pkt->data;
 	{
 		case Mpeg2:
 		{
+			SetCrop(0);
 			SendCodecData(pip,pts, pkt->data, pkt->size);
 			break;
 		}
@@ -2421,6 +2423,12 @@ nalHeader = (unsigned char*)pkt->data;
 		case Avc:
 		case Hevc:
 		{
+			if (videoFormat == Avc) {
+				SetCrop(1);
+			}
+			else {
+				SetCrop(2);
+			}
 			if (!isAnnexB)
 			{
 				// Five least significant bits of first NAL unit byte signify nal_unit_type.
