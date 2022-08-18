@@ -24,7 +24,7 @@ A software and GPU emulated UHD output device plugin for VDR.
     o Video hardware decoder ODROID
     o Audio FFMpeg / Alsa / Analog
     o Audio FFMpeg / Alsa / Digital
-    o Audio FFMpeg / OSS / Analog
+    o Audio Amp control via CEC
     o HDMI/SPDIF pass-through
     o Suspend / Dettach 
 
@@ -84,14 +84,7 @@ Setup:	environment
 		alsa control channel name
 
     
-	OSS_AUDIODEV=/dev/dsp
-		oss dsp device name
-	OSS_PASSTHROUGHDEV=
-		oss pass-though (AC-3,E-AC-3,DTS,...) device name
-	OSS_MIXERDEV=/dev/mixer
-		oss mixer device name
-	OSS_MIXER_CHANNEL=pcm
-		oss mixer channel name
+
 
 
 Commandline:
@@ -101,12 +94,7 @@ Commandline:
 
     -a audio_device
 
-	Selects audio output module and device.
-	""		to disable audio output
-	/...		to use oss audio module (if compiled with oss
-			support)
-	other		to use alsa audio module (if compiled with alsa
-			support)
+
 
 	
 
@@ -125,11 +113,11 @@ Keymacros:
 
 	This are the supported key sequences:
 
-	@softhdcuvid Blue 1 0		disable pass-through
-	@softhdcuvid Blue 1 1		enable pass-through
-	@softhdcuvid Blue 1 2		toggle pass-through
-	@softhdcuvid Blue 1 3		decrease audio delay by 10ms
-	@softhdcuvid Blue 1 4		increase audio delay by 10ms
-	@softhdcuvid Blue 1 5		toggle ac3 mixdown
+	@softhdodroid Blue 1 0		disable pass-through
+	@softhdodroid Blue 1 1		enable pass-through
+	@softhdodroid Blue 1 2		toggle pass-through
+	@softhdodroid Blue 1 3		decrease audio delay by 10ms
+	@softhdodroid Blue 1 4		increase audio delay by 10ms
+	@softhdodroid Blue 1 5		toggle ac3 mixdown
 	
 

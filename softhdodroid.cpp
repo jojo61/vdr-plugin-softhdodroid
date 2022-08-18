@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.7"
+static const char *const VERSION = "3.8"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -135,6 +135,7 @@ static char ConfigAudioPassthrough;     ///< config audio pass-through mask
 static char AudioPassthroughState;      ///< flag audio pass-through on/off
 static char ConfigAudioDownmix;         ///< config ffmpeg audio downmix
 static char ConfigAudioSoftvol;         ///< config use software volume
+static char ConfigAudioCECDevice=0;     ///< config CEC Device of Audio Amp
 static char ConfigAudioNormalize;       ///< config use normalize volume
 static int ConfigAudioMaxNormalize;     ///< config max normalize factor
 static char ConfigAudioCompression;     ///< config use volume compression
@@ -995,6 +996,7 @@ class cMenuSetupSoft:public cMenuSetupPage
     int AudioPassthroughEAC3;
     int AudioDownmix;
     int AudioSoftvol;
+    int AudioCECDevice;
     int AudioNormalize;
     int AudioMaxNormalize;
     int AudioCompression;
@@ -1140,7 +1142,8 @@ void cMenuSetupSoft::Create(void)
 		} else {
         	Add(new cMenuEditBoolItem(tr("Enable (E-)AC-3 (decoder) downmix"), &AudioDownmix, trVDR("no"), trVDR("yes")));
 		}
-        Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("Hardware"), tr("Software")));
+        Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("Hardware/CEC"), tr("Software")));
+        Add(new cMenuEditIntItem(tr("Audio CEC Device (TV=0)"), &AudioCECDevice, 0, 15));
         Add(new cMenuEditBoolItem(tr("Enable normalize volume"), &AudioNormalize, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditIntItem(tr("  Max normalize factor (/1000)"), &AudioMaxNormalize, 0, 10000));
         Add(new cMenuEditBoolItem(tr("Enable volume compression"), &AudioCompression, trVDR("no"), trVDR("yes")));
@@ -1306,6 +1309,7 @@ cMenuSetupSoft::cMenuSetupSoft(void)
     AudioPassthroughEAC3 = ConfigAudioPassthrough & CodecEAC3;
     AudioDownmix = ConfigAudioDownmix;
     AudioSoftvol = ConfigAudioSoftvol;
+    AudioCECDevice = ConfigAudioCECDevice;
     AudioNormalize = ConfigAudioNormalize;
     AudioMaxNormalize = ConfigAudioMaxNormalize;
     AudioCompression = ConfigAudioCompression;
@@ -1429,6 +1433,8 @@ void cMenuSetupSoft::Store(void)
     CodecSetAudioDownmix(ConfigAudioDownmix);
     SetupStore("AudioSoftvol", ConfigAudioSoftvol = AudioSoftvol);
     AudioSetSoftvol(ConfigAudioSoftvol);
+    SetupStore("AudioCECDevice", ConfigAudioCECDevice = AudioCECDevice);
+    AudioSetCECDevice(ConfigAudioCECDevice);
     SetupStore("AudioNormalize", ConfigAudioNormalize = AudioNormalize);
     SetupStore("AudioMaxNormalize", ConfigAudioMaxNormalize = AudioMaxNormalize);
     AudioSetNormalize(ConfigAudioNormalize, ConfigAudioMaxNormalize);
@@ -3156,6 +3162,10 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
     }
     if (!strcasecmp(name, "AudioSoftvol")) {
         AudioSetSoftvol(ConfigAudioSoftvol = atoi(value));
+        return true;
+    }
+    if (!strcasecmp(name, "AudioCECDevice")) {
+        AudioSetCECDevice(ConfigAudioCECDevice = atoi(value));
         return true;
     }
     if (!strcasecmp(name, "AudioNormalize")) {

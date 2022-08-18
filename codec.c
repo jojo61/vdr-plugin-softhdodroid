@@ -505,8 +505,9 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
     int err;
 
     audio_ctx = audio_decoder->AudioCtx;
-    Debug(3, "codec/audio: format change %s %dHz *%d channels%s%s%s%s%s\n",
+    Debug(3, "codec/audio: format change %s %dHz *%d Codec ID %d channels%s%s%s%s%s\n",
         av_get_sample_fmt_name(audio_ctx->sample_fmt), audio_ctx->sample_rate, audio_ctx->channels,
+        audio_ctx->codec_id,
         CodecPassthrough & CodecPCM ? " PCM" : "", CodecPassthrough & CodecMPA ? " MPA" : "",
         CodecPassthrough & CodecAC3 ? " AC-3" : "", CodecPassthrough & CodecEAC3 ? " E-AC-3" : "",
         CodecPassthrough ? " pass-through" : "");
@@ -520,6 +521,8 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
 
     // SPDIF/HDMI pass-through
     if ((CodecPassthrough & CodecAC3 && audio_ctx->codec_id == AV_CODEC_ID_AC3)
+        || (CodecPassthrough & CodecPCM && audio_ctx->codec_id == AV_CODEC_ID_MP2)
+        || (CodecPassthrough & CodecPCM && audio_ctx->codec_id == AV_CODEC_ID_AAC_LATM)
         || (CodecPassthrough & CodecEAC3 && audio_ctx->codec_id == AV_CODEC_ID_EAC3)) {
         if (audio_ctx->codec_id == AV_CODEC_ID_EAC3) {
             // E-AC-3 over HDMI some receivers need HBR

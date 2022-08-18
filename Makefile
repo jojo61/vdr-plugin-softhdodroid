@@ -89,6 +89,17 @@ _CFLAGS += $(shell pkg-config --cflags freetype2)
 LIBS += $(shell pkg-config --libs freetype2)
 
 
+#
+# Test and set config for libcec 
+#
+ifeq (exists, $(shell pkg-config libcec && echo exists))
+_CFLAGS += $(shell pkg-config --cflags libcec)
+LIBS += $(shell pkg-config --libs libcec)
+CONFIG += -DUSE_CEC 
+OBJS = cec.o
+else
+OBJS = 
+endif
 
 
 
@@ -106,7 +117,7 @@ _CFLAGS += $(shell pkg-config --cflags libdrm)
 LIBS += $(shell pkg-config --libs libdrm)
 LIBS +=  -ldl 
 else
-LIBS += -lMali -ldl -lGLU
+LIBS += -lMali -ldl -lGLU 
 endif
 
 ARCHIVE = $(PLUGIN)-$(VERSION)
@@ -164,7 +175,7 @@ LIBS += $(shell pkg-config --libs libswresample)
 
 ### The object files (add further files here):
 
-OBJS = softhdodroid.o openglosd.o video.o softhddev.o audio.o ringbuffer.o codec.o
+OBJS += softhdodroid.o openglosd.o video.o softhddev.o audio.o ringbuffer.o codec.o 
 
 SRCS = $(wildcard $(OBJS:.o=.c)) *.cpp
 

@@ -174,6 +174,8 @@ static int AudioCompressionFactor;      ///< current compression factor
 static int AudioMaxCompression;         ///< max. compression factor
 static int AudioStereoDescent;          ///< volume descent for stereo
 static int AudioVolume;                 ///< current volume (0 .. 1000)
+static int use_cec = 0;                 /// USe CEC Commands for volup and voldown
+static int AudioCECDev=0;               /// Audio CEC Device Number
 
 extern int VideoAudioDelay;             ///< import audio/video delay
 extern int ConfigVideoFastSwitch;      ///< config fast channel switch
@@ -1071,12 +1073,30 @@ static void AlsaInitPCM(void)
 static void AlsaSetVolume(int volume)
 {
     int v;
+    static int vol = -1;
 
+#ifdef USE_CEC
+    if (use_cec) { 
+        if (vol == -1 && volume) {
+            vol = volume;
+        }
+        if (volume) {
+            if (vol > volume) {
+                cec_send_command(AudioCECDev,"down");
+            }
+            if(vol < volume) {
+                cec_send_command(AudioCECDev,"up");
+            }
+            vol = volume;
+        }
+    }
+#else
     if (AlsaMixer && AlsaMixerElem) {
         v = (volume * AlsaRatio) / (1000 * 1000);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 0, v);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 1, v);
     }
+#endif
 }
 
 /**
@@ -2099,6 +2119,8 @@ uint64_t AudioGetwClock(void)
 */
 void AudioSetVolume(int volume)
 {
+
+
     AudioVolume = volume;
     AudioMute = !volume;
     // reduce loudness for stereo output
@@ -2197,6 +2219,17 @@ void AudioSetSoftvol(int onoff)
     } else {
         AudioSoftVolume = onoff;
     }
+}
+
+/**
+**
+**	Set Audio CEC Device
+**
+**	@param Device Number
+*/
+void AudioSetCECDevice(int device)
+{
+    AudioCECDev = device;    
 }
 
 /**
@@ -2354,124 +2387,7 @@ void AudioInit(void)
     AudioDoingInit = 1;
     AudioRingInit();
     AudioUsedModule->Init();
-#if 0
-    //
-    //  Check which channels/rates/formats are supported
-    //  FIXME: we force 44.1Khz and 48Khz must be supported equal
-    //  FIXME: should use bitmap of channels supported in RatesInHw
-    //  FIXME: use loop over sample-rates
-    freq = 44100;
-    AudioRatesInHw[Audio44100] = 0;
-    for (chan = 1; chan < 9; ++chan) {
-        int tchan;
-        int tfreq;
 
-        tchan = chan;
-        tfreq = freq;
-        if (AudioUsedModule->Setup(&tfreq, &tchan, 0)) {
-            AudioChannelsInHw[chan] = 0;
-        } else {
-            AudioChannelsInHw[chan] = chan;
-            AudioRatesInHw[Audio44100] |= (1 << chan);
-        }
-    }
-    freq = 48000;
-    AudioRatesInHw[Audio48000] = 0;
-    for (chan = 1; chan < 9; ++chan) {
-        int tchan;
-        int tfreq;
-
-        if (!AudioChannelsInHw[chan]) {
-            continue;
-        }
-        tchan = chan;
-        tfreq = freq;
-        if (AudioUsedModule->Setup(&tfreq, &tchan, 0)) {
-            //AudioChannelsInHw[chan] = 0;
-        } else {
-            AudioChannelsInHw[chan] = chan;
-            AudioRatesInHw[Audio48000] |= (1 << chan);
-        }
-    }
-    freq = 192000;
-    AudioRatesInHw[Audio192000] = 0;
-    for (chan = 1; chan < 9; ++chan) {
-        int tchan;
-        int tfreq;
-
-        if (!AudioChannelsInHw[chan]) {
-            continue;
-        }
-        tchan = chan;
-        tfreq = freq;
-        if (AudioUsedModule->Setup(&tfreq, &tchan, 0)) {
-            //AudioChannelsInHw[chan] = 0;
-        } else {
-            AudioChannelsInHw[chan] = chan;
-            AudioRatesInHw[Audio192000] |= (1 << chan);
-        }
-    }
-    //  build channel support and conversion table
-    for (u = 0; u < AudioRatesMax; ++u) {
-        for (chan = 1; chan < 9; ++chan) {
-            AudioChannelMatrix[u][chan] = 0;
-            if (!AudioRatesInHw[u]) {   // rate unsupported
-                continue;
-            }
-            if (AudioChannelsInHw[chan]) {
-                AudioChannelMatrix[u][chan] = chan;
-            } else {
-                switch (chan) {
-                    case 1:
-                        if (AudioChannelsInHw[2]) {
-                            AudioChannelMatrix[u][chan] = 2;
-                        }
-                        break;
-                    case 2:
-                    case 3:
-                        if (AudioChannelsInHw[4]) {
-                            AudioChannelMatrix[u][chan] = 4;
-                            break;
-                        }
-                    case 4:
-                        if (AudioChannelsInHw[5]) {
-                            AudioChannelMatrix[u][chan] = 5;
-                            break;
-                        }
-                    case 5:
-                        if (AudioChannelsInHw[6]) {
-                            AudioChannelMatrix[u][chan] = 6;
-                            break;
-                        }
-                    case 6:
-                        if (AudioChannelsInHw[7]) {
-                            AudioChannelMatrix[u][chan] = 7;
-                            break;
-                        }
-                    case 7:
-                        if (AudioChannelsInHw[8]) {
-                            AudioChannelMatrix[u][chan] = 8;
-                            break;
-                        }
-                    case 8:
-                        if (AudioChannelsInHw[6]) {
-                            AudioChannelMatrix[u][chan] = 6;
-                            break;
-                        }
-                        if (AudioChannelsInHw[2]) {
-                            AudioChannelMatrix[u][chan] = 2;
-                            break;
-                        }
-                        if (AudioChannelsInHw[1]) {
-                            AudioChannelMatrix[u][chan] = 1;
-                            break;
-                        }
-                        break;
-                }
-            }
-        }
-    }
-#endif
 
     for (u = 0; u < AudioRatesMax; ++u) {
         Info(_("audio: %6dHz supports %d %d %d %d %d %d %d %d channels\n"), AudioRatesTable[u],
@@ -2497,6 +2413,12 @@ void AudioInit(void)
         AudioInitThread();
     }
 #endif
+
+#ifdef USE_CEC
+    use_cec = cec_init();
+#else
+    use_cec = 0;
+#endif
     AudioDoingInit = 0;
 }
 
@@ -2520,6 +2442,13 @@ void AudioExit(void)
     AudioRingExit();
     AudioRunning = 0;
     AudioPaused = 0;
+
+#ifdef USE_CEC
+    if (use_cec) {
+        cec_exit();
+        use_cec = 0;
+    }
+#endif
 }
 
 #ifdef AUDIO_TEST

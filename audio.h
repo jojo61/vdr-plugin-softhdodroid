@@ -43,6 +43,7 @@ extern void AudioPause(void);           ///< pause audio
 
 extern void AudioSetBufferTime(int);    ///< set audio buffer time
 extern void AudioSetSoftvol(int);       ///< enable/disable softvol
+extern void AudioSetCECDevice(int);       ///< set Audio CEC Device
 extern void AudioSetNormalize(int, int);    ///< set normalize parameters
 extern void AudioSetCompression(int, int);  ///< set compression parameters
 extern void AudioSetStereoDescent(int); ///< set stereo loudness descent
@@ -55,6 +56,10 @@ extern void AudioSetChannel(const char *);  ///< set mixer channel
 extern void AudioSetAutoAES(int);       ///< set automatic AES flag handling
 extern void AudioInit(void);            ///< setup audio module
 extern void AudioExit(void);            ///< cleanup and exit audio module
+
+extern int cec_init();
+extern int cec_send_command(int ,char *);
+extern int cec_exit();
 
 //----------------------------------------------------------------------------
 //  Variables
