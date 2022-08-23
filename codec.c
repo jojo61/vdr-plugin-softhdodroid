@@ -521,8 +521,6 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
 
     // SPDIF/HDMI pass-through
     if ((CodecPassthrough & CodecAC3 && audio_ctx->codec_id == AV_CODEC_ID_AC3)
-        || (CodecPassthrough & CodecPCM && audio_ctx->codec_id == AV_CODEC_ID_MP2)
-        || (CodecPassthrough & CodecPCM && audio_ctx->codec_id == AV_CODEC_ID_AAC_LATM)
         || (CodecPassthrough & CodecEAC3 && audio_ctx->codec_id == AV_CODEC_ID_EAC3)) {
         if (audio_ctx->codec_id == AV_CODEC_ID_EAC3) {
             // E-AC-3 over HDMI some receivers need HBR

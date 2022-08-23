@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.8"
+static const char *const VERSION = "3.8.1"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -1142,8 +1142,12 @@ void cMenuSetupSoft::Create(void)
 		} else {
         	Add(new cMenuEditBoolItem(tr("Enable (E-)AC-3 (decoder) downmix"), &AudioDownmix, trVDR("no"), trVDR("yes")));
 		}
-        Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("Hardware/CEC"), tr("Software")));
+#ifdef USE_CEC
+        Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("CEC"), tr("Software")));
         Add(new cMenuEditIntItem(tr("Audio CEC Device (TV=0)"), &AudioCECDevice, 0, 15));
+#else
+        Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("Hardware"), tr("Software")));
+#endif
         Add(new cMenuEditBoolItem(tr("Enable normalize volume"), &AudioNormalize, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditIntItem(tr("  Max normalize factor (/1000)"), &AudioMaxNormalize, 0, 10000));
         Add(new cMenuEditBoolItem(tr("Enable volume compression"), &AudioCompression, trVDR("no"), trVDR("yes")));
