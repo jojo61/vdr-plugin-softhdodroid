@@ -1072,7 +1072,7 @@ static void AlsaInitPCM(void)
 */
 static void AlsaSetVolume(int volume)
 {
-    int v;
+    
     static int vol = -1;
 
 #ifdef USE_CEC
