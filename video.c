@@ -20,6 +20,7 @@
 /// $Id: 83cd827a8744e8c80c8adba6cb87653b0ad58c45 $
 //////////////////////////////////////////////////////////////////////////////
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 #include "ge2d.h"
@@ -102,6 +103,10 @@ static int VideoCutTopBottom[VideoResolutionMax];
 
 /// Default cut left and right in pixels
 static int VideoCutLeftRight[VideoResolutionMax];
+
+
+char MyConfigDir[200];
+int locale_dot=0;
 
 
 static pthread_t VideoThread;           ///< video decode thread
@@ -388,6 +393,177 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 		amlFreerun(0);
 	}
 };
+
+void dot_to_comma(char *input) {
+    char *ptr = NULL;
+	if (locale_dot)
+		return;
+    while(ptr = strpbrk(input, ".")) { //find the first dot in input
+        *ptr = ','; //replace the dot with a comma
+    }
+}
+
+static inline bool isnumeric(char c)
+{
+    return (c >= '0' && c <= '9') || c == '-';
+}
+
+check_locale() {
+	float test = 5.0;
+	char t[20];
+	sprintf(t,"%f",test);
+	if (strpbrk(t, ".")) {
+	   locale_dot = 1;
+	}
+	//printf("Test >%s< %d\n",t,locale_dot);
+}
+
+float *lut_parse_cube(FILE *fp, int *size) {
+
+	char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+	int cube_size,lines;
+	float minr,ming,minb,maxr,maxg,maxb,r,g,b,*data,*ptr;
+
+    while ((read = getline(&line, &len, fp)) != -1) {
+
+		if (line[0] == '#' || len == 0) {
+			continue;
+		}
+		if (strstr(line,"LUT_3D_SIZE")) {
+			sscanf(line,"LUT_3D_SIZE %d",&cube_size);
+			printf("Cubesize %d\n",cube_size);
+			if (cube_size > 64)
+				return NULL;
+		}
+
+		if (strstr(line,"DOMAIN_MIN")) {
+			dot_to_comma(line);
+			sscanf(line,"DOMAIN_MIN %f %f %f",&minr,&ming,&minb);
+			printf("DOMAIN_MIN %f %f %f\n",minr,ming,minb);
+		}
+
+		if (strstr(line,"DOMAIN_MAX")) {
+			dot_to_comma(line);
+			sscanf(line,"DOMAIN_MAX %f %f %f",&maxr,&maxg,&maxb);
+			printf("DOMAIN_MAX %f %f %f\n",maxr,maxg,maxb);
+		}
+
+		if (strstr(line,"TITLE")) {
+			continue;
+		}
+
+		if (isnumeric(line[0])) {
+			break;
+		}
+	}
+
+	lines = cube_size * cube_size * cube_size;
+	*size = cube_size;
+
+	ptr = data = malloc(sizeof(float) * lines * 3);
+
+	do {
+		dot_to_comma(line);
+		sscanf(line,"%f %f %f",&r,&g,&b);
+		*data++ = r;
+		*data++ = g;
+		*data++ = b;
+		//printf("Got %s %d\n",line,lines);
+	}  while ((read = getline(&line, &len, fp)) != -1 && --lines);
+
+    if (line)
+        free(line);
+	return ptr;
+}
+
+unsigned int  *convert_to_17(float *lut, int size ) {
+	unsigned int *lut17 = malloc(sizeof(int) * 17 * 17 * 17 * 3);
+	float faktor = (float)size / 17.0;
+	float maxw = 4095.0;
+	for (int b = 0; b < 17; b++) {
+        for (int g = 0; g < 17; g++) {
+            for (int r = 0; r < 17; r++) {
+                size_t offset = b * 289 + g * 17 + r;
+				size_t offset1 = (b * 17.0 * faktor +  g * faktor) * 17.0 + r * faktor;
+				
+                const float *src = &lut[offset1 * 3];
+                unsigned int *dst = &lut17[offset * 3];
+                dst[0] = (uint)(src[0] * maxw);
+                dst[1] = (uint)(src[1] * maxw);
+                dst[2] = (uint)(src[2] * maxw);
+				if( b == 0 && g == 0)
+				  printf("Offset %d Offset1 %d - %d %d %d\n",offset,offset1,dst[0],dst[1],dst[2]);
+            }
+        }
+    }
+	return lut17;
+}
+
+#define _VE_CM  'C'
+#define AMVECM_IOC_SET_3D_LUT  _IO(_VE_CM, 0x6d)
+#define AMVECM_IOC_LOAD_3D_LUT  _IO(_VE_CM, 0x6e)
+#define AMVECM_IOC_SET_3D_LUT_ORDER  _IO(_VE_CM, 0x6f)
+
+void Load_Lut() {
+
+	FILE *lutf;
+    char tmp[200];
+	float *lut=NULL;
+	unsigned int *lut17=NULL;
+	int size;
+	char *lut_file = "lut/lut.cube";
+
+
+	check_locale();
+return;
+
+    sprintf(tmp, "%s/%s", MyConfigDir, lut_file);
+
+	printf("Opening %s LUT File\n",tmp);
+
+    if (lutf = fopen(tmp, "r") ) {
+        if (!(lut = lut_parse_cube(lutf,&size)))
+            printf("Failed parsing LUT.. continuing anyway\n");
+		printf("LUT Size %d\n",size);
+        fclose(lutf);
+		if (lut) {
+			lut17 = convert_to_17(lut,size);
+			int _amlogicDev = open("/dev/amvecm", O_RDWR, 0);
+
+			// If the device is still not open, there is something wrong
+			if (_amlogicDev == -1)
+			{
+				Debug(3,"No amvecm device found");
+				free(lut);
+				free(lut17);
+				return;
+			}
+			amlSetString("/sys/class/amvecm/debug","3dlut enable");
+			//amlSetString("/sys/class/amvecm/debug","3dlut debug 1");
+			//amlSetString("/sys/class/amvecm/debug","3dlut open");
+			if (ioctl(_amlogicDev, AMVECM_IOC_SET_3D_LUT,  (void *)lut17)  == -1 )
+			{
+				// Failed to configure Lut
+				Debug(3,"Failed to set LUT Data\n");
+				perror("Failed to set LUT Data: ");
+			} else {
+				amlSetString("/sys/class/amvecm/debug","3dlut open");
+				printf("LUT initialized\n");
+				//amlSetString("/sys/class/amvecm/debug","3dlut close");
+			}
+			close(_amlogicDev);
+			free(lut);
+			free(lut17);
+		}
+		
+    } else {
+        Debug(3, "No LUT File used\n");
+    }
+	
+	
+}
 
 /// Grab screen raw.
  uint8_t *VideoGrabService(int *size, int *width, int *height) {
@@ -893,6 +1069,8 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 	amlSetString("/sys/class/video/crop", "0 0 0 0");
 
+	amlSetString("/sys/class/amvecm/debug","3dlut close");
+	amlSetString("/sys/class/amvecm/debug","3dlut disable");
 	
  };            ///< Cleanup and exit video module.
 
@@ -1553,9 +1731,13 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
 	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
+
+	amlSetString("/sys/class/amvecm/debug","sr enable");
+
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d MPEG2 PIP %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip,use_pip_mpeg2);
 	ClearDisplay();
+	// Load_Lut();
 };
 
 

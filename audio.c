@@ -1092,7 +1092,7 @@ static void AlsaSetVolume(int volume)
     }
 #else
     if (AlsaMixer && AlsaMixerElem) {
-        v = (volume * AlsaRatio) / (1000 * 1000);
+        int v = (volume * AlsaRatio) / (1000 * 1000);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 0, v);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 1, v);
     }

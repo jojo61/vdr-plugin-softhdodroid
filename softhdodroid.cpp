@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.8.2"
+static const char *const VERSION = "3.8.3"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2863,7 +2863,10 @@ bool cPluginSoftHdDevice::ProcessArgs(int argc, char *argv[])
 bool cPluginSoftHdDevice::Initialize(void)
 {
     // dsyslog("[softhddev]%s:\n", __FUNCTION__);
+    const char *d;
 
+    d = cPlugin::ConfigDirectory("softhdodroid");
+    strcpy(MyConfigDir, d);
     MyDevice = new cSoftHdDevice();
 
     return true;
