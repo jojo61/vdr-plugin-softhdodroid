@@ -384,6 +384,7 @@ void VideoSetClosing(VideoHwDecoder *decoder) {
 /// Set trick play speed.
 void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
 
+	//printf("set trickspeed to %d\n",speed);
 	decoder->TrickSpeed = speed;
     decoder->TrickCounter = speed;
     if (speed) {
@@ -1222,7 +1223,7 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		ProcessBuffer(decoder->HwDecoder,avpkt);
 		return;
 	}
-	decoder->PTS = avpkt->pts;   		// save last pts;
+	
 	if (!decoder->HwDecoder->TrickSpeed)
 		ProcessClockBuffer(handle);
 	else {
@@ -1231,11 +1232,24 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
-	ProcessBuffer(decoder->HwDecoder,avpkt);
+	if (decoder->HwDecoder->TrickSpeed == 0 || avpkt->size > 5)
+		ProcessBuffer(decoder->HwDecoder,avpkt);
+	//printf("Trickspeed %d\n",decoder->HwDecoder->TrickSpeed);
 	if (decoder->HwDecoder->TrickSpeed) {
-		usleep(20000*decoder->HwDecoder->TrickSpeed);
+		//printf("got %#012" PRIx64 " old %#012" PRIx64 " size %d\n",avpkt->pts,decoder->PTS,avpkt->size);
+		if ((avpkt->pts != AV_NOPTS_VALUE) && (decoder->PTS != AV_NOPTS_VALUE))  {
+			long diff = avpkt->pts - decoder->PTS;
+			diff = diff < 0 ? -diff: diff;
+			int waiter = (diff / 43) * 20;
+			//printf("Trickspeed wait %d diff = %ld\n",waiter,diff);
+			usleep(waiter*decoder->HwDecoder->TrickSpeed);
+		}
+		
 	}
-	//amlGetBufferStatus();
+	if (avpkt->pts != AV_NOPTS_VALUE) {
+		decoder->PTS = avpkt->pts;   		// save last pts;
+	}
+	
 };
 
 
@@ -2523,7 +2537,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 #if 0	
 nalHeader = (unsigned char*)pkt->data;
 	len = pkt->size - 4;
-	if (test > 0) {
+	
 	switch(hwdecoder->Format) {
 			case Hevc:
 						{
@@ -2556,12 +2570,45 @@ nalHeader = (unsigned char*)pkt->data;
 							}
 						}
 						break;
+			case Avc:
+			{
+				int nal_unit_type;
+				nalHeader = (unsigned char*)pkt->data;
+				printf("start with len %d\n",pkt->size);
+				if (len == 1)
+				   return;
+				while (len--) {
+					if (nalHeader[0] == 0 && 
+						nalHeader[1] == 0 &&
+						nalHeader[2] == 1) {
+							nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
+							printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
+							if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
+								break;
+								
+							}
+							else {
+								nalHeader++;
+								continue;
+							}
+					}
+					else {
+						nalHeader++;										// wait for I-Frame
+					}
+				}
+				if (len <= 0) {
+					printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+				}
+				else {
+					printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+				}
+			}
+			break;
 			default:
 				break;
 
 	}
-	test--;
-	}
+
 #endif
 
 	uint64_t pts = 0;
