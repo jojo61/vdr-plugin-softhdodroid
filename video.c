@@ -68,6 +68,9 @@ enum {
 #include "audio.h"
 #include "misc.h"
 
+extern uint64_t AudioGetClock(void);
+extern uint64_t GetCurrentVPts(int);
+
 #define False 0
 #define True 1
 typedef int Bool;
@@ -340,7 +343,7 @@ void VideoOsdClear(void) {
  };
 
  int64_t VideoGetClock(const VideoHwDecoder *i) {
-	 
+
 	 return LastPTS;
 
  };
@@ -1173,8 +1176,7 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 
 }
 
-extern uint64_t AudioGetClock(void);
-extern uint64_t GetCurrentVPts(int);
+
 
 extern int SetCurrentPCR(int, uint64_t );
 extern int AHandle;
@@ -1232,8 +1234,8 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
-	if (decoder->HwDecoder->TrickSpeed == 0 || avpkt->size > 5)
-		ProcessBuffer(decoder->HwDecoder,avpkt);
+	
+	ProcessBuffer(decoder->HwDecoder,avpkt);
 	//printf("Trickspeed %d\n",decoder->HwDecoder->TrickSpeed);
 	if (decoder->HwDecoder->TrickSpeed) {
 		//printf("got %#012" PRIx64 " old %#012" PRIx64 " size %d\n",avpkt->pts,decoder->PTS,avpkt->size);

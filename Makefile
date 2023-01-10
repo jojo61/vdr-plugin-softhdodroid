@@ -36,7 +36,6 @@ PLUGIN = softhdodroid
 CONFIG += -DHAVE_GL			# needed for mpv libs
 CONFIG += -DAV_INFO -DAV_INFO_TIME=3000	# info/debug a/v sync
 CONFIG += -DUSE_MPEG_COMPLETE		# support only complete mpeg packets
-CONFIG += -DH264_EOS_TRICKSPEED		# insert seq end packets for trickspeed
 CONFIG += -DUSE_VDR_SPU			# use VDR SPU decoder.
 CONFIG += -DUSE_OPENGLOSD 
 

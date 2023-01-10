@@ -2199,36 +2199,6 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
     if ((data[6] & 0xC0) == 0x80 && z >= 2 && check[0] == 0x01 && check[1] == 0x09 && !check[3] && !check[4]) {
         // old PES HDTV recording z == 2 -> stronger check!
         if (stream->CodecID == AV_CODEC_ID_H264) {
-#ifdef DUMP_TRICKSPEED
-            if (stream->TrickSpeed) {
-                char buf[1024];
-                int fd;
-                static int FrameCounter;
-
-                snprintf(buf, sizeof(buf), "frame_%06d_%08d.raw", getpid(), FrameCounter++);
-                if ((fd = open(buf, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666)) >= 0) {
-                    if (write(fd, data + 9 + n, size - 9 - n)) {
-                        // this construct is to remove the annoying warning
-                    }
-                    close(fd);
-                }
-            }
-#endif
-#ifdef H264_EOS_TRICKSPEED
-            // this should improve ffwd+frew, but produce crash in ffmpeg
-            // with some streams
-            if (stream->TrickSpeed && pts != (int64_t) AV_NOPTS_VALUE) {
-                // H264 NAL End of Sequence
-                static uint8_t seq_end_h264[] = { 0x00, 0x00, 0x00, 0x01, 0x0A };
-
-                // 1-5=SLICE 6=SEI 7=SPS 8=PPS
-                // NAL SPS sequence parameter set
-                if ((check[7] & 0x1F) == 0x07) {
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, AV_NOPTS_VALUE, AV_NOPTS_VALUE, seq_end_h264, sizeof(seq_end_h264));
-                }
-            }
-#endif
             VideoNextPacket(stream, AV_CODEC_ID_H264);
         } else {
             Debug(3, "video: h264 detected\n");
