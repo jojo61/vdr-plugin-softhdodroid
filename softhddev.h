@@ -58,7 +58,7 @@ extern "C"
     /// C plugin get video stream size and aspect
     extern void GetVideoSize(int *, int *, double *);
     /// C plugin set trick speed
-    extern void TrickSpeed(int);
+    extern void TrickSpeed(int,int);
     /// C plugin clears all video and audio data from the device
     extern void Clear(void);
     /// C plugin sets the device into play mode

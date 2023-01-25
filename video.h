@@ -78,6 +78,7 @@ typedef struct _odroid_decoder_
     int SurfaceField;                   ///< current displayed field
     int TrickSpeed;                     ///< current trick speed
     int TrickCounter;                   ///< current trick speed counter
+    int Forward;
     struct timespec FrameTime;          ///< time of last display
     VideoStream *Stream;                ///< video stream
     int Closing;                        ///< flag about closing current stream
@@ -343,7 +344,7 @@ extern void VideoSetOsd3DMode(int);
 extern void VideoSetClock(VideoHwDecoder *, int64_t);
 
 /// Get video clock.
-extern int64_t VideoGetClock(const VideoHwDecoder *);
+extern uint64_t VideoGetClock(const VideoHwDecoder *);
 
 /// Set closing flag.
 extern void VideoSetClosing(VideoHwDecoder *);
@@ -352,7 +353,7 @@ extern void VideoSetClosing(VideoHwDecoder *);
 extern void VideoResetStart(VideoHwDecoder *);
 
 /// Set trick play speed.
-extern void VideoSetTrickSpeed(VideoHwDecoder *, int);
+extern void VideoSetTrickSpeed(VideoHwDecoder *, int, int);
 
 /// Grab screen.
 extern uint8_t *VideoGrab(int *, int *, int *, int);

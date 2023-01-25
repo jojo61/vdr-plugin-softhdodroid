@@ -2199,32 +2199,6 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
     if ((data[6] & 0xC0) == 0x80 && z >= 2 && check[0] == 0x01 && check[1] == 0x09 && !check[3] && !check[4]) {
         // old PES HDTV recording z == 2 -> stronger check!
         if (stream->CodecID == AV_CODEC_ID_H264) {
-#if 0 
-            // this should improve ffwd+frew, but produce crash in ffmpeg
-            // with some streams
-            if (stream->TrickSpeed && pts != (int64_t) AV_NOPTS_VALUE) {
-                // H264 NAL End of Sequence
-                static uint8_t seq_end_h264[] = { 0x00, 0x00, 0x00, 0x01, 0x0A };
-
-                // 1-5=SLICE 6=SEI 7=SPS 8=PPS
-                // NAL SPS sequence parameter set
-               // if ((check[7] & 0x1F) == 0x07) {
-                    
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, pts, dts, check - 2, l + 2);
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, pts, dts, check - 2, l + 2);
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, pts, dts, check - 2, l + 2);
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, pts, dts, check - 2, l + 2);
-                    
-                    VideoNextPacket(stream, AV_CODEC_ID_H264);
-                    VideoEnqueue(stream, AV_NOPTS_VALUE, AV_NOPTS_VALUE, seq_end_h264, sizeof(seq_end_h264));
-                    return size;
-                //}
-            }
-#endif
             VideoNextPacket(stream, AV_CODEC_ID_H264);
         } else {
             Debug(3, "video: h264 detected\n");
@@ -2536,11 +2510,11 @@ void GetVideoSize(int *width, int *height, double *aspect)
 **
 **  @param speed    trick speed
 */
-void TrickSpeed(int speed)
+void TrickSpeed(int speed, int forward)
 {
     MyVideoStream->TrickSpeed = speed;
     if (MyVideoStream->HwDecoder) {
-        VideoSetTrickSpeed(MyVideoStream->HwDecoder, speed);
+        VideoSetTrickSpeed(MyVideoStream->HwDecoder, speed, forward);
     } else {
         // can happen, during startup
         Debug(3, "softhddev: %s called without hw decoder\n", __FUNCTION__);
@@ -2575,7 +2549,7 @@ void Clear(void)
 
 void Play(void)
 {
-    TrickSpeed(0);                      // normal play
+    TrickSpeed(0,0);                      // normal play
     SkipAudio = 0;
     AudioPlay();
     amlResume();

@@ -185,6 +185,8 @@ int use_pip=0,use_pip_mpeg2=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
+uint64_t TrickPTS;
+int myTrickSpeed= 0;
 
 bool doPauseFlag = false;
 bool doResumeFlag = false;
@@ -342,9 +344,34 @@ void VideoOsdClear(void) {
     ClearDisplay();
  };
 
- int64_t VideoGetClock(const VideoHwDecoder *i) {
 
-	 return LastPTS;
+uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
+	uint64_t PTS = atomic_read(&LastPTS);
+	uint64_t RealPTS; 
+	int i=100;
+#if 1
+	if (myTrickSpeed) {
+		
+		while (TrickPTS == 0) {
+			//Debug(3,"wait for  Trick PTS %#012" PRIx64 " \n",TrickPTS);
+		   usleep(20000);
+		}
+		usleep(20000);
+		//Debug(3,"read Trick PTS %#012" PRIx64 " \n",TrickPTS);
+		return TrickPTS;
+	}
+#endif
+	while ((RealPTS = GetCurrentVPts(0)) == 0 && i--) {
+		//Debug(3,"wait for  Real PTS  \n");
+		usleep(10000);
+	}
+	if (RealPTS > 0) {
+	   PTS &= 0xffffffff00000000;
+	   PTS |= RealPTS;
+	   //Debug(3,"read fixed PTS %#012" PRIx64 " diff  %d \n",PTS,PTS - SavePTS);
+	}
+	usleep(20000);
+	return PTS;
 
  };
 
@@ -385,15 +412,17 @@ void VideoSetClosing(VideoHwDecoder *decoder) {
 };
 
 /// Set trick play speed.
-void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed) {
+void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed, int forward) {
 
-	//printf("set trickspeed to %d\n",speed);
+	Debug(3,"set trickspeed to %d\n",speed);
 	decoder->TrickSpeed = speed;
-    decoder->TrickCounter = speed;
+    decoder->Forward = forward;
     if (speed) {
 		amlFreerun(1);
+		myTrickSpeed=1;
         decoder->Closing = 0;
     } else {
+		myTrickSpeed=0;
 		amlFreerun(0);
 	}
 };
@@ -1226,25 +1255,37 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		return;
 	}
 	
-	if (!decoder->HwDecoder->TrickSpeed)
+	if (!decoder->HwDecoder->TrickSpeed) {
 		ProcessClockBuffer(handle);
+		TrickPTS=0;
+	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
-			SetCurrentPCR(handle,avpkt->pts);
+			if (!decoder->HwDecoder->Forward) {
+				amlReset();
+			}
+			amlFreerun(1);
+			SetCurrentPCR(handle,avpkt->pts); 
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
 	
 	ProcessBuffer(decoder->HwDecoder,avpkt);
 	//printf("Trickspeed %d\n",decoder->HwDecoder->TrickSpeed);
+
 	if (decoder->HwDecoder->TrickSpeed) {
+		
 		//printf("got %#012" PRIx64 " old %#012" PRIx64 " size %d\n",avpkt->pts,decoder->PTS,avpkt->size);
 		if ((avpkt->pts != AV_NOPTS_VALUE) && (decoder->PTS != AV_NOPTS_VALUE))  {
 			long diff = avpkt->pts - decoder->PTS;
-			diff = diff < 0 ? -diff: diff;
+			//diff = diff < 0 ? -diff: diff;
 			int waiter = (diff / 43) * 20;
+			waiter = waiter <0 ? -waiter:waiter;
+			waiter = waiter == 0 ? 25000 : waiter;
+			TrickPTS = avpkt->pts;
 			//printf("Trickspeed wait %d diff = %ld\n",waiter,diff);
-			usleep(waiter*decoder->HwDecoder->TrickSpeed);
+			usleep(20000*decoder->HwDecoder->TrickSpeed);
+			
 		}
 		
 	}
@@ -2378,7 +2419,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 
 
 	unsigned char* nalHeader = (unsigned char*)pkt->data;
-	len = pkt->size - 4;
+	len = pkt->size - 3;
 
 	if (isFirstVideoPacket)
 	{
@@ -2538,8 +2579,9 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 
 #if 0	
 nalHeader = (unsigned char*)pkt->data;
-	len = pkt->size - 4;
-	
+	len = pkt->size - 3;
+if (hwdecoder->TrickSpeed ) {
+	//Debug(3,"Check in  PTS  %#012" PRIx64 "\n",pkt->pts);
 	switch(hwdecoder->Format) {
 			case Hevc:
 						{
@@ -2564,11 +2606,11 @@ nalHeader = (unsigned char*)pkt->data;
 								}
 							}
 							if (len <= 0) {
-								printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+								//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
 								//return;
 							}
 							else {
-								printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+								//printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 							}
 						}
 						break;
@@ -2576,9 +2618,7 @@ nalHeader = (unsigned char*)pkt->data;
 			{
 				int nal_unit_type;
 				nalHeader = (unsigned char*)pkt->data;
-				printf("start with len %d\n",pkt->size);
-				if (len == 1)
-				   return;
+				//printf("start with len %d\n",pkt->size);
 				while (len--) {
 					if (nalHeader[0] == 0 && 
 						nalHeader[1] == 0 &&
@@ -2586,7 +2626,8 @@ nalHeader = (unsigned char*)pkt->data;
 							nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
 							printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
 							if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
-								break;
+								nalHeader++;
+								continue;
 								
 							}
 							else {
@@ -2599,10 +2640,10 @@ nalHeader = (unsigned char*)pkt->data;
 					}
 				}
 				if (len <= 0) {
-					printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
+					//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
 				}
 				else {
-					printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
+					//printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
 				}
 			}
 			break;
@@ -2610,7 +2651,8 @@ nalHeader = (unsigned char*)pkt->data;
 				break;
 
 	}
-
+	printf("\n");
+}
 #endif
 
 	uint64_t pts = 0;
@@ -2825,9 +2867,10 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 
     int handle = OdroidDecoders[pip]->handle;
 
-	if ((pts > 0) && !pip)
+	if ((pts) && !pip)
 	{
-		LastPTS = pts;
+		atomic_set(&LastPTS, pts);
+		
 		CheckinPts(handle, pts);
 	}
 
@@ -3009,7 +3052,6 @@ void amlFreerun(int val)
 		//printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
-	
 	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)val);
 	//int r = ioctl(cntl_handle, AMSTREAM_IOC_TRICKMODE ,val);
 	//codecMutex.Unlock();

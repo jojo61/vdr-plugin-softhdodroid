@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.8.5"
+static const char *const VERSION = "3.8.6"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2451,7 +2451,7 @@ void cSoftHdDevice::TrickSpeed(int speed, bool forward)
 {
     dsyslog("[softhddev]%s: %d %d\n", __FUNCTION__, speed, forward);
 
-    ::TrickSpeed(speed);
+    ::TrickSpeed(speed,forward);
 }
 
 /**
