@@ -1248,6 +1248,7 @@ void ProcessClockBuffer(int handle)
 
 void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt) 
 {	
+	int waiter=20000;
 	int pip = decoder->HwDecoder->pip;
 	int handle = decoder->HwDecoder->handle;
 	if (pip) {
@@ -1261,8 +1262,9 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
-			if (!decoder->HwDecoder->Forward) {
+			if (!decoder->HwDecoder->Forward && videoFormat == Avc)  {
 				amlReset();
+				waiter = decoder->HwDecoder->TrickSpeed == 1 ? 40000:30000;
 			}
 			amlFreerun(1);
 			SetCurrentPCR(handle,avpkt->pts); 
@@ -1277,14 +1279,16 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		
 		//printf("got %#012" PRIx64 " old %#012" PRIx64 " size %d\n",avpkt->pts,decoder->PTS,avpkt->size);
 		if ((avpkt->pts != AV_NOPTS_VALUE) && (decoder->PTS != AV_NOPTS_VALUE))  {
+#if 0
 			long diff = avpkt->pts - decoder->PTS;
 			//diff = diff < 0 ? -diff: diff;
 			int waiter = (diff / 43) * 20;
 			waiter = waiter <0 ? -waiter:waiter;
 			waiter = waiter == 0 ? 25000 : waiter;
+#endif
 			TrickPTS = avpkt->pts;
 			//printf("Trickspeed wait %d diff = %ld\n",waiter,diff);
-			usleep(20000*decoder->HwDecoder->TrickSpeed);
+			usleep(waiter*decoder->HwDecoder->TrickSpeed);
 			
 		}
 		
