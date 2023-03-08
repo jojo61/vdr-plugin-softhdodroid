@@ -178,10 +178,11 @@ bool isAnnexB = false;
 bool isShortStartCode = false;
 bool isExtraDataSent = false;
 uint64_t FirstVPTS;
-int64_t estimatedNextPts = 0;
+uint64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
 int use_pip=0,use_pip_mpeg2=0;
+int winx=0,winy=0,winh=0,winw=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
@@ -259,7 +260,7 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 /// Set video output position.
 void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, int height) {
 
-
+	//printf("set output position %d %d %d %d\n",x,y,width,height);
 	if (!OsdWidth || !OsdHeight) {
 		return;
 	}
@@ -274,7 +275,9 @@ void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, in
 		y = (y * VideoWindowHeight) / OsdHeight;
 		height = (height * VideoWindowHeight) / OsdHeight;
 	}
-
+	if (!decoder->pip) {
+    	winx = x; winy = y; winh = height; winw = width;
+	}
 	amlSetVideoAxis(decoder->pip,x,y,x+width,y+height);
 };
 
@@ -354,15 +357,15 @@ uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
 		
 		while (TrickPTS == 0) {
 			//Debug(3,"wait for  Trick PTS %#012" PRIx64 " \n",TrickPTS);
-		   usleep(20000);
+		   usleep(2000);
 		}
-		usleep(20000);
+		usleep(200);
 		//Debug(3,"read Trick PTS %#012" PRIx64 " \n",TrickPTS);
 		return TrickPTS;
 	}
 #endif
 	while ((RealPTS = GetCurrentVPts(0)) == 0 && i--) {
-		//Debug(3,"wait for  Real PTS  \n");
+		printf("wait for  Real PTS  \n");
 		usleep(10000);
 	}
 	if (RealPTS > 0) {
@@ -370,7 +373,7 @@ uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
 	   PTS |= RealPTS;
 	   //Debug(3,"read fixed PTS %#012" PRIx64 " diff  %d \n",PTS,PTS - SavePTS);
 	}
-	usleep(20000);
+	usleep(2000);
 	return PTS;
 
  };
@@ -1757,6 +1760,9 @@ bool getResolution(char *mode) {
 		OsdHeight = 1080;
 	}
 
+	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
+    
+
 	// Check if H264-PIP is available
 	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
 	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
@@ -1849,8 +1855,9 @@ extern void DelPip(void);
 	if (!pip) {
 		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
 		amlResume();
-		if (!isPIP)
-			amlSetVideoAxis(0, VideoWindowX,VideoWindowY, VideoWindowWidth, VideoWindowHeight);
+		if (!isPIP) {
+		    amlSetVideoAxis(0,winx,winy,winx+winw,winy+winh);
+		}
 	}
 };
 
@@ -2420,6 +2427,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 	//playPauseMutex.Lock();
 	static int ratio=3;
 	uint32_t screenMode;
+	uint64_t pts;
 	int len,b2;
 	int pip = hwdecoder->pip;
 	if (doResumeFlag)
@@ -2668,7 +2676,7 @@ if (hwdecoder->TrickSpeed ) {
 }
 #endif
 
-	uint64_t pts = 0;
+	pts = 0;
 
 	if (pkt->pts != AV_NOPTS_VALUE)
 	{
@@ -2986,6 +2994,7 @@ void amlReset()
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;
+	estimatedNextPts = 0;
 	InternalOpen(OdroidDecoders[0], videoFormat,FrameRate);
 }
 

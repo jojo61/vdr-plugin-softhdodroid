@@ -3133,7 +3133,7 @@ void ScaleVideo(int x, int y, int width, int height)
 
     if (PiPActive && !(x & y & width & height)) {
         Info("[softhddev]%s: fullscreen with PiP active.\n", __FUNCTION__);
-        x = mwx; y = mwy; width = mww; height = mwh;
+        //x = mwx; y = mwy; width = mww; height = mwh;
     }
 
     if (MyVideoStream->HwDecoder) {
