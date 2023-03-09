@@ -90,6 +90,7 @@ static VideoStream *AudioSyncStream;    ///< video stream for audio/video sync
 /// Minimum free space in audio buffer 8 packets for 8 channels
 #define AUDIO_MIN_BUFFER_FREE (3072 * 8 * 8)
 #define AUDIO_BUFFER_SIZE (512 * 1024)  ///< audio PES buffer default size
+#define AUDIO_MAX_BUFFERS (150 * 1024)  
 static AVPacket AudioAvPkt[1];          ///< audio a/v packet
 int AudioDelay = 0;
 
@@ -979,7 +980,7 @@ static int TsDemuxer(TsDemux * tsdx, const uint8_t * data, int size)
 #endif
 
 
-
+extern int AudioGetBufferUsedbytes(void) ;
 
 /**
 **  Play audio packet.
@@ -1021,6 +1022,12 @@ int PlayAudio(const uint8_t * data, int size, uint8_t id)
     if (AudioFreeBytes() < AUDIO_MIN_BUFFER_FREE) {
         return 0;
     }
+
+    // dont fill audio buffers too much
+    if (AudioGetBufferUsedbytes() > AUDIO_MAX_BUFFERS) {
+        return 0;
+    }
+
 #ifdef USE_SOFTLIMIT
     // soft limit buffer full
     if (AudioSyncStream && VideoGetBuffers(AudioSyncStream) > 3 && AudioUsedBytes() > AUDIO_MIN_BUFFER_FREE * 2) {
@@ -1232,7 +1239,6 @@ int PlayTsAudio(const uint8_t * data, int size)
     if (StreamFreezed) {                // stream freezed
         return 0;
     }
-
     if (NewAudioStream) {
         // this clears the audio ringbuffer indirect, open and setup does it
         CodecAudioClose(MyAudioDecoder);
@@ -1248,6 +1254,12 @@ int PlayTsAudio(const uint8_t * data, int size)
     if (AudioFreeBytes() < AUDIO_MIN_BUFFER_FREE) {
         return 0;
     }
+
+    // dont fill audio buffers too much
+    if (AudioGetBufferUsedbytes() > AUDIO_MAX_BUFFERS) {
+        return 0;
+    }
+
 #ifdef USE_SOFTLIMIT
     // soft limit buffer full
     if (AudioSyncStream && VideoGetBuffers(AudioSyncStream) > 3 && AudioUsedBytes() > AUDIO_MIN_BUFFER_FREE * 2) {

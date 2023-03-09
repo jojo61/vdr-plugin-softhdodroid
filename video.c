@@ -364,6 +364,8 @@ uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
 		return TrickPTS;
 	}
 #endif
+	return LastPTS;
+#if 0
 	while ((RealPTS = GetCurrentVPts(0)) == 0 && i--) {
 		printf("wait for  Real PTS  \n");
 		usleep(10000);
@@ -375,7 +377,7 @@ uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
 	}
 	usleep(2000);
 	return PTS;
-
+#endif
  };
 
 
@@ -1957,6 +1959,8 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	vformat_t amlFormat = (vformat_t)0;
 	dec_sysinfo_t am_sysinfo = { 0 };
 
+	estimatedNextPts = 0;
+
 	if (!pip) {
 		PIP_allowed = false;
 	}
@@ -2682,7 +2686,12 @@ if (hwdecoder->TrickSpeed ) {
 	{
 		double timeStamp = av_q2d(timeBase) * pkt->pts;
 		pts = (uint64_t)(timeStamp * PTS_FREQ);
-
+#if 0
+		if (estimatedNextPts &&  (abs(estimatedNextPts - pkt->pts) > 90000)) {
+			printf("jump in PTS: reset\n");
+			//amlReset();
+		}
+#endif
 		estimatedNextPts = pkt->pts + 3600; // pkt->duration;
 		lastTimeStamp = timeStamp;
 	}

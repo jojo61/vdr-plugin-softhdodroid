@@ -2059,6 +2059,11 @@ int64_t AudioGetDelay(void)
     return pts;
 }
 
+int AudioGetBufferUsedbytes(void) {
+    return (int) RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
+}
+
+
 /**
 **	Set audio clock base.
 **
@@ -2070,7 +2075,7 @@ void AudioSetClock(int64_t pts)
         Debug(4, "audio: set clock %s -> %s pts\n", Timestamp2String(AudioRing[AudioRingWrite].PTS),
             Timestamp2String(pts));
     }
-  //printf("Audiosetclock                  pts %#012" PRIx64 " %d\n",pts,RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer));
+  //printf("Audiosetclock                  pts %#012" PRIx64 " %ld\n",pts,RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer));
     AudioRing[AudioRingWrite].PTS = pts;
 }
 
