@@ -1072,11 +1072,10 @@ static void AlsaInitPCM(void)
 */
 static void AlsaSetVolume(int volume)
 {
-    
+#ifdef USE_CEC
     static int vol = -1;
 
-#ifdef USE_CEC
-    if (use_cec) { 
+    if (use_cec) {
         if (vol == -1 && volume) {
             vol = volume;
         }
@@ -1551,7 +1550,7 @@ static void *AudioPlayHandlerThread(void *dummy)
         Debug(3, "audio: wait on start condition\n");
         pthread_mutex_lock(&AudioMutex);
         AudioRunning = 0;
-        
+
         do {
             pthread_cond_wait(&AudioStartCond, &AudioMutex);
             // cond_wait can return, without signal!
@@ -1808,7 +1807,7 @@ void AudioEnqueue(const void *samples, int count)
         n = RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
 
         if (!ConfigVideoFastSwitch) {
-            if (isRadio < 75) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio 
+            if (isRadio < 75) {    // do not wait forever if it is a Radio Station. Each Enque is 24ms Audio
 
                 vpts = FirstVPTS;
 
@@ -1830,7 +1829,7 @@ void AudioEnqueue(const void *samples, int count)
         }
         //        skip = AudioSkip;
         // FIXME: round to packet size
-        
+
         Debug(3, "audio: start? %4zdms skip %dms vpts: %#012" PRIx64 " apts  %#012" PRIx64 " Referenz %#012" PRIx64 "\n", (n * 1000)
             / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
             (skip * 1000)
@@ -1854,10 +1853,10 @@ void AudioEnqueue(const void *samples, int count)
             // restart play-back
             // no lock needed, can wakeup next time
             AudioRunning = 1;
-            if (!ConfigVideoFastSwitch) {      
+            if (!ConfigVideoFastSwitch) {
                 FirstVPTS = 0;
                 isRadio = 0;
-            }    
+            }
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "Start on AudioEnque Threshold %d n %d\n", AudioStartThreshold, n);
         }
@@ -2234,7 +2233,7 @@ void AudioSetSoftvol(int onoff)
 */
 void AudioSetCECDevice(int device)
 {
-    AudioCECDev = device;    
+    AudioCECDev = device;
 }
 
 /**
@@ -2398,7 +2397,7 @@ void AudioInit(void)
         Info(_("audio: %6dHz supports %d %d %d %d %d %d %d %d channels\n"), AudioRatesTable[u],
             AudioChannelMatrix[u][1], AudioChannelMatrix[u][2], AudioChannelMatrix[u][3], AudioChannelMatrix[u][4],
             AudioChannelMatrix[u][5], AudioChannelMatrix[u][6], AudioChannelMatrix[u][7], AudioChannelMatrix[u][8]);
-        
+
         AudioChannelMatrix[u][1]=AudioChannelMatrix[u][2]=AudioChannelMatrix[u][3]=AudioChannelMatrix[u][4]=\
         AudioChannelMatrix[u][5]=AudioChannelMatrix[u][6]=AudioChannelMatrix[u][7]=AudioChannelMatrix[u][8]=2;
         //printf("audio: %6dHz supports %d %d %d %d %d %d %d %d channels\n", AudioRatesTable[u],
@@ -2412,7 +2411,7 @@ void AudioInit(void)
     //printf("ChannelsinHW %d %d %d %d %d %d %d %d\n",AudioChannelsInHw[1],AudioChannelsInHw[2],AudioChannelsInHw[3],
     //                                                    AudioChannelsInHw[4],AudioChannelsInHw[5],AudioChannelsInHw[6],
     //                                                    AudioChannelsInHw[7],AudioChannelsInHw[8]);
-    
+
 #ifdef USE_AUDIO_THREAD
     if (AudioUsedModule->Thread) {      // supports threads
         AudioInitThread();

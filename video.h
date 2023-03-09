@@ -406,6 +406,6 @@ extern int amlSetInt(char *, int );
 extern void VideoThreadExit(void);
 extern void InternalClose(int );
 extern void InternalOpen(VideoHwDecoder *, int, double );
-extern void ProcessBuffer(VideoHwDecoder *, AVPacket* );
+extern void ProcessBuffer(VideoHwDecoder *, const AVPacket* );
 extern int SendCodecData(int , uint64_t , unsigned char* , int );
 /// @}

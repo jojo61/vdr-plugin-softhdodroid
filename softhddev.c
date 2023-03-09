@@ -1025,6 +1025,7 @@ int PlayAudio(const uint8_t * data, int size, uint8_t id)
 
     // dont fill audio buffers too much
     if (AudioGetBufferUsedbytes() > AUDIO_MAX_BUFFERS) {
+        usleep(1000);
         return 0;
     }
 
@@ -1257,6 +1258,7 @@ int PlayTsAudio(const uint8_t * data, int size)
 
     // dont fill audio buffers too much
     if (AudioGetBufferUsedbytes() > AUDIO_MAX_BUFFERS) {
+        usleep(1000);
         return 0;
     }
 
@@ -2410,7 +2412,7 @@ uint8_t *GrabImage(int *size, int jpeg, int quality, int width, int height)
 **
 **  @param play_mode    play mode (none, video+audio, audio-only, ...)
 */
-//extern void amlClearVideo();
+
 int SetPlayMode(int play_mode)
 {
     int i;

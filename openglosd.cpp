@@ -331,7 +331,7 @@ bool cShader::Compile(const char *vertexCode, const char *fragmentCode)
     glShaderSource(sVertex, 1, (const GLchar **)&buffer, NULL);
     glCompileShader(sVertex);
     GlxCheck();
-    
+
     //esyslog("[softhddev]:SHADER:VERTEX %s\n",buffer);
     if (!CheckCompileErrors(sVertex)) {
         free(buffer);
@@ -618,7 +618,7 @@ cOglFb::cOglFb(GLint width, GLint height, GLint viewPortWidth, GLint viewPortHei
         scrollable = true;
     else
         scrollable = false;
-    
+
 }
 
 cOglFb::~cOglFb(void)
@@ -632,7 +632,7 @@ cOglFb::~cOglFb(void)
 bool cOglFb::Init(void)
 {
     initiated = true;
-    
+
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -1047,7 +1047,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
 #if 1
     GLfloat x2 = x + (GLfloat)fb->Width();
     y = oFb->Height() - y;
-    GLfloat y2 = y - (GLfloat)fb->Height();   
+    GLfloat y2 = y - (GLfloat)fb->Height();
 
     GLfloat texX1 = 0.0f;
     GLfloat texX2 = 1.0f;
@@ -1056,13 +1056,12 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
 
     GLfloat quadVertices[] = {
         // Pos    // TexCoords
-        x ,  y ,  texX1, texY1,          //left top
-        x ,  y2,  texX1, texY2,          //left bottom
-        x2,  y2,  texX2, texY2,          //right bottom
-
-        x ,  y ,  texX1, texY1,          //left top
-        x2,  y2,  texX2, texY2,          //right bottom
-        x2,  y ,  texX2, texY1           //right top
+       (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
+       (GLfloat)x ,  (GLfloat)y2,  texX1, texY2,          //left bottom
+       (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
+       (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
+       (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
+       (GLfloat)x2,  (GLfloat)y ,  texX2, texY1           //right top
     };
 
     VertexBuffers[vbTexture]->ActivateShader();
@@ -1082,15 +1081,15 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     VertexBuffers[vbTexture]->EnableBlending();
     glFlush();
 #else
-        fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
+    fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
 #endif
-        
+
         oFb->Unbind();
         fb->BindRead();
         return true;
     }
     //return true;
-    
+
 #if 1
     fb->BindRead();
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1112,16 +1111,16 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     int io = ioctl(ion_fd, ION_IOC_ALLOC, &allocation_data);
     if (io != 0)
     {
-        printf("ION_IOC_ALLOC failed.");					
+        printf("ION_IOC_ALLOC failed.");
     }
-    
+
     IonSurface surface = { 0 };
     surface.length = size;
     surface.stride = stride;
     surface.ion_handle = allocation_data.handle;
-                
+
     //surface.map_ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, ionData.fd, 0);
-    surface.rect.X = x; 
+    surface.rect.X = x;
     surface.rect.Y = y;
     surface.rect.Width = fb->Width();
     surface.rect.Height = fb->Height();
@@ -1141,7 +1140,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         printf("ION_IOC_SHARE failed.\n");
     }
 
-    surface.share_fd = ionData.fd;	
+    surface.share_fd = ionData.fd;
 
 
     // Copy data
@@ -1151,7 +1150,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         printf("mmap failed.\n");
     }
 
-    
+
     uint8_t* src_ptr = posd;
     uint8_t* dst_ptr = (uint8_t*)map_ptr;
     dst_ptr += stride * (fb->Height() - 1);
@@ -1161,7 +1160,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
 
         src_ptr += fb->Width() * 4;
         dst_ptr -= stride;
-        
+
     };
 
     munmap(map_ptr, surface.length);
@@ -1215,7 +1214,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     io = ioctl(ge2d_fd, GE2D_STRETCHBLIT, &blitRect);
     if (io < 0)
     {
-        printf("GE2D_BLIT_NOALPHA failed.\n");					
+        printf("GE2D_BLIT_NOALPHA failed.\n");
     }
 
 
@@ -1228,7 +1227,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     io = ioctl(ion_fd, ION_IOC_FREE, &ionHandleData);
     if (io != 0)
     {
-        printf("ION_IOC_FREE failed.\n");	
+        printf("ION_IOC_FREE failed.\n");
     }
 
     //WaitVsync();
@@ -1707,7 +1706,7 @@ bool cOglCmdDrawImage::Execute(void)
 
 
 //  pthread_mutex_lock(&OSDMutex);
- 
+
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, argb);
@@ -2090,15 +2089,15 @@ void cOglThread::Action(void)
 
 bool cOglThread::InitOpenGL(void)
 {
-    
+
     EGLNativeDisplayType nativeDisplay=EGL_DEFAULT_DISPLAY;
-    
+
 	ion_fd = open("/dev/ion", O_RDWR);
 	if (ion_fd < 0)
 	{
 		printf("open /dev/ion failed.");
 	}
-   
+
     eglDisplay = eglGetDisplay(nativeDisplay);
 
         // Initialize EGL
@@ -2120,13 +2119,13 @@ bool cOglThread::InitOpenGL(void)
 	printf("EGL: ClientExtensions=%s\n", eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS));
 	printf("\n");
 #endif
-    
+
     const EGLint configAttributes[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,      
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_ALPHA_SIZE, 0,
         EGL_RED_SIZE, 8,
         EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,       
+        EGL_BLUE_SIZE, 8,
         EGL_DEPTH_SIZE, 16,
         EGL_STENCIL_SIZE, 0,
         EGL_BUFFER_SIZE,  32,
@@ -2141,7 +2140,7 @@ bool cOglThread::InitOpenGL(void)
 	{
 		GlxCheck();
 	}
-  
+
     EGLConfig* configs = new EGLConfig[num_configs];
 	success = eglChooseConfig(eglDisplay, configAttributes, configs, num_configs, &num_configs);
 	if (success != EGL_TRUE)
@@ -2167,7 +2166,7 @@ bool cOglThread::InitOpenGL(void)
 		eglGetConfigAttrib(eglDisplay, configs[i], EGL_ALPHA_SIZE, &configAlphaSize);
 		eglGetConfigAttrib(eglDisplay, configs[i], EGL_DEPTH_SIZE, &configDepthSize);
 		eglGetConfigAttrib(eglDisplay, configs[i], EGL_STENCIL_SIZE, &configStencilSize);
-        
+
 		if (configRedSize == 8 &&
 			configBlueSize == 8 &&
 			configGreenSize == 8 &&
@@ -2186,7 +2185,7 @@ bool cOglThread::InitOpenGL(void)
 
     const EGLint contextAttributes[] =
     {
-        EGL_CONTEXT_CLIENT_VERSION, 2, 
+        EGL_CONTEXT_CLIENT_VERSION, 2,
         EGL_NONE
     };
 
@@ -2208,7 +2207,7 @@ bool cOglThread::InitOpenGL(void)
     ClearCursor(1);
 
     eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, eglContext);
-    
+
 #if 0
     // Clear 3 OSD Buffers
     glClearColor(0,0,0,0) ;
@@ -2224,7 +2223,7 @@ bool cOglThread::InitOpenGL(void)
 #endif
 
     VertexBuffers[vbText]->EnableBlending();
-    
+
     glDisable(GL_DEPTH_TEST);
     GlxCheck();
     OsdClose();
@@ -2272,7 +2271,7 @@ void cOglThread::DeleteVertexBuffers(void)
 void cOglThread::Cleanup(void)
 {
     esyslog("[softhddev]OglThread cleanup\n");
-   
+
     OsdClose();
 
     DeleteVertexBuffers();
@@ -2282,7 +2281,7 @@ void cOglThread::Cleanup(void)
     DeleteShaders();
     // glVDPAUFiniNV();
     cOglFont::Cleanup();
-   
+
 }
 
 /****************************************************************************************
@@ -2556,7 +2555,7 @@ cOglOsd::cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > o
 
 //    pthread_mutex_lock(&OSDMutex);
     VideoGetOsdSize((int*)&MyOsdWidth, (int *)&MyOsdHeight);
-   
+
     dsyslog("[softhddev]cOglOsd osdLeft %d osdTop %d screenWidth %d screenHeight %d", Left, Top, MyOsdWidth, MyOsdHeight);
 
 #if 0
@@ -2564,9 +2563,9 @@ cOglOsd::cOglOsd(int Left, int Top, uint Level, std::shared_ptr < cOglThread > o
         free(posd);
     posd = (unsigned char *)calloc(osdWidth * osdHeight * 4, 1);
 #endif
-  
+
     cSize maxPixmapSize_ODROID(oglThread->MaxTextureSize(), oglThread->MaxTextureSize());
-    
+
     // create output framebuffer
 
     if (!oFb) {

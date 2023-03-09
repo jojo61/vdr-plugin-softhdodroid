@@ -80,8 +80,8 @@ typedef int Bool;
 #define bool Bool
 
 typedef struct
-{ 
-    uint32_t x0; 
+{
+    uint32_t x0;
     uint32_t y0;
     uint32_t x1;
     uint32_t y1;
@@ -116,7 +116,7 @@ static pthread_t VideoThread;           ///< video decode thread
 //static pthread_cond_t VideoWakeupCond;  ///< wakeup condition variable
 //static pthread_mutex_t VideoMutex;      ///< video condition mutex
 //static pthread_mutex_t VideoLockMutex;  ///< video lock mutex
-pthread_mutex_t OSDMutex;               ///< OSD update mutex 
+pthread_mutex_t OSDMutex;               ///< OSD update mutex
 
 /// Default audio/video delay
 int VideoAudioDelay;
@@ -313,7 +313,7 @@ void VideoSetCutTopBottom(int pixels[VideoResolutionMax]) {
     VideoCutTopBottom[0] = pixels[0];
     VideoCutTopBottom[1] = pixels[1];
     VideoCutTopBottom[2] = pixels[2];
-   
+
     // FIXME: update output
 }
 
@@ -326,7 +326,7 @@ void VideoSetCutLeftRight(int pixels[VideoResolutionMax]) {
     VideoCutLeftRight[0] = pixels[0];
     VideoCutLeftRight[1] = pixels[1];
     VideoCutLeftRight[2] = pixels[2];
-   
+
     // FIXME: update output
 }
 
@@ -349,12 +349,9 @@ void VideoOsdClear(void) {
 
 
 uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
-	uint64_t PTS = atomic_read(&LastPTS);
-	uint64_t RealPTS; 
-	int i=100;
 #if 1
 	if (myTrickSpeed) {
-		
+
 		while (TrickPTS == 0) {
 			//Debug(3,"wait for  Trick PTS %#012" PRIx64 " \n",TrickPTS);
 		   usleep(2000);
@@ -366,6 +363,10 @@ uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
 #endif
 	return LastPTS;
 #if 0
+	uint64_t PTS = atomic_read(&LastPTS);
+	uint64_t RealPTS;
+	int i=100;
+
 	while ((RealPTS = GetCurrentVPts(0)) == 0 && i--) {
 		printf("wait for  Real PTS  \n");
 		usleep(10000);
@@ -433,10 +434,10 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed, int forward) {
 };
 
 void dot_to_comma(char *input) {
-    char *ptr = NULL;
+   char *ptr = NULL;
 	if (locale_dot)
 		return;
-    while(ptr = strpbrk(input, ".")) { //find the first dot in input
+   while ((ptr = strpbrk(input, "."))) { //find the first dot in input
         *ptr = ','; //replace the dot with a comma
     }
 }
@@ -446,7 +447,7 @@ static inline bool isnumeric(char c)
     return (c >= '0' && c <= '9') || c == '-';
 }
 
-check_locale() {
+void check_locale() {
 	float test = 5.0;
 	char t[20];
 	sprintf(t,"%f",test);
@@ -511,8 +512,8 @@ float *lut_parse_cube(FILE *fp, int *size) {
 		//printf("Got %s %d\n",line,lines);
 	}  while ((read = getline(&line, &len, fp)) != -1 && --lines);
 
-    if (line)
-        free(line);
+   if (line)
+      free(line);
 	return ptr;
 }
 
@@ -525,14 +526,14 @@ unsigned int  *convert_to_17(float *lut, int size ) {
             for (int r = 0; r < 17; r++) {
                 size_t offset = b * 289 + g * 17 + r;
 				size_t offset1 = (b * 17.0 * faktor +  g * faktor) * 17.0 + r * faktor;
-				
+
                 const float *src = &lut[offset1 * 3];
                 unsigned int *dst = &lut17[offset * 3];
                 dst[0] = (uint)(src[0] * maxw);
                 dst[1] = (uint)(src[1] * maxw);
                 dst[2] = (uint)(src[2] * maxw);
 				if( b == 0 && g == 0)
-				  printf("Offset %d Offset1 %d - %d %d %d\n",offset,offset1,dst[0],dst[1],dst[2]);
+				  printf("Offset %zu Offset1 %zu - %d %d %d\n",offset,offset1,dst[0],dst[1],dst[2]);
             }
         }
     }
@@ -555,13 +556,13 @@ void Load_Lut() {
 
 
 	check_locale();
-return;
+   return;
 
-    sprintf(tmp, "%s/%s", MyConfigDir, lut_file);
+   sprintf(tmp, "%s/%s", MyConfigDir, lut_file);
 
 	printf("Opening %s LUT File\n",tmp);
 
-    if (lutf = fopen(tmp, "r") ) {
+   if ((lutf = fopen(tmp, "r"))) {
         if (!(lut = lut_parse_cube(lutf,&size)))
             printf("Failed parsing LUT.. continuing anyway\n");
 		printf("LUT Size %d\n",size);
@@ -595,12 +596,12 @@ return;
 			free(lut);
 			free(lut17);
 		}
-		
+
     } else {
         Debug(3, "No LUT File used\n");
     }
-	
-	
+
+
 }
 
 /// Grab screen raw.
@@ -646,7 +647,7 @@ int GrabOsd(char *base, int width, int height) {
 	bytesPerPixel = vinfo.bits_per_pixel / 8;
 
 	capSize = VideoWindowWidth * VideoWindowHeight * bytesPerPixel;
-		
+
 	/* map the device to memory */
 	char *_fbp = (char*)mmap(0, capSize, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, _fbfd, 0);
 	if (!_fbp)	{
@@ -661,10 +662,10 @@ int GrabOsd(char *base, int width, int height) {
 
 uint8_t GrabVideo(char *base, int width, int height) {
 
-	
+
 // If the device is not open, attempt to open it
 	//printf("capture Video %d %d\n",width,height);
-	
+
 	int _amlogicCaptureDev = open("/dev/amvideocap0", O_RDONLY, 0);
 
 	// If the device is still not open, there is something wrong
@@ -676,7 +677,7 @@ uint8_t GrabVideo(char *base, int width, int height) {
 
 	int stride = ALIGN(width, 16) * 4;
 	int format = GE2D_FORMAT_S32_ARGB;
-	
+
 	if (ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_WIDTH,  stride / 4)  == -1 ||
 		ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_HEIGHT, height) == -1 ||
 		ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_FORMAT, format) == -1 )
@@ -695,7 +696,7 @@ uint8_t GrabVideo(char *base, int width, int height) {
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_WANTFRAME_AT_FLAGS, CAP_FLAG_AT_TIME_WINDOW);
 	//WaitVsync();
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_SET_START_CAPTURE, 1);
-	
+
 	// Read the snapshot into the memory
 	//ioctl(_amlogicCaptureDev, AMVIDEOCAP_IOW_GET_STATE, &state);
 	//printf("Got Cap State %d\n",state);
@@ -746,7 +747,7 @@ static int scan_str(const char* buf, const char* pattern)
        return res;
 }
 
-                      
+
 ///
 /// Grab output surface already locked.
 ///
@@ -768,14 +769,14 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 
 	char vdec_status[512];
 	amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status));
-	
+
 	if(strstr(vdec_status,"No vdec")) {
 		return NULL;
 	}
-	
+
     width = scan_str(vdec_status,"width : ");
 	height = scan_str(vdec_status,"height : ");
-	
+
 	//printf("Video is %d-%d\n",width,height);
     // get real surface size
 
@@ -828,7 +829,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
             Debug(3,"video/cuvid: out of memory\n");
             return NULL;
         }
-        
+
 		if (!GrabVideo(base,width,height)) {
 			free(base);
 			return NULL;
@@ -845,7 +846,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 			for (int y = 0; y < OsdHeight; ++y)
 			{
 				unsigned char *videoPtr = (unsigned char*)osd + y * stride;
-				
+
 				for (int x = 0; x < OsdWidth; ++x, base += 4, videoPtr += 4)
 				{
 					float alpha = videoPtr[3] / (float)255;
@@ -858,8 +859,8 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
 					base[2] = (1- alpha) * (float)base[2] + alpha * (float)videoPtr[2];
 					//A
 					base[3] = 0xff;// we are solid now
-					
-				}	
+
+				}
 			}
 			free(osd);
 			base = sb;
@@ -899,9 +900,9 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 	scale_width = *width;
 	scale_height = *height;
 	n = 0;
-	
+
 	data = OdroidVideoGrab(size, width, height, 1);
-	
+
 	if (data == NULL)
 		return NULL;
 
@@ -973,7 +974,7 @@ uint8_t *VideoGrab(int *size, int *width, int *height, int write_header)
 
 		*size = *width * *height * 3 + n;
 	}
-	free(data); 
+	free(data);
 
 	return rgb;
 }
@@ -991,7 +992,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		*aspect_num = *aspect_den = 1;
 		return;
 	}
-	
+
 	*width  = scan_str(vdec_status,"width : ");
     *height = scan_str(vdec_status,"height : ");
     int r   = scan_str(vdec_status,"ratio_control : ");
@@ -1009,7 +1010,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 	//OsdWidth = VideoWindowWidth;
 	//OsdHeight = VideoWindowHeight;
- 	
+
  };         ///< Setup osd
 
 
@@ -1017,7 +1018,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 
  void VideoExit(void) {
-	
+
 	// Restore alpha setting
 	int fd_m;
 	struct fb_var_screeninfo info;
@@ -1109,7 +1110,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 	amlSetString("/sys/class/amvecm/debug","3dlut close");
 	amlSetString("/sys/class/amvecm/debug","3dlut disable");
-	
+
  };            ///< Cleanup and exit video module.
 
 
@@ -1154,12 +1155,12 @@ extern void amlClearVBuf();
   /// C callback feed key press
     // void FeedKeyPress(const char *i, const char *j, int k, int l, const char *m) {};
 
-           
-     
+
+
 /// C plugin play TS video packet
 void PlayTsVideo(const uint8_t *i, int j) {};
-   
-void VideoSetHdr2Sdr(int i) 
+
+void VideoSetHdr2Sdr(int i)
 {
 
 	Hdr2Sdr = i;
@@ -1172,7 +1173,7 @@ void VideoSetHdr2Sdr(int i)
 	}
 };
 
-void VideoSetDenoise(int i) 
+void VideoSetDenoise(int i)
 {
 
 	NoiseReduction = i;
@@ -1183,7 +1184,7 @@ void VideoSetDenoise(int i)
 		Debug(3,"Enable Noise reduction\n");
 		amlSetString("/sys/module/di/parameters/nr2_en", "1");
 	}
-};           
+};
 
 void VideoDelHwDecoder(VideoHwDecoder * decoder)
 {
@@ -1196,13 +1197,13 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 	for (int i = 0; i < OdroidDecoderN; ++i) {
         if (OdroidDecoders[i] == decoder) {
             OdroidDecoders[i] = NULL;
-			
+
             // copy last slot into empty slot
-		
+
             if (i < --OdroidDecoderN) {
                 OdroidDecoders[i] = OdroidDecoders[OdroidDecoderN];
             }
-			          
+
             free(decoder);
             return;
         }
@@ -1219,10 +1220,10 @@ void ProcessClockBuffer(int handle)
 
 		// truncate to 32bit
 		uint64_t apts;
-		uint64_t pts = apts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ; 
+		uint64_t pts = apts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ;
 		pts &= 0xffffffff;
 
-		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;	
+		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;
 		vpts &= 0xffffffff;
 
 		if (!pts || !vpts) {
@@ -1242,7 +1243,7 @@ void ProcessClockBuffer(int handle)
 		if (driftFrames >= maxDelta || driftFrames <= -maxDelta)
 		{
 			{
-				
+
 				SetCurrentPCR(handle,apts);
 
 				//printf("AmlVideoSink: Adjust PTS - apts= %#012" PRIx64 " vpts %#012" PRIx64 "   (%f frames)\n", pts , vpts , driftFrames);
@@ -1251,8 +1252,8 @@ void ProcessClockBuffer(int handle)
 
 	}
 
-void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt) 
-{	
+void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
+{
 	int waiter=20000;
 	int pip = decoder->HwDecoder->pip;
 	int handle = decoder->HwDecoder->handle;
@@ -1260,7 +1261,7 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		ProcessBuffer(decoder->HwDecoder,avpkt);
 		return;
 	}
-	
+
 	if (!decoder->HwDecoder->TrickSpeed) {
 		ProcessClockBuffer(handle);
 		TrickPTS=0;
@@ -1272,16 +1273,16 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 				waiter = decoder->HwDecoder->TrickSpeed == 1 ? 40000:30000;
 			}
 			amlFreerun(1);
-			SetCurrentPCR(handle,avpkt->pts); 
+			SetCurrentPCR(handle,avpkt->pts);
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
-	
+
 	ProcessBuffer(decoder->HwDecoder,avpkt);
 	//printf("Trickspeed %d\n",decoder->HwDecoder->TrickSpeed);
 
 	if (decoder->HwDecoder->TrickSpeed) {
-		
+
 		//printf("got %#012" PRIx64 " old %#012" PRIx64 " size %d\n",avpkt->pts,decoder->PTS,avpkt->size);
 		if ((avpkt->pts != AV_NOPTS_VALUE) && (decoder->PTS != AV_NOPTS_VALUE))  {
 #if 0
@@ -1294,14 +1295,14 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 			TrickPTS = avpkt->pts;
 			//printf("Trickspeed wait %d diff = %ld\n",waiter,diff);
 			usleep(waiter*decoder->HwDecoder->TrickSpeed);
-			
+
 		}
-		
+
 	}
 	if (avpkt->pts != AV_NOPTS_VALUE) {
 		decoder->PTS = avpkt->pts;   		// save last pts;
 	}
-	
+
 };
 
 
@@ -1315,32 +1316,32 @@ void ClearDisplay(void)
 
 
 void WaitVsync() {
-   
+
 	int fd = open("/dev/fb0", O_RDWR);
-	
+
 	if (ioctl(fd, FBIO_WAITFORVSYNC, 1) < 0)
 	{
 		printf("FBIO_WAITFORVSYNC failed.\n");
 	}
 	close(fd);
-}	
-	
+}
+
 
 void ClearCursor(int blank) {
 
 	int fd = open("/dev/tty1", O_RDWR);
-    
+
     if(0 < fd)
     {
-        write(fd, "\033[?25", 5);
-        write(fd, blank==0 ? "h" : "l", 1);
+       int res = write(fd, "\033[?25", 5);
+       res += write(fd, blank==0 ? "h" : "l", 1);
     }
     close(fd);
 }
 
 void Fbdev_blank(int blank) {
 int fd = open("/dev/tty0", O_RDWR);
-    
+
     if(0 < fd)
     {
         ioctl(fd, FBIOBLANK, blank ? VESA_POWERDOWN: VESA_NO_BLANKING);
@@ -1368,7 +1369,7 @@ void VideoThreadExit(void)
             Debug(3, "video: can't cancel video decoder thread\n");
         }
 
-       
+
         VideoThread = 0;
         //pthread_cond_destroy(&VideoWakeupCond);
         //pthread_mutex_destroy(&VideoLockMutex);
@@ -1395,13 +1396,13 @@ void OdroidDisplayHandlerThread(void)
     int free;
     OdroidDecoder *decoder;
 
-	for (i = 0; i < OdroidDecoderN; ++i) { 
-		
+	for (i = 0; i < OdroidDecoderN; ++i) {
+
 		decoder = OdroidDecoders[i];
 		if (!decoder)
 			continue;
 
-		free = amlGetBufferFree(decoder->pip);	
+		free = amlGetBufferFree(decoder->pip);
 		//printf("Free in Prozent: %d\n",free);
 
 		if (free > 60) {
@@ -1425,7 +1426,7 @@ void OdroidDisplayHandlerThread(void)
 
 		}
 	}
-    
+
     usleep(5000);
 	return;
 }
@@ -1434,7 +1435,7 @@ void *VideoDisplayHandlerThread(void *dummy)
 {
 
   //  prctl(PR_SET_NAME, "video decoder", 0, 0, 0);
-    
+
     pthread_cleanup_push(delete_decode, NULL);
     for (;;) {
         // fix dead-lock with OdroidExit
@@ -1445,7 +1446,7 @@ void *VideoDisplayHandlerThread(void *dummy)
         OdroidDisplayHandlerThread();
     }
     pthread_cleanup_pop(NULL);
-  
+
     return dummy;
 }
 
@@ -1454,7 +1455,7 @@ void *VideoDisplayHandlerThread(void *dummy)
 ///
 void VideoThreadInit(void)
 {
-  
+
  //   pthread_mutex_init(&VideoMutex, NULL);
  //   pthread_mutex_init(&VideoLockMutex, NULL);
  //   pthread_mutex_init(&OSDMutex, NULL);
@@ -1491,7 +1492,7 @@ OdroidDecoder *VideoNewHwDecoder(VideoStream * stream)
 
     Debug(3, "Odroid New HW Decoder\n");
 
-    
+
     if (!(decoder = calloc(1, sizeof(*decoder)))) {
         Debug(3,"video/Odroid: out of memory\n");
         return NULL;
@@ -1507,7 +1508,7 @@ OdroidDecoder *VideoNewHwDecoder(VideoStream * stream)
     decoder->PixFmt = AV_PIX_FMT_NONE;
 
     decoder->Stream = stream;
-    
+
     decoder->Closing = -300 - 1;
     decoder->PTS = AV_NOPTS_VALUE;
 
@@ -1536,12 +1537,12 @@ void VideoSetVideoMode( __attribute__((unused))
         Debug(3, "call back set video mode %d %d\n", width, height);
     }
 
-   
+
     VideoWindowWidth = width;
     VideoWindowHeight = height;
 
     SetVideoMode();
-    
+
 
 }
 
@@ -1658,9 +1659,9 @@ bool getResolution(char *mode) {
 #define FBIOGET_OSD_DMABUF               0x46fc
 
 
- void VideoInit(const char *i) 
+ void VideoInit(const char *i)
 {
-	
+
 
 	char mode[256];
 
@@ -1691,11 +1692,11 @@ bool getResolution(char *mode) {
 		printf("Reset FREERUN failed.\n");
 		return;
 	}
-	
+
 	VideoSetFastSwitch(ConfigVideoFastSwitch);
-	
+
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
-	
+
 	getResolution(mode);
 
 	// enable alpha setting
@@ -1734,11 +1735,11 @@ bool getResolution(char *mode) {
 	} else {
 		DmaBufferHandle = h[1];
 	}
-	
+
 	close(fd);
 #if 0
 	// Set graphics mode
-	int ttyfd = open("/dev/tty0", O_RDWR);	
+	int ttyfd = open("/dev/tty0", O_RDWR);
 	if (ttyfd < 0)
 	{
 		printf("Could not open /dev/tty0\n");
@@ -1763,12 +1764,12 @@ bool getResolution(char *mode) {
 	}
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
-    
+
 
 	// Check if H264-PIP is available
 	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
 	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
-	
+
 	if (fd2 > 0 ) {
 		vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
 		char vfm_status[512];
@@ -1780,11 +1781,11 @@ bool getResolution(char *mode) {
         	if (strstr(vfm_status,"mpeg12")) {
 				use_pip_mpeg2 = 1;
 			}
-		}	
+		}
 		close (fd2);
 	}
 	close(fd1);
-	
+
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};
 
@@ -1838,11 +1839,11 @@ extern void DelPip(void);
 
 	default:
 			printf("Unknown Video Codec\n");
-		
+
 			return;
-		
+
 	}
-	
+
 	if (!pip) {
 		FirstVPTS = AV_NOPTS_VALUE;
 		isAnnexB = false;
@@ -1852,7 +1853,7 @@ extern void DelPip(void);
 	if (isOpen && !pip) {
 		InternalClose(pip);
 	}
-	
+
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
 		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
@@ -1951,7 +1952,7 @@ const char* CODEC_VIDEO_ES_HEVC_DEVICE_SCHED = "/dev/amstream_hevc_sched";
 
 void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 {
-    
+
 	int handle;
 	int pip = hwdecoder->pip;
 	// Open codec
@@ -1967,7 +1968,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 	if (!pip)
  	    amlSetInt("/sys/class/video/disable_video",0);
-	
+
 	switch (format)
 	{
 		case Hevc:
@@ -1981,7 +1982,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			}
 			break;
 		case Avc:
-			
+
 			Debug(3,"AmlVideoSink - VIDEO/H264\n");
 
 			amlFormat = VFORMAT_H264;
@@ -1990,7 +1991,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				PIP_allowed = true;
 			}
 			hwdecoder->handle = open("/dev/amstream_vframe", flags);
-			
+
 
 			break;
 		case Mpeg2:
@@ -2004,17 +2005,17 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
 				if (use_pip && !pip && isPIP) {
 					DelPip();
-				}		
+				}
 			}
 			break;
 		default:
 			Debug(3,"AmlVideoSink - VIDEO/UNKNOWN(%d)\n", (int)format);
             return;
-			
+
 	}
 
 	if (hwdecoder->handle < 0)
-	{	
+	{
 		Debug(3,"AmlCodec open failed. %d\n",hwdecoder->handle);
         return;
 	}
@@ -2022,13 +2023,13 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	hwdecoder->Format = format;
 
 	// Set video format
-	
+
 	//codec.stream_type = STREAM_TYPE_ES_VIDEO;
 	//codec.has_video = 1;
 	////codec.noblock = 1;
 
 	// Note: Without EXTERNAL_PTS | SYNC_OUTSIDE, the codec auto adjusts
-	// frame-rate from PTS 
+	// frame-rate from PTS
 	//am_sysinfo.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE);
 	//am_sysinfo.param = (void*)(EXTERNAL_PTS | SYNC_OUTSIDE | USE_IDR_FRAMERATE | UCODE_IP_ONLY_PARAM);
 	//am_sysinfo.param = (void*)(SYNC_OUTSIDE | USE_IDR_FRAMERATE);
@@ -2043,7 +2044,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 	// Note: Testing has shown that the ALSA clock requires the +1
 	am_sysinfo.rate = 96000.0 / frameRate + 0.5;
-	
+
 	//am_sysinfo.width = width;
 	//am_sysinfo.height = height;
 	//am_sysinfo.ratio64 = (((int64_t)width) << 32) | ((int64_t)height);
@@ -2109,10 +2110,10 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			Debug(3,"AmlVideoSink - VIDEO/UNKNOWN(%d)\n", (int)format);
             return;
 
-			
+
 	}
 #endif
-	
+
 	int r;
 
 	if (apiLevel >= S905) // S905
@@ -2129,7 +2130,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
             return;
 		}
 	}
-		
+
 	if (apiLevel >= S905) // S905
 	{
 		if (!pip) {
@@ -2140,7 +2141,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			}
 			else if (use_pip_mpeg2 && (format == Mpeg2)) {
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.mpeg12.00 ppmgr deinterlace  amvideo");
-			}				
+			}
 		}
 		//amlSetInt("/sys/class/video/blackout_policy", 0);
 
@@ -2157,7 +2158,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			amlSetInt("/sys/class/video/pip_global_output",1);
 		}
 	}
-	
+
 	r = ioctl(handle, AMSTREAM_IOC_SYSINFO, (unsigned long)&am_sysinfo);
 	if (r < 0)
 	{
@@ -2182,7 +2183,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		}
 	}
 
-	
+
 
 
 	//codec_h_control(pcodec->cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)enable);
@@ -2222,7 +2223,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 #endif
 	//amlSetInt("/sys/class/video/disable_video",0);
-	
+
 	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
 	if (!pip) {
 		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
@@ -2287,7 +2288,7 @@ uint64_t GetCurrentVPts(int handle)
 		vpts = parm.data_32;
 		//vpts = parm.data_64;
 
-		
+
 	}
 	else	// S805
 	{
@@ -2426,7 +2427,7 @@ void SetCrop(int codec) {
 	Debug(3,"Set Crop to %s\n",s);
 }
 
-void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
+void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 {
 	//playPauseMutex.Lock();
 	static int ratio=3;
@@ -2470,21 +2471,21 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			isShortStartCode = false;
 		}
 
-#if 1		
+#if 1
 		switch(hwdecoder->Format) {
 			case Hevc:
 						{
 							int nal_unit_type;
 							nalHeader = (unsigned char*)pkt->data;
 							while (len--) {
-								if (nalHeader[0] == 0 && 
+								if (nalHeader[0] == 0 &&
 									nalHeader[1] == 0 &&
 									nalHeader[2] == 1) {
 										nal_unit_type = ((nalHeader[3] >>1)  & 0x3f);  		// Get Frame Type
 										//printf("HEVC Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
 										if (nal_unit_type == 32 ) {
 											break;
-											
+
 										}
 										else {
 											nalHeader++;
@@ -2509,14 +2510,14 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 							int nal_unit_type;
 							nalHeader = (unsigned char*)pkt->data;
 							while (len--) {
-								if (nalHeader[0] == 0 && 
+								if (nalHeader[0] == 0 &&
 									nalHeader[1] == 0 &&
 									nalHeader[2] == 1) {
 										nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
 										//printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
 										if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
 											break;
-											
+
 										}
 										else {
 											nalHeader++;
@@ -2538,7 +2539,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 						break;
 			case Mpeg2:
 				while (len--) {
-					if (nalHeader[0] == 0 && 
+					if (nalHeader[0] == 0 &&
 						nalHeader[1] == 0 &&
 						nalHeader[2] == 1 &&
 						nalHeader[3] == 0) {						// Picture Start Code
@@ -2567,7 +2568,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 			default:
 				break;
 		}
-#endif		
+#endif
 		if (!pip) {
 			FirstVPTS = pkt->pts;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
@@ -2578,11 +2579,11 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 		//amlCodec.SetSyncThreshold(pts);
 
 		isFirstVideoPacket = false;
-		
+
 	}
 	else {
 		if (hwdecoder->Format == Mpeg2 && !pip &&
-			nalHeader[0] == 0 && 
+			nalHeader[0] == 0 &&
 			nalHeader[1] == 0 &&
 			nalHeader[2] == 1 &&
 			nalHeader[3] == 0xb3) {						// Sequence Header
@@ -2591,18 +2592,18 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, AVPacket* pkt)
 				if (r == 2 && r != ratio) {
 					//printf("Set Ratio %d\n",r);
 					ratio = 2;
-					screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3; 
+					screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3;
 					ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
 				} else if (r == 3 && r != ratio) {
 					//printf("Set Ratio %d\n",r);
 					ratio = 3;
-					screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9; 
+					screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
 					ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
 				}
 			}
 	}
 
-#if 0	
+#if 0
 nalHeader = (unsigned char*)pkt->data;
 	len = pkt->size - 3;
 if (hwdecoder->TrickSpeed ) {
@@ -2611,9 +2612,9 @@ if (hwdecoder->TrickSpeed ) {
 			case Hevc:
 						{
 							int nal_unit_type;
-							
+
 							while (len--) {
-								if (nalHeader[0] == 0 && 
+								if (nalHeader[0] == 0 &&
 									nalHeader[1] == 0 &&
 									nalHeader[2] == 1) {
 										nal_unit_type = ((nalHeader[3] >> 1)  & 0x3f);  		// Get Frame Type
@@ -2645,7 +2646,7 @@ if (hwdecoder->TrickSpeed ) {
 				nalHeader = (unsigned char*)pkt->data;
 				//printf("start with len %d\n",pkt->size);
 				while (len--) {
-					if (nalHeader[0] == 0 && 
+					if (nalHeader[0] == 0 &&
 						nalHeader[1] == 0 &&
 						nalHeader[2] == 1) {
 							nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
@@ -2653,7 +2654,7 @@ if (hwdecoder->TrickSpeed ) {
 							if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
 								nalHeader++;
 								continue;
-								
+
 							}
 							else {
 								nalHeader++;
@@ -2722,7 +2723,7 @@ if (hwdecoder->TrickSpeed ) {
 
 			break;
 		}
-	
+
 		case Avc:
 		case Hevc:
 		{
@@ -2881,12 +2882,12 @@ int WriteData(int handle, unsigned char* data, int length)
 	if (length < 1) {
 		return 0;
 	}
-	
+
 	int ret = write(handle, data, length);
 	if (ret == length) {
 		usleep(2000);
 	}
-	
+
 	return ret; //written;
 }
 
@@ -2900,7 +2901,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 	if ((pts) && !pip)
 	{
 		atomic_set(&LastPTS, pts);
-		
+
 		CheckinPts(handle, pts);
 	}
 
@@ -2956,7 +2957,7 @@ void amlPause()
 		return;
 	}
 
-	
+
 	//codec_pause(&codec);
 	int ret = ioctl(cntl_handle, AMSTREAM_IOC_VPAUSE, 1);
 	if (ret < 0)
@@ -2979,7 +2980,7 @@ void amlResume()
 		return;
 	}
 
-	
+
 	//codec_resume(&codec);
 	int ret = ioctl(cntl_handle, AMSTREAM_IOC_VPAUSE, 0);
 	if (ret < 0)
@@ -3025,7 +3026,7 @@ void InternalClose(int pip)
 		return;
 	}
 	if (pip) {
-		
+
 		uint32_t nMode = 1;
 		ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
 		amlSetString("/sys/class/vfm/map","rm pip1");
@@ -3034,7 +3035,7 @@ void InternalClose(int pip)
 	} else {
 		amlSetString("/sys/class/vfm/map","rm pip0");
 	}
-	
+
 
 	OdroidDecoders[pip]->handle = -1;
 
@@ -3091,7 +3092,7 @@ void amlFreerun(int val)
 	{
 		printf("AMSTREAM_FREERUN failed. %d",val);
 		return;
-	}	
+	}
 }
 
 void amlTrickMode(int val)  // unused
@@ -3104,8 +3105,8 @@ void amlTrickMode(int val)  // unused
 		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
-	
-	
+
+
 	int r = ioctl(cntl_handle, AMSTREAM_IOC_TRICKMODE ,(unsigned long)val);
 	//codecMutex.Unlock();
 
@@ -3113,10 +3114,10 @@ void amlTrickMode(int val)  // unused
 	{
 		printf("AMSTREAM_TRICKMODE failed. %d",val);
 		return;
-	}	
+	}
 }
 
-int amlGetBufferFree(int pip)  
+int amlGetBufferFree(int pip)
 {
 	//codecMutex.Lock();
 
@@ -3127,13 +3128,13 @@ int amlGetBufferFree(int pip)
 		return 100;
 	}
 	int handle = OdroidDecoders[pip]->handle;
-	
+
 	struct buf_status status;
 	if (apiLevel >= S905)	// S905
 	{
 		struct am_ioctl_parm_ex parm = { 0 };
 		parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
-		
+
 		int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
 
 		//codecMutex.Unlock();
@@ -3270,9 +3271,9 @@ bool amlHasRW(char *path)
 
 
 #if 0
-void amlClearVideo()  
+void amlClearVideo()
 {
-	
+
 	Debug(3,"clear vbuf\n");
 	if (!isOpen)
 	{
@@ -3286,7 +3287,7 @@ void amlClearVideo()
 	{
 		printf("AMSTREAM_CLEAR_VIDEO failed.");
 		return;
-	}	
+	}
 }
 
 void amlClearVBuf()   // unused
@@ -3302,13 +3303,13 @@ void amlClearVBuf()   // unused
 		return;
 	}
 
-	
+
 	struct buf_status status;
 	if (apiLevel >= S905)	// S905
 	{
 		struct am_ioctl_parm_ex parm = { 0 };
 		parm.cmd = AMSTREAM_CLEAR_VBUF;
-		
+
 		int r = ioctl(handle, AMSTREAM_IOC_SET_EX, (unsigned long)&parm);
 
 		//codecMutex.Unlock();
@@ -3319,13 +3320,13 @@ void amlClearVBuf()   // unused
 			return;
 		}
 
-		
+
 	}
 }
 
 void amlSetVideoDelayLimit(int ms)  // unused
 {
-	
+
     codec_h_ioctl_set (handle, AMSTREAM_SET_VIDEO_DELAY_LIMIT_MS, ms);
 
 }
@@ -3340,16 +3341,16 @@ void amlDecReset()  // unused
 		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
-	
+
 	//int r = ioctl(cntl_handle, AMSTREAM_IOC_CLEAR_VBUF);
-	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_DEC_RESET,(unsigned long)1);	
+	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_DEC_RESET,(unsigned long)1);
 	//codecMutex.Unlock();
 
 	if (r < 0)
 	{
 		printf("AMSTREAM_DEC_RESET failed.");
 		return;
-	}	
+	}
 }
 
 
@@ -3364,7 +3365,7 @@ amlClearVideo()  // unused
 		return;
 	}
 
-	
+
 	//codec_resume(&codec);
 	int ret = ioctl(cntl_handle, AMSTREAM_IOC_CLEAR_VIDEO, 0);
 	if (ret < 0)
@@ -3399,7 +3400,7 @@ void amlGetVideoAxis()  // unused
 	}
 
 	//printf("Video Axis %d %d - %d %d\n",params[0],params[1],params[2],params[3]);
-		
+
 	return;
 }
 
