@@ -3093,7 +3093,7 @@ void amlSetVideoAxis(int pip, int x, int y, int width, int height)
 }
 
 
-void amlFreerun(int val)
+int amlFreerun(int val)
 {
 	//codecMutex.Lock();
 
@@ -3101,7 +3101,7 @@ void amlFreerun(int val)
 	{
 		//codecMutex.Unlock();
 		//printf("The codec is not open. %s\n",__FUNCTION__);
-		return;
+		return 1;
 	}
 	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)val);
 	//int r = ioctl(cntl_handle, AMSTREAM_IOC_TRICKMODE ,val);
@@ -3110,8 +3110,9 @@ void amlFreerun(int val)
 	if (r < 0)
 	{
 		printf("AMSTREAM_FREERUN failed. %d",val);
-		return;
+		return 1;
 	}
+	return 0;
 }
 
 void amlTrickMode(int val)  // unused

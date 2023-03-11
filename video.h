@@ -395,7 +395,7 @@ extern int codec_h_ioctl_set(int , int , unsigned long  );
 extern void amlSetVideoAxis(int , int , int , int , int );
 extern void amlResume();
 extern void amlPause();
-extern void amlFreerun(int);
+extern int amlFreerun(int);
 extern void amlTrickMode(int);
 extern void amlReset();
 extern void ClearDisplay(void);

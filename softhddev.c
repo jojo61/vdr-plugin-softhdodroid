@@ -2613,8 +2613,10 @@ void StillPicture(const uint8_t * data, int size)
     fprintf(stderr, "still-picture\n");
 #endif
 
-    usleep(25000);
-    amlFreerun(1);
+    
+    i=5;
+    while (amlFreerun(1) && i--)
+        usleep(20000);
     //amlTrickMode(1);
     //amlClearVBuf();
     
