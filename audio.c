@@ -1819,7 +1819,7 @@ void AudioEnqueue(const void *samples, int count)
                     skip = n;    // Clear Audio until Video PTS
                 } else  {
                     int i = 10;
-                    while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay -24000 )) == 2 && i--) {
+                    while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay - 10000 )) == 2 && i--) {
                         usleep(5000);
                     }
                 }
@@ -1847,7 +1847,7 @@ void AudioEnqueue(const void *samples, int count)
         // forced start or enough video + audio buffered
         // for some exotic channels * 4 too small
 
-        if (AudioStartThreshold * 1.8  < n || (AudioVideoIsReady
+        if (AudioStartThreshold * 1.2  < n || (AudioVideoIsReady
                 //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back

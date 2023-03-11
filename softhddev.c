@@ -2415,33 +2415,15 @@ uint8_t *GrabImage(int *size, int jpeg, int quality, int width, int height)
 
 int SetPlayMode(int play_mode)
 {
-    int i;
     Debug(3, "Set Playmode %d\n", play_mode);
     switch (play_mode) {
-        case 0:                        // audio/video from decoder
-            // tell video parser we get new stream
-            //amlClearVideo();
+        case 0:
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
-                amlSetInt("/sys/class/video/blackout_policy", ConfigVideoBlackPicture);
-                VideoResetPacket(MyVideoStream);        // terminate work
-                MyVideoStream->ClearBuffers = 1;
-                if (!SkipAudio) {
-                    AudioFlushBuffers();
-                }
-                // wait for empty buffers
-                for (i = 0; MyVideoStream->ClearBuffers && i < 20; ++i) {
-                    usleep(1 * 1000);
-                }
+               Clear();
+               MyVideoStream->ClearClose = 0;
                 if (MyVideoStream->CodecID != AV_CODEC_ID_NONE) {
-                    MyVideoStream->NewStream = 1;
-                    MyVideoStream->InvalidPesCounter = 0;
-                    // tell hw decoder we are closing stream
-                    VideoSetClosing(MyVideoStream->HwDecoder);
-                    VideoResetStart(MyVideoStream->HwDecoder);
-#ifdef DEBUG
-                    VideoSwitch = GetMsTicks();
-                    Debug(3, "video: new stream start\n");
-#endif
+                        MyVideoStream->NewStream = 1;
+                        MyVideoStream->InvalidPesCounter = 0;
                 }
             }
             if (MyAudioDecoder) {       // tell audio parser we have new stream
@@ -2451,22 +2433,16 @@ int SetPlayMode(int play_mode)
             }
             break;
         case 1:                        // audio/video from player
-            VideoDisplayWakeup();
-            Play();
-            break;
         case 2:                        // audio only from player, video from decoder
         case 3:                        // audio only from player, no video (black screen)
-            Debug(3, "softhddev: FIXME: audio only, silence video errors\n");
-            VideoDisplayWakeup();
-            Play();
-            break;
         case 4:                        // video only from player, audio from decoder
-            VideoDisplayWakeup();
-            Play();
+            amlSetInt("/sys/class/video/blackout_policy", ConfigVideoBlackPicture);
             break;
     }
     return 1;
+
 }
+
 
 /**
 **  Gets the current System Time Counter, which can be used to
@@ -2553,7 +2529,6 @@ void Clear(void)
     for (i = 0; MyVideoStream->ClearBuffers && i < 20; ++i) {
         usleep(1 * 1000);
     }
-    amlReset();
     Debug(3, "[softhddev]%s: %dms buffers %d\n", __FUNCTION__, i, VideoGetBuffers(MyVideoStream));
 }
 

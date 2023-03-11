@@ -1141,7 +1141,9 @@ void CodecVideoDelDecoder(VideoDecoder *decoder){
 
 extern void amlClearVBuf();
 /// Flush video buffers.
- void CodecVideoFlushBuffers(VideoDecoder *decoder) {};
+ void CodecVideoFlushBuffers(VideoDecoder *decoder) {
+        amlReset();
+};
 
 
 /// Setup and initialize codec module.
@@ -2843,7 +2845,7 @@ if (hwdecoder->TrickSpeed ) {
 void CheckinPts(int handle, uint64_t pts)
 {
 	//codecMutex.Lock();
-
+	int r;
 
 	if (!isOpen)
 	{
@@ -2859,10 +2861,27 @@ void CheckinPts(int handle, uint64_t pts)
 	if (apiLevel >= S905)	// S905
 	{
 		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
+#if 0
+		int cmd_new = AMSTREAM_IOC_SET;
+		unsigned long parm_new;
+		struct am_ioctl_parm parm;
+		
+        memset(&parm, 0, sizeof(parm));
+        parm.cmd = AMSTREAM_SET_TSTAMP_US64;
+        parm.data_64 = pts;
+        parm_new = (unsigned long)&parm;
+        r = ioctl(handle, cmd_new, parm_new);
+		if (r < 0)
+		{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_IOC_TSTAMP failed\n");
+			return;
+		}
+#endif
 	}
 	else	// S805
 	{
-		int r = ioctl(handle, AMSTREAM_IOC_TSTAMP, (unsigned long) pts);
+		r = ioctl(handle, AMSTREAM_IOC_TSTAMP, (unsigned long) pts);
 		if (r < 0)
 		{
 			//codecMutex.Unlock();
