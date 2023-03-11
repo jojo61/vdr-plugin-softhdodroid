@@ -2612,11 +2612,12 @@ void StillPicture(const uint8_t * data, int size)
 #ifdef STILL_DEBUG
     fprintf(stderr, "still-picture\n");
 #endif
-    
+
+    usleep(25000);
     amlFreerun(1);
-    amlTrickMode(1);
+    //amlTrickMode(1);
     //amlClearVBuf();
-    usleep(10000);
+    
     for (i = 0; i < 4; ++i) {
         const uint8_t *split;
         int n;
@@ -2685,8 +2686,8 @@ void StillPicture(const uint8_t * data, int size)
     
   //  VideoNextPacket(MyVideoStream, AV_CODEC_ID_NONE);   // close last stream
    
-    usleep(25000);
-   amlTrickMode(0);
+   //usleep(25000);
+   //amlTrickMode(0);
    amlFreerun(0);
     //VideoSetTrickSpeed(MyVideoStream->HwDecoder, 0);
 }
