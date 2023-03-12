@@ -1088,14 +1088,14 @@ static void AlsaSetVolume(int volume)
             }
             vol = volume;
         }
-    }
-#else
+    } else 
+#endif
     if (AlsaMixer && AlsaMixerElem) {
         int v = (volume * AlsaRatio) / (1000 * 1000);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 0, v);
         snd_mixer_selem_set_playback_volume(AlsaMixerElem, 1, v);
     }
-#endif
+
 }
 
 /**
@@ -2419,7 +2419,12 @@ void AudioInit(void)
 #endif
 
 #ifdef USE_CEC
-    use_cec = cec_init();
+    if (!AudioSoftVolume) {
+        use_cec = cec_init();
+    }
+    else {
+        use_cec = 0;
+    }
 #else
     use_cec = 0;
 #endif

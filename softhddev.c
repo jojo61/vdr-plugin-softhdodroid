@@ -2418,6 +2418,9 @@ int SetPlayMode(int play_mode)
     Debug(3, "Set Playmode %d\n", play_mode);
     switch (play_mode) {
         case 0:
+            if (ConfigVideoBlackPicture) {
+                amlSetInt("/sys/class/video/disable_video", 1);
+            }
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                Clear();
                MyVideoStream->ClearClose = 0;
@@ -2436,7 +2439,9 @@ int SetPlayMode(int play_mode)
         case 2:                        // audio only from player, video from decoder
         case 3:                        // audio only from player, no video (black screen)
         case 4:                        // video only from player, audio from decoder
-            amlSetInt("/sys/class/video/blackout_policy", ConfigVideoBlackPicture);
+            if (ConfigVideoBlackPicture) {
+                amlSetInt("/sys/class/video/disable_video", 0);
+            }
             break;
     }
     return 1;
