@@ -90,7 +90,7 @@ static VideoStream *AudioSyncStream;    ///< video stream for audio/video sync
 /// Minimum free space in audio buffer 8 packets for 8 channels
 #define AUDIO_MIN_BUFFER_FREE (3072 * 8 * 8)
 #define AUDIO_BUFFER_SIZE (512 * 1024)  ///< audio PES buffer default size
-#define AUDIO_MAX_BUFFERS (150 * 1024)  
+#define AUDIO_MAX_BUFFERS (260 * 1024)  
 static AVPacket AudioAvPkt[1];          ///< audio a/v packet
 int AudioDelay = 0;
 
