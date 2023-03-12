@@ -2439,6 +2439,7 @@ int SetPlayMode(int play_mode)
         case 2:                        // audio only from player, video from decoder
         case 3:                        // audio only from player, no video (black screen)
         case 4:                        // video only from player, audio from decoder
+        case 5:                        // pmExtern_THIS_SHOULD_BE_AVOIDED
             if (ConfigVideoBlackPicture) {
                 amlSetInt("/sys/class/video/disable_video", 0);
             }
