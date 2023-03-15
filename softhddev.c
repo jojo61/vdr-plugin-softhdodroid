@@ -2440,6 +2440,7 @@ int SetPlayMode(int play_mode)
         case 3:                        // audio only from player, no video (black screen)
         case 4:                        // video only from player, audio from decoder
         case 5:                        // pmExtern_THIS_SHOULD_BE_AVOIDED
+            Play();
             if (ConfigVideoBlackPicture) {
                 amlSetInt("/sys/class/video/disable_video", 0);
             }
@@ -2623,7 +2624,7 @@ void StillPicture(const uint8_t * data, int size)
     i=5;
     while (amlFreerun(1) && i--)
         usleep(20000);
-    //amlTrickMode(1);
+    amlTrickMode(1);
     //amlClearVBuf();
     
     for (i = 0; i < 4; ++i) {
@@ -2694,8 +2695,8 @@ void StillPicture(const uint8_t * data, int size)
     
   //  VideoNextPacket(MyVideoStream, AV_CODEC_ID_NONE);   // close last stream
    
-   //usleep(25000);
-   //amlTrickMode(0);
+   usleep(25000);
+   amlTrickMode(0);
    amlFreerun(0);
     //VideoSetTrickSpeed(MyVideoStream->HwDecoder, 0);
 }
