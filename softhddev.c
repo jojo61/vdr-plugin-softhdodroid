@@ -2827,13 +2827,9 @@ const char *CommandLineHelp(void)
     return "  -a device\taudio device (fe. alsa: hw:0,0 oss: /dev/dsp)\n"
         "  -p device\taudio device for pass-through (hw:0,1 or /dev/dsp1)\n"
         "  -c channel\taudio mixer channel name (fe. PCM)\n" 
-        "  -m disable pip in mpeg2 streams\n" 
         "  -s\t\tstart in suspended mode\n"
-        "  -D\t\tstart in detached mode\n"
-        "  -w workaround\tenable/disable workarounds\n"
-        "\talsa-driver-broken\tdisable broken alsa driver message\n"
-        "\talsa-no-close-open\tdisable close open to fix alsa no sound bug\n"
-        "\talsa-close-open-delay\tenable close open delay to fix no sound bug\n";
+        "  -D\t\tstart in detached mode\n";
+     
         
 }
 

@@ -1221,9 +1221,18 @@ void ProcessClockBuffer(int handle)
 	{
 
 		// truncate to 32bit
-		uint64_t apts;
-		uint64_t pts = apts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ;
+		static uint64_t apts;
+
+		uint64_t pts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ;
+		if (pts != AV_NOPTS_VALUE) {
+			if (apts != AV_NOPTS_VALUE && (pts -  apts) > 0x1000000) {
+				amlReset();
+			}
+			
+		}
+		apts = pts;
 		pts &= 0xffffffff;
+		//printf("apts  %#012" PRIx64 " \n",apts);
 
 		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;
 		vpts &= 0xffffffff;
@@ -1795,6 +1804,7 @@ bool getResolution(char *mode) {
 	sprintf(waxis_str, "0 0 %d %d", VideoWindowWidth-1, VideoWindowHeight-1);
 
 	amlSetString("/sys/class/vfm/map","rm default");
+	sleep(2);
 	amlSetString("/sys/class/vfm/map","add default decoder ppmgr deinterlace amvideo");
 
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
@@ -2924,7 +2934,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 
 		CheckinPts(handle, pts);
 	}
-
+//printf("vpts  %#012" PRIx64 " \n",pts);
 	int maxAttempts = 150;
 	int offset = 0;
 	while (offset < length)
@@ -3074,7 +3084,7 @@ void amlSetVideoAxis(int pip, int x, int y, int width, int height)
 	if (!isOpen)
 	{
 		//codecMutex.Unlock();
-		printf("The codec is not open. %s\n",__FUNCTION__);
+		//printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
 

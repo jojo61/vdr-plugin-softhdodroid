@@ -2076,6 +2076,7 @@ void AudioSetClock(int64_t pts)
     }
   //printf("Audiosetclock                  pts %#012" PRIx64 " %ld\n",pts,RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer));
     AudioRing[AudioRingWrite].PTS = pts;
+    //printf("apts  %#012" PRIx64 " \n",pts);
 }
 
 /**
@@ -2091,6 +2092,9 @@ uint64_t AudioGetClock(void)
 
         // delay zero, if no valid time stamp
         if ((delay = AudioGetDelay())) {
+            if (delay > AudioRing[AudioRingRead].PTS) {
+                delay = 0;
+            }
             if (AudioRing[AudioRingRead].Passthrough) {
                 return AudioRing[AudioRingRead].PTS + 0 * 90 - delay;
             }
