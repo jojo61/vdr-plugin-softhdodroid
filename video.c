@@ -1222,17 +1222,23 @@ void ProcessClockBuffer(int handle)
 
 		// truncate to 32bit
 		static uint64_t apts;
-
+		uint64_t diff;
 		uint64_t pts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ;
 		if (pts != AV_NOPTS_VALUE) {
-			if (apts != AV_NOPTS_VALUE && (pts -  apts) > 0x1000000) {
-				amlReset();
+			if (apts != AV_NOPTS_VALUE) { 
+				if (pts > apts) {
+				   diff = pts -  apts;
+				} else {
+				   diff = apts -  pts;
+				}
+				if (diff > 0x100000) {
+					//printf("pts wrap  %#012" PRIx64 "  %#012" PRIx64 "  %#012" PRIx64 "  \n",pts, apts,diff);
+					amlReset();
+				}
 			}
-			
 		}
 		apts = pts;
 		pts &= 0xffffffff;
-		//printf("apts  %#012" PRIx64 " \n",apts);
 
 		uint64_t vpts = (uint64_t)GetCurrentVPts(handle) ;
 		vpts &= 0xffffffff;
