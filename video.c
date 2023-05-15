@@ -1809,10 +1809,14 @@ bool getResolution(char *mode) {
 	sprintf(fsaxis_str, "0 0 %d %d", OsdWidth-1, OsdHeight-1);
 	sprintf(waxis_str, "0 0 %d %d", VideoWindowWidth-1, VideoWindowHeight-1);
 
-	amlSetString("/sys/class/vfm/map","rm default");
-	sleep(2);
+	amlSetString("/sys/class/vfm/map","rm all");
+	sleep(1);
 	amlSetString("/sys/class/vfm/map","add default decoder ppmgr deinterlace amvideo");
-
+	amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
+	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
+	amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
+	amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
+	
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 	amlSetString("/sys/class/graphics/fb0/free_scale_axis", fsaxis_str);
 	amlSetString("/sys/class/graphics/fb0/window_axis", waxis_str);
@@ -2931,12 +2935,19 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
 	Bool result = true;
+	static uint64_t lpts;
 
     int handle = OdroidDecoders[pip]->handle;
 
 	if ((pts) && !pip)
 	{
 		atomic_set(&LastPTS, pts);
+
+		if((pts & 0xffffffff) + 0x10000 < lpts) {
+			//printf("PTS wrap\n");
+			amlReset();
+		}
+		lpts = pts & 0xffffffff;
 
 		CheckinPts(handle, pts);
 	}
