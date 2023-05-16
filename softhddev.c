@@ -2008,7 +2008,7 @@ static void StopVideo(void)
     //restore decoder default settings
     amlSetInt("/sys/class/video/blackout_policy", 1);   //do this here to avoid freezing the last frame
     amlSetInt("/sys/class/tsync/slowsync_enable", 1);
-    VideoStreamClose(MyVideoStream, 0);
+    VideoStreamClose(MyVideoStream, 1);
     VideoExit();
     AudioSyncStream = NULL;
 #if 0

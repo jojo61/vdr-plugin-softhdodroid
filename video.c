@@ -1808,7 +1808,7 @@ bool getResolution(char *mode) {
 
 	sprintf(fsaxis_str, "0 0 %d %d", OsdWidth-1, OsdHeight-1);
 	sprintf(waxis_str, "0 0 %d %d", VideoWindowWidth-1, VideoWindowHeight-1);
-
+	amlSetInt("/sys/class/graphics/fb0/blank", 1);
 	amlSetString("/sys/class/vfm/map","rm all");
 	sleep(1);
 	amlSetString("/sys/class/vfm/map","add default decoder ppmgr deinterlace amvideo");
@@ -1823,7 +1823,8 @@ bool getResolution(char *mode) {
 	amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
 	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
-
+	amlSetInt("/sys/class/graphics/fb0/blank", 0);
+	
 	amlSetString("/sys/class/amvecm/debug","sr enable");
 
 	GetApiLevel();
