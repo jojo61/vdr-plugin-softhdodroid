@@ -1359,11 +1359,12 @@ void ClearCursor(int blank) {
 void Fbdev_blank(int blank) {
 int fd = open("/dev/tty0", O_RDWR);
 
-    if(0 < fd)
+    if(fd >= 0)
     {
         ioctl(fd, FBIOBLANK, blank ? VESA_POWERDOWN: VESA_NO_BLANKING);
+		close (fd);
     }
-    close(fd);
+    
 }
 
 
@@ -1787,7 +1788,7 @@ bool getResolution(char *mode) {
 	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
 	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
 
-	if (fd2 > 0 ) {
+	if (fd2 >= 0 ) {
 		vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
 		char vfm_status[512];
 		use_pip = 1;
