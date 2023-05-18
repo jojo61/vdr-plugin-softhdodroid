@@ -186,6 +186,7 @@ int winx=0,winy=0,winh=0,winw=0;
 
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
+uint64_t lpts;
 uint64_t TrickPTS;
 int myTrickSpeed= 0;
 
@@ -1063,6 +1064,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		close(ttyfd);
 	}
 #endif
+	amlSetInt("/sys/class/graphics/fb0/blank", 1);
 #if 1
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
@@ -1090,7 +1092,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	close(fd_m);
 #endif
 	//close (ge2d_fd);
-
+	
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 
 	// restore vfm mapping
@@ -1110,7 +1112,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 	amlSetString("/sys/class/amvecm/debug","3dlut close");
 	amlSetString("/sys/class/amvecm/debug","3dlut disable");
-
+	amlSetInt("/sys/class/graphics/fb0/blank", 0);
  };            ///< Cleanup and exit video module.
 
 
@@ -1722,6 +1724,8 @@ bool getResolution(char *mode) {
 	struct fb_var_screeninfo info;
 	uint32_t h[3];
 
+	amlSetInt("/sys/class/graphics/fb0/blank", 1);
+
 	fd = open("/dev/fb0", O_RDWR);
 	ioctl(fd, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -1753,26 +1757,8 @@ bool getResolution(char *mode) {
 	} else {
 		DmaBufferHandle = h[1];
 	}
-
 	close(fd);
-#if 0
-	// Set graphics mode
-	int ttyfd = open("/dev/tty0", O_RDWR);
-	if (ttyfd < 0)
-	{
-		printf("Could not open /dev/tty0\n");
-		return;
-	}
-	else
-	{	int ret = ioctl(ttyfd, KDSETMODE, KD_GRAPHICS);
-		if (ret < 0) {
-			printf("KDSETMODE failed.");
-			return;
-		}
 
-		close(ttyfd);
-	}
-#endif
 	if (VideoWindowWidth < 1920) {    // is screen is only 1280 or smaller
 		OsdWidth = VideoWindowWidth;
 		OsdHeight = VideoWindowHeight;
@@ -1809,7 +1795,7 @@ bool getResolution(char *mode) {
 
 	sprintf(fsaxis_str, "0 0 %d %d", OsdWidth-1, OsdHeight-1);
 	sprintf(waxis_str, "0 0 %d %d", VideoWindowWidth-1, VideoWindowHeight-1);
-	amlSetInt("/sys/class/graphics/fb0/blank", 1);
+	
 	amlSetString("/sys/class/vfm/map","rm all");
 	sleep(1);
 	amlSetString("/sys/class/vfm/map","add default decoder ppmgr deinterlace amvideo");
@@ -2596,6 +2582,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 #endif
 		if (!pip) {
 			FirstVPTS = pkt->pts;
+			lpts=0;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
 			uint64_t dpts = pkt->pts & 0xffffffff;
 			SetCurrentPCR(hwdecoder->handle,dpts);
@@ -2712,12 +2699,7 @@ if (hwdecoder->TrickSpeed ) {
 	{
 		double timeStamp = av_q2d(timeBase) * pkt->pts;
 		pts = (uint64_t)(timeStamp * PTS_FREQ);
-#if 0
-		if (estimatedNextPts &&  (abs(estimatedNextPts - pkt->pts) > 90000)) {
-			printf("jump in PTS: reset\n");
-			//amlReset();
-		}
-#endif
+
 		estimatedNextPts = pkt->pts + 3600; // pkt->duration;
 		lastTimeStamp = timeStamp;
 	}
@@ -2937,7 +2919,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
 	Bool result = true;
-	static uint64_t lpts;
+	
 
     int handle = OdroidDecoders[pip]->handle;
 
@@ -2945,7 +2927,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 	{
 		atomic_set(&LastPTS, pts);
 
-		if((pts & 0xffffffff) + 0x10000 < lpts) {
+		if(lpts  && ((pts & 0xffffffff) + 0x10000 < lpts)) {
 			//printf("PTS wrap\n");
 			amlReset();
 		}
