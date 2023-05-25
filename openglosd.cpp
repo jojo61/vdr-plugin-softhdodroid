@@ -1624,7 +1624,7 @@ bool cOglCmdDrawText::Execute(void)
 {
     cOglFont *f = cOglFont::Get(*fontName, fontSize);
 
-    if (!f)
+    if (!f || !symbols[0])
         return false;
 
     VertexBuffers[vbText]->ActivateShader();
