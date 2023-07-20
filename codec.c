@@ -58,6 +58,8 @@
 #define _(str) gettext(str)             ///< gettext shortcut
 #define _N(str) str                     ///< gettext_noop shortcut
 
+#include <alsa/asoundlib.h>
+
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
 #include <libavutil/mem.h>
@@ -263,7 +265,7 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
                 amlSetInt("/sys/class/audiodsp/digital_codec", 2);
             break;
         case AV_CODEC_ID_EAC3:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+                amlSetInt("/sys/class/audiodsp/digital_codec", 4);
             break;
         case AV_CODEC_ID_AAC_LATM:
                 amlSetInt("/sys/class/audiodsp/digital_codec", 0);
@@ -330,9 +332,9 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
         Fatal(_("codec: can't allocate audio codec context\n"));
     }
 
-    //if (CodecDownmix) {
+    if (CodecDownmix) {
         audio_decoder->AudioCtx->request_channel_layout = AV_CH_LAYOUT_STEREO;
-    //}
+    }
     pthread_mutex_lock(&CodecLockMutex);
     // open codec
     if (1) {
@@ -475,6 +477,7 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
                 buf[i + 3] = rs;
                 buf[i + 4] = c;
                 buf[i + 5] = lfe;
+
             }
             break;
         case 8:
@@ -491,6 +494,98 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
             }
             break;
     }
+}
+
+void amlSetMixer(int codec) {
+    
+  int err;
+  int cardNr = 0;
+  
+  if (cardNr >= 0)
+  {
+    snd_mixer_t *handle = NULL;
+    snd_mixer_elem_t *elem;
+    snd_mixer_selem_id_t *sid;
+
+    char card[64] = { 0 };
+    sprintf(card, "hw:%i", cardNr);
+
+    Debug(3,"CAESinkALSA - Use card \"%s\" and set codec format %d\n", card,codec );
+
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+
+    if ((err = snd_mixer_open(&handle, 0)) < 0)
+    {
+      Debug(3, "CAESinkALSA- can not open Mixer: %s\n", snd_strerror(err));
+      return;
+    }
+
+    if ((err = snd_mixer_attach(handle, card)) < 0)
+    {
+      Debug(3, "CAESinkALSA - Mixer attach %s error: %s", card, snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+
+    if ((err = snd_mixer_selem_register(handle, NULL, NULL)) < 0)
+    {
+      Debug(3, "CAESinkALSA - Mixer register error: %s", snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+
+    if ((err = snd_mixer_load(handle)) < 0)
+    {
+      Debug(3, "CAESinkALSA- Mixer %s load error: %s", card, snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+
+    Debug(3,"CAESinkALSA - Set Spdif to HDMITX to spdif \n");
+    snd_mixer_selem_id_set_name(sid, "Spdif to HDMITX Select");
+    elem = snd_mixer_find_selem(handle, sid);
+    if (!elem) {
+        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+        snd_mixer_close(handle);
+        return;
+    }
+
+    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // 0 = spdif  1= spdif_b
+
+    // set codec format for SPDIF-B
+    Debug(3,"CAESinkALSA - Set codec for Spdif_b\n");
+    snd_mixer_selem_id_set_name(sid, "Audio spdif_b format");
+    elem = snd_mixer_find_selem(handle, sid);
+    if (!elem) {
+        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+        snd_mixer_close(handle);
+        return;
+    }
+
+    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
+
+    /* FALLTHROUGH */
+
+            // set codec format for SPDIF-A
+    Debug(3,"CAESinkALSA - Set codec for spdif\n");
+    snd_mixer_selem_id_set_name(sid, "Audio spdif format");
+    elem = snd_mixer_find_selem(handle, sid);
+    if (!elem) {
+        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+        snd_mixer_close(handle);
+        return;
+    }
+
+    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
+   
+    snd_mixer_close(handle);
+    amlSetInt("/sys/class/audiodsp/digital_codec", codec);
+  }
+
 }
 
 /**
@@ -524,12 +619,15 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
         || (CodecPassthrough & CodecEAC3 && audio_ctx->codec_id == AV_CODEC_ID_EAC3)) {
         if (audio_ctx->codec_id == AV_CODEC_ID_EAC3) {
             // E-AC-3 over HDMI some receivers need HBR
-            audio_decoder->HwSampleRate *= 4;
+            //audio_decoder->HwSampleRate *= 4;
         }
         audio_decoder->HwChannels = 2;
         audio_decoder->SpdifIndex = 0;  // reset buffer
         audio_decoder->SpdifCount = 0;
         *passthrough = 1;
+    }
+    if (!*passthrough) {
+        amlSetMixer(audio_ctx->channels > 2 ? 6 : 0);
     }
     // channels/sample-rate not support?
     if ((err = AudioSetup(&audio_decoder->HwSampleRate, &audio_decoder->HwChannels, *passthrough))) {

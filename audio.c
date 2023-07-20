@@ -2402,8 +2402,10 @@ void AudioInit(void)
             AudioChannelMatrix[u][1], AudioChannelMatrix[u][2], AudioChannelMatrix[u][3], AudioChannelMatrix[u][4],
             AudioChannelMatrix[u][5], AudioChannelMatrix[u][6], AudioChannelMatrix[u][7], AudioChannelMatrix[u][8]);
 
-        AudioChannelMatrix[u][1]=AudioChannelMatrix[u][2]=AudioChannelMatrix[u][3]=AudioChannelMatrix[u][4]=\
-        AudioChannelMatrix[u][5]=AudioChannelMatrix[u][6]=AudioChannelMatrix[u][7]=AudioChannelMatrix[u][8]=2;
+        AudioChannelMatrix[u][1]=AudioChannelMatrix[u][2]=2;
+        AudioChannelMatrix[u][3]=AudioChannelMatrix[u][4]=4;
+        AudioChannelMatrix[u][5]=AudioChannelMatrix[u][6]=6;
+        AudioChannelMatrix[u][7]=AudioChannelMatrix[u][8]=8;
         //printf("audio: %6dHz supports %d %d %d %d %d %d %d %d channels\n", AudioRatesTable[u],
         //    AudioChannelMatrix[u][1], AudioChannelMatrix[u][2], AudioChannelMatrix[u][3], AudioChannelMatrix[u][4],
         //    AudioChannelMatrix[u][5], AudioChannelMatrix[u][6], AudioChannelMatrix[u][7], AudioChannelMatrix[u][8]);
