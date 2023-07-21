@@ -473,10 +473,10 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
                 lfe = buf[i + 3];
                 ls = buf[i + 4];
                 rs = buf[i + 5];
-                buf[i + 2] = ls;
-                buf[i + 3] = rs;
-                buf[i + 4] = c;
-                buf[i + 5] = lfe;
+                buf[i + 2] = lfe; // ls
+                buf[i + 3] = c;   // rs;
+                buf[i + 4] = ls;  //c;
+                buf[i + 5] = rs;  //lfe;
 
             }
             break;
@@ -487,10 +487,10 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
                 lfe = buf[i + 3];
                 ls = buf[i + 4];
                 rs = buf[i + 5];
-                buf[i + 2] = ls;
-                buf[i + 3] = rs;
-                buf[i + 4] = c;
-                buf[i + 5] = lfe;
+                buf[i + 2] = lfe; //ls;
+                buf[i + 3] = c;   //rs;
+                buf[i + 4] = ls;  //c;
+                buf[i + 5] = rs;  //lfe;
             }
             break;
     }
@@ -914,6 +914,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 #endif
 
 #ifdef USE_SWRESAMPLE
+    //printf("chanlayout %lx\n",audio_ctx->channel_layout);
     audio_decoder->Resample =
         swr_alloc_set_opts(audio_decoder->Resample, audio_ctx->channel_layout, AV_SAMPLE_FMT_S16,
         audio_decoder->HwSampleRate, audio_ctx->channel_layout, audio_ctx->sample_fmt, audio_ctx->sample_rate, 0,
@@ -929,7 +930,6 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
         Error(_("codec/audio: can't setup resample\n"));
         return;
     }
-
     av_opt_set_int(audio_decoder->Resample, "in_channel_layout", audio_ctx->channel_layout, 0);
     av_opt_set_int(audio_decoder->Resample, "in_sample_fmt", audio_ctx->sample_fmt, 0);
     av_opt_set_int(audio_decoder->Resample, "in_sample_rate", audio_ctx->sample_rate, 0);
