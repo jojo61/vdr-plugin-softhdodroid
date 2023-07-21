@@ -93,7 +93,7 @@ Commandline:
 	Use vdr -h to see the command line arguments supported by the plugin.
 
     -a plughw:CARD=AMLAUGESOUND,DEV=3
-    -p plughw:CARD=AMLAUGESOUND,DEV=3
+    -p plughw:CARD=AMLAUGESOUND,DEV=2
 
 	
 
