@@ -137,8 +137,8 @@ static const char *AudioModuleName;     ///< which audio module to use
 
 /// Selected audio module.
 static const AudioModule *AudioUsedModule = &NoopModule;
-static const char *AudioPCMDevice;      ///< PCM device name
-static const char *AudioPassthroughDevice;  ///< Passthrough device name
+static const char *AudioPCMDevice = "hw:0,3";          ///< PCM device name
+static const char *AudioPassthroughDevice = "hw:0,0";  ///< Passthrough device name
 static char AudioAppendAES;             ///< flag automatic append AES
 static const char *AudioMixerDevice;    ///< mixer device name
 static const char *AudioMixerChannel;   ///< mixer channel name

@@ -52,7 +52,7 @@ Install:
 	make
 	make install
 
-	You have to start vdr with e.g.:  -P 'softhdodroid -a plughw:CARD=AMLAUGESOUND,DEV=3 ..<more options>.. '
+	You have to start vdr with e.g.:  -P 'softhdodroid '
 
 	You need to run vdr as root.
 	You should adapt config.ini in /media/boot and change the Screensettings from hdmimode=1080p60hz to your preferred 
@@ -92,8 +92,12 @@ Commandline:
 
 	Use vdr -h to see the command line arguments supported by the plugin.
 
-    -a plughw:CARD=AMLAUGESOUND,DEV=3
-    -p plughw:CARD=AMLAUGESOUND,DEV=2
+    -a Audiodevice         e.g. plughw:CARD=AMLAUGESOUND,DEV=3  (usually not needed)
+    -p DigitalAudiodevice  e.g. plughw:CARD=AMLAUGESOUND,DEV=2  (usually not needed)
+	-s Start in suspended Mode
+	-D Start in detached Mode
+
+	Normaly you do not need any Parameters. The Audiodevices have sensible defaults.
 
 	
 

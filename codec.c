@@ -541,7 +541,8 @@ void amlSetMixer(int codec) {
       snd_mixer_close(handle);
       return;
     }
-
+    
+    /*
     Debug(3,"CAESinkALSA - Set Spdif to HDMITX to spdif \n");
     snd_mixer_selem_id_set_name(sid, "Spdif to HDMITX Select");
     elem = snd_mixer_find_selem(handle, sid);
@@ -553,6 +554,7 @@ void amlSetMixer(int codec) {
     }
 
     snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // 0 = spdif  1= spdif_b
+    */
 
     // set codec format for SPDIF-B
     Debug(3,"CAESinkALSA - Set codec for Spdif_b\n");
