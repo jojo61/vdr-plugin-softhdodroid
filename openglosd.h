@@ -406,9 +406,10 @@ class cOglCmdRenderFbToBufferFb:public cOglCmd
     GLfloat x, y;
     GLfloat drawPortX, drawPortY;
     GLint transparency;
+    GLint alphablending;
   public:
      cOglCmdRenderFbToBufferFb(cOglFb * fb, cOglFb * buffer, GLint x, GLint y, GLint transparency, GLint drawPortX,
-        GLint drawPortY);
+        GLint drawPortY, bool alphablending);
      virtual ~ cOglCmdRenderFbToBufferFb(void)
     {
     };

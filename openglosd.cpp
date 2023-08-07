@@ -966,7 +966,7 @@ bool cOglCmdDeleteFb::Execute(void)
 }
 
 //------------------ cOglCmdRenderFbToBufferFb --------------------
-cOglCmdRenderFbToBufferFb::cOglCmdRenderFbToBufferFb(cOglFb * fb, cOglFb * buffer, GLint x, GLint y, GLint transparency, GLint drawPortX, GLint drawPortY):cOglCmd
+cOglCmdRenderFbToBufferFb::cOglCmdRenderFbToBufferFb(cOglFb * fb, cOglFb * buffer, GLint x, GLint y, GLint transparency, GLint drawPortX, GLint drawPortY,bool alphablending):cOglCmd
     (fb)
 {
     this->buffer = buffer;
@@ -974,7 +974,8 @@ cOglCmdRenderFbToBufferFb::cOglCmdRenderFbToBufferFb(cOglFb * fb, cOglFb * buffe
     this->y = (GLfloat) y;
     this->drawPortX = (GLfloat) drawPortX;
     this->drawPortY = (GLfloat) drawPortY;
-    this->transparency = transparency;
+    this->transparency = (alphablending ? transparency : ALPHA_OPAQUE);
+    this->alphablending = alphablending;
 
 }
 
@@ -1016,11 +1017,16 @@ bool cOglCmdRenderFbToBufferFb::Execute(void)
 
     if (!fb->BindTexture())
         return false;
+    if (!alphablending)
+        VertexBuffers[vbTexture]->DisableBlending();
 
     VertexBuffers[vbTexture]->Bind();
     VertexBuffers[vbTexture]->SetVertexData(quadVertices);
     VertexBuffers[vbTexture]->DrawArrays();
     VertexBuffers[vbTexture]->Unbind();
+
+    if (!alphablending)
+        VertexBuffers[vbTexture]->EnableBlending();
     buffer->Unbind();
 
     return true;
@@ -2701,9 +2707,17 @@ void cOglOsd::Flush(void)
         for (int i = 0; i < oglPixmaps.Size(); i++) {
             if (oglPixmaps[i]) {
                 if (oglPixmaps[i]->Layer() == layer) {
-                    oglThread->DoCmd(new cOglCmdRenderFbToBufferFb(oglPixmaps[i]->Fb(), bFb,
-                            oglPixmaps[i]->ViewPort().X(), (!isSubtitleOsd) ? oglPixmaps[i]->ViewPort().Y() : 0,
-                            oglPixmaps[i]->Alpha(), oglPixmaps[i]->DrawPort().X(), oglPixmaps[i]->DrawPort().Y()));
+                    //printf("%d %d Layer %d\n",oglPixmaps[i]->Width(),oglPixmaps[i]->Height(),i);
+                    bool alphablending = layer == 0 ? false : true; // Decide wether to render (with alpha) or copy a pixmap
+                    oglThread->DoCmd(new cOglCmdRenderFbToBufferFb( oglPixmaps[i]->Fb(), 
+                                                                    bFb,
+                                                                    oglPixmaps[i]->ViewPort().X(), 
+                                                                    (!isSubtitleOsd) ? oglPixmaps[i]->ViewPort().Y() : 0,
+                                                                    oglPixmaps[i]->Alpha(), 
+                                                                    oglPixmaps[i]->DrawPort().X(), 
+                                                                    oglPixmaps[i]->DrawPort().Y(),
+                                                                    alphablending
+                                                                    ));
                     oglPixmaps[i]->SetDirty(false);
                 }
             }
