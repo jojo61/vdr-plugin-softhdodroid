@@ -1715,6 +1715,30 @@ bool getResolution(char *mode) {
 
 	VideoSetFastSwitch(ConfigVideoFastSwitch);
 
+	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)1);
+	if (r != 0)
+	{
+		//codecMutex.Unlock();
+		printf("AMSTREAM_IOC_SYNCENABLE failed.\n");
+		return;
+	}
+
+	r = ioctl(cntl_handle, AMSTREAM_IOC_AVTHRESH, (unsigned long)2700000); //entspricht 90000*30 in kodi
+	if (r != 0)
+	{
+			//codecMutex.Unlock();
+			printf("AMSTREAM_IOC_AVTHRESH failed.\n");
+			return;
+	}
+
+	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCTHRESH, (unsigned long)1);
+	if (r != 0)
+	{
+		//codecMutex.Unlock();
+		printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
+		return;
+	}
+	amlSetInt("/sys/class/video/blackout_policy", 0);
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 
 	getResolution(mode);
@@ -1866,6 +1890,8 @@ extern void DelPip(void);
 
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
+		amlSetInt("/sys/class/video/disable_video",0);
+
 		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
 		amlResume();
 		if (!isPIP) {
@@ -1976,8 +2002,8 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		PIP_allowed = false;
 	}
 
-	if (!pip)
- 	    amlSetInt("/sys/class/video/disable_video",0);
+	//if (!pip)
+ 	//    amlSetInt("/sys/class/video/disable_video",0);
 
 	switch (format)
 	{
@@ -2197,31 +2223,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 
 	//codec_h_control(pcodec->cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)enable);
-	if (!pip) {
-		r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)1);
-		if (r != 0)
-		{
-			//codecMutex.Unlock();
-			printf("AMSTREAM_IOC_SYNCENABLE failed.\n");
-			return;
-		}
-
-		r = ioctl(cntl_handle, AMSTREAM_IOC_AVTHRESH, (unsigned long)2700000); //entspricht 90000*30 in kodi
-		if (r != 0)
-		{
-				//codecMutex.Unlock();
-				printf("AMSTREAM_IOC_AVTHRESH failed.\n");
-				return;
-		}
-
-		r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCTHRESH, (unsigned long)1);
-		if (r != 0)
-		{
-			//codecMutex.Unlock();
-			printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
-			return;
-		}
-	}
+	
 
 #if 0
 	// Restore settings that Kodi tramples
@@ -3031,7 +3033,7 @@ void amlReset()
 		return;
 	}
 	// set the system blackout_policy to leave the last frame showing
-	amlSetInt("/sys/class/video/blackout_policy", 0);
+	//amlSetInt("/sys/class/video/blackout_policy", 0);
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;

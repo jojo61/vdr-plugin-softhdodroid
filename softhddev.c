@@ -2008,6 +2008,9 @@ static void StopVideo(void)
     //restore decoder default settings
     amlSetInt("/sys/class/video/blackout_policy", 1);   //do this here to avoid freezing the last frame
     amlSetInt("/sys/class/tsync/slowsync_enable", 1);
+    amlSetInt("/sys/class/video/disable_video", 1);
+    //restore decoder default settings
+    amlSetInt("/sys/class/video/disable_video", 0);
     VideoStreamClose(MyVideoStream, 1);
     VideoExit();
     AudioSyncStream = NULL;
@@ -2441,9 +2444,9 @@ int SetPlayMode(int play_mode)
         case 4:                        // video only from player, audio from decoder
         case 5:                        // pmExtern_THIS_SHOULD_BE_AVOIDED
             Play();
-            if (ConfigVideoBlackPicture) {
-                amlSetInt("/sys/class/video/disable_video", 0);
-            }
+            //if (ConfigVideoBlackPicture) {
+            //    amlSetInt("/sys/class/video/disable_video", 0);
+            //}
             break;
     }
     return 1;
