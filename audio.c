@@ -2093,7 +2093,7 @@ uint64_t AudioGetClock(void)
         // delay zero, if no valid time stamp
         if ((delay = AudioGetDelay())) {
             if (delay > AudioRing[AudioRingRead].PTS) {
-                delay = 0;
+                //delay = 0;
             }
             if (AudioRing[AudioRingRead].Passthrough) {
                 return AudioRing[AudioRingRead].PTS + 0 * 90 - delay;

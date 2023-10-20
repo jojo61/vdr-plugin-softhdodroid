@@ -187,6 +187,7 @@ int winx=0,winy=0,winh=0,winw=0;
 const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
 uint64_t lpts;
+int inwrap=0;
 uint64_t TrickPTS;
 int myTrickSpeed= 0;
 
@@ -1223,9 +1224,12 @@ void ProcessClockBuffer(int handle)
 	{
 
 		// truncate to 32bit
-		static uint64_t apts;
-		uint64_t diff;
+	
+		
 		uint64_t pts = (uint64_t)AudioGetClock(); //(uint64_t) GetCurrentAPts(AHandle) ;
+		static uint64_t apts;
+	#if 0
+		uint64_t diff;
 		if (pts != AV_NOPTS_VALUE) {
 			if (apts != AV_NOPTS_VALUE) { 
 				if (pts > apts) {
@@ -1234,11 +1238,12 @@ void ProcessClockBuffer(int handle)
 				   diff = apts -  pts;
 				}
 				if (diff > 0x100000) {
-					//printf("pts wrap  %#012" PRIx64 "  %#012" PRIx64 "  %#012" PRIx64 "  \n",pts, apts,diff);
-					amlReset();
+					printf("pts wrap  %#012" PRIx64 "  %#012" PRIx64 "  %#012" PRIx64 "  \n",pts, apts,diff);
+					//amlReset();
 				}
 			}
 		}
+	#endif
 		apts = pts;
 		pts &= 0xffffffff;
 
@@ -1249,8 +1254,14 @@ void ProcessClockBuffer(int handle)
 			return;
 		}
 
-		pts = (pts + VideoAudioDelay) & 0xffffffff;
+		if (inwrap && vpts < 0x10000) {
+			amlFreerun(0);
+			inwrap=0;
+			Debug(3,"ende inwrap \n");
+		}
 
+		pts = (pts + VideoAudioDelay) & 0xffffffff;
+		//printf("pts   %#012" PRIx64 "  %#012" PRIx64 "  %#012" PRIx64 "  \n",pts, apts,vpts);
 		double drift = ((double)vpts - (double)pts) / (double)PTS_FREQ;
 		//double driftTime = drift / (double)PTS_FREQ;
 
@@ -1259,7 +1270,7 @@ void ProcessClockBuffer(int handle)
 
 		// To minimize clock jitter, only adjust the clock if it
 		// deviates more than +/- 2 frames
-		if (driftFrames >= maxDelta || driftFrames <= -maxDelta)
+		if ((driftFrames >= maxDelta || driftFrames <= -maxDelta) && abs(driftFrames) < 1000)
 		{
 			{
 
@@ -2585,6 +2596,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 		if (!pip) {
 			FirstVPTS = pkt->pts;
 			lpts=0;
+			inwrap=0;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
 			uint64_t dpts = pkt->pts & 0xffffffff;
 			SetCurrentPCR(hwdecoder->handle,dpts);
@@ -2928,10 +2940,12 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 	if ((pts) && !pip)
 	{
 		atomic_set(&LastPTS, pts);
-
-		if(lpts  && ((pts & 0xffffffff) + 0x10000 < lpts)) {
-			//printf("PTS wrap\n");
-			amlReset();
+		//printf("pts PTS  %#012" PRIx64 "  %#012" PRIx64 "\n",pts ,lpts);
+		if(lpts  && !inwrap && ((pts & 0xffffffff)  < 0x1000) && (lpts > 0xffff0000)) {
+			Debug(3,"PTS wrap \n");
+			inwrap=1;
+			amlFreerun(1);
+			//amlReset();
 		}
 		lpts = pts & 0xffffffff;
 

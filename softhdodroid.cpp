@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.13" 
+static const char *const VERSION = "3.14" 
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -91,7 +91,7 @@ static char ConfigSuspendClose;         ///< suspend should close devices
 static int ConfigOsdWidth;              ///< config OSD width
 static int ConfigOsdHeight;             ///< config OSD height
        int ConfigVideoBlackPicture = 1; ///< config enable black picture on channel switch
-       int ConfigVideoFastSwitch = 0;   ///< config enable fast channel switch
+       int ConfigVideoFastSwitch = 1;   ///< config enable fast channel switch
 static char ConfigVideoStudioLevels;    ///< config use studio levels
 
 static int ConfigVideoBrightness;       ///< config video brightness
