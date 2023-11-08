@@ -2589,7 +2589,7 @@ void StillPicture(const uint8_t * data, int size)
     // H264 NAL End of Sequence
     static uint8_t seq_end_h264[] = { 0x00, 0x00, 0x00, 0x01, 0x0A };
     // H265 NAL End of Sequence
-    static uint8_t seq_end_h265[] = { 0x00, 0x00, 0x00, 0x01, 0x48, 0x01 }; //0x48 = end of seq   0x4a = end of stream
+    static uint8_t seq_end_h265[] = {  0x00, 0x00, 0x00, 0x01, 0x4a, 0x01 }; //0x48 = end of seq   0x4a = end of stream
     int i;
 
     // might be called in Suspended Mode
@@ -2630,10 +2630,9 @@ void StillPicture(const uint8_t * data, int size)
     amlTrickMode(1);
     //amlClearVBuf();
     
-    for (i = 0; i < 4; ++i) {
+    for (i = 0; i < 2; ++i) {
         const uint8_t *split;
         int n;
-                
         // FIXME: vdr pes recordings sends mixed audio/video
         if ((data[3] & 0xF0) == 0xE0) { // PES packet
 
@@ -2649,7 +2648,6 @@ void StillPicture(const uint8_t * data, int size)
                     break;
                 }
 #endif
-                
                 len = (split[4] << 8) + split[5];
                 if (!len || len + 6 > n) {
                     if ((split[3] & 0xF0) == 0xE0) {
