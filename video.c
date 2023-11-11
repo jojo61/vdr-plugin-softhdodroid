@@ -121,8 +121,10 @@ pthread_mutex_t OSDMutex;               ///< OSD update mutex
 /// Default audio/video delay
 int VideoAudioDelay;
 
-///< config fast channel switch
+///< config values
 extern int ConfigVideoFastSwitch;
+extern int ConfigVideoBrightness;
+extern int ConfigVideoContrast;
 
 enum ApiLevel
 {
@@ -233,31 +235,20 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 };
 
 /// Set brightness adjustment.
- void VideoSetBrightness(int i) {};
+ void VideoSetBrightness(int ConfigVideoBrightness) {
+    //Amlogic output brightness range is -255 to 255 with default of 0.
+    int aml_brightness;
+    aml_brightness = ConfigVideoBrightness * 5.1 - 255;
+    amlSetInt("/sys/class/amvecm/brightness1", aml_brightness);
+};
 
 /// Set contrast adjustment.
- void VideoSetContrast(int i) {};
-
-/// Set saturation adjustment.
- void VideoSetSaturation(int i) {};
-
-/// Set Gamma.
- void VideoSetGamma(int i) {};
-
-/// Set Color Temp.
- void VideoSetTemperature(int i) {};
-
-/// Set ColorSpace.
- void VideoSetTargetColor(int i) {};
-
-/// Set hue adjustment.
- void VideoSetHue(int i) {};
-
-/// Set Color Blindness.
- void VideoSetColorBlindness(int i) {};
-
-/// Set Color Blindness Faktor
- void VideoSetColorBlindnessFaktor(int i) {};
+ void VideoSetContrast(int ConfigVideoContrast) {
+    //Amlogic output contrast range is -127 to 127 with default of 0.
+    int aml_contrast;
+    aml_contrast = ConfigVideoContrast * 2.54 - 127;
+    amlSetInt("/sys/class/amvecm/contrast1", aml_contrast); 
+};
 
 /// Set video output position.
 void VideoSetOutputPosition(VideoHwDecoder *decoder, int x, int y, int width, int height) {
@@ -1725,6 +1716,8 @@ bool getResolution(char *mode) {
 	}
 
 	VideoSetFastSwitch(ConfigVideoFastSwitch);
+	VideoSetBrightness(ConfigVideoBrightness);
+	VideoSetContrast(ConfigVideoContrast);
 
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)1);
 	if (r != 0)

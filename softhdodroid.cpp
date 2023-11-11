@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "3.15" 
+static const char *const VERSION = "3.16"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -94,15 +94,8 @@ static int ConfigOsdHeight;             ///< config OSD height
        int ConfigVideoFastSwitch = 1;   ///< config enable fast channel switch
 static char ConfigVideoStudioLevels;    ///< config use studio levels
 
-static int ConfigVideoBrightness;       ///< config video brightness
-static int ConfigVideoContrast = 100;   ///< config video contrast
-static int ConfigVideoSaturation = 100; ///< config video saturation
-static int ConfigVideoHue;              ///< config video hue
-static int ConfigGamma=100;             ///< config Gamma
-static int ConfigTemperature=0;         ///< config Temperature
-static int ConfigTargetColorSpace;      ///< config Target Colrospace
-static int ConfigColorBlindness;
-static int ConfigColorBlindnessFaktor;
+       int ConfigVideoBrightness = 50;  ///< config video brightness
+       int ConfigVideoContrast = 50;    ///< config video contrast
 static int ConfigHDR2SDR;
 
 /// config deinterlace
@@ -965,15 +958,8 @@ class cMenuSetupSoft:public cMenuSetupPage
 
     int Brightness;
     int Contrast;
-    int Saturation;
-    int Hue;
-    int Gamma;
-	int Temperature;
-    int TargetColorSpace;
     int ScreenResolution;
     int ScalerTest;
-    int ColorBlindnessFaktor;
-    int ColorBlindness;
     int HDR2SDR;
     
 
@@ -1080,9 +1066,16 @@ void cMenuSetupSoft::Create(void)
     
     int current;
     int i;
-
+    int brightness_min, brightness_def, brightness_max;
+    int contrast_min, contrast_def, contrast_max;
 
     current = Current();                // get current menu item index
+    brightness_min = 0;
+    brightness_def = 50;
+    brightness_max = 100;
+    contrast_min = 0;
+    contrast_def = 50;
+    contrast_max = 100;    
     Clear();                            // clear the menu
 
     //
@@ -1113,6 +1106,12 @@ void cMenuSetupSoft::Create(void)
         Add(new cMenuEditBoolItem(tr("Fast channel switch"), &FastSwitch, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("Noise Reduction"), &Denoise, trVDR("no"), trVDR("yes")));
         Add(new cMenuEditBoolItem(tr("HDR to SDR Mode"), &HDR2SDR, trVDR("no"), trVDR("yes")));
+        Add(new cMenuEditIntItem(*cString::sprintf(tr("Brightness (%d..[%d]..%d)"),
+            brightness_min, brightness_def, brightness_max), &Brightness,
+            brightness_min, brightness_max));
+        Add(new cMenuEditIntItem(*cString::sprintf(tr("Contrast (%d..[%d]..%d)"),
+            contrast_min, contrast_def, contrast_max), &Contrast,
+            contrast_min, contrast_max));
         for (i = 0; i < RESOLUTIONS; ++i) {
             cString msg;
 
@@ -1279,13 +1278,11 @@ cMenuSetupSoft::cMenuSetupSoft(void)
  
     Brightness = ConfigVideoBrightness;
     Contrast = ConfigVideoContrast;
-    Saturation = ConfigVideoSaturation;
-    Hue = ConfigVideoHue;
-    Gamma = ConfigGamma;
-	Temperature = ConfigTemperature;
-    TargetColorSpace = ConfigTargetColorSpace;
-    ColorBlindness = ConfigColorBlindness;
-    ColorBlindnessFaktor = ConfigColorBlindnessFaktor;
+    if (Brightness == 0 && ConfigVideoContrast == 100) {
+        //assume wrong defaults values from previous plugin versions
+        Brightness = 50;
+        Contrast = 50;
+    }    
     // ScalerTest = ConfigScalerTest;
     Denoise = ConfigVideoDenoise;
     HDR2SDR = ConfigHDR2SDR;
@@ -1369,16 +1366,6 @@ void cMenuSetupSoft::Store(void)
     VideoSetBrightness(ConfigVideoBrightness);
     SetupStore("Contrast", ConfigVideoContrast = Contrast);
     VideoSetContrast(ConfigVideoContrast);
-    SetupStore("Saturation", ConfigVideoSaturation = Saturation);
-    VideoSetSaturation(ConfigVideoSaturation);
-    SetupStore("Gamma", ConfigGamma = Gamma);
-    VideoSetGamma(ConfigGamma);
-	SetupStore("Temperature", ConfigTemperature = Temperature);
-    VideoSetTemperature(ConfigTemperature);
-    SetupStore("TargetColorSpace", ConfigTargetColorSpace = TargetColorSpace);
-    VideoSetTargetColor(ConfigTargetColorSpace);
-    SetupStore("Hue", ConfigVideoHue = Hue);
-    VideoSetHue(ConfigVideoHue);
     SetupStore("Denoise", ConfigVideoDenoise = Denoise);
     VideoSetDenoise(ConfigVideoDenoise);
     SetupStore("HDR2SDR", ConfigHDR2SDR = HDR2SDR);
@@ -3039,6 +3026,7 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         int i;
 
         i = atoi(value);
+        i = i == 0 ? 50 : i;
         ConfigVideoBrightness = i > 100 ? 100 : i;
         VideoSetBrightness(ConfigVideoBrightness);
         return true;
@@ -3047,42 +3035,11 @@ bool cPluginSoftHdDevice::SetupParse(const char *name, const char *value)
         int i;
 
         i = atoi(value);
+        i = i == 100 ? 50 :i;
         ConfigVideoContrast = i > 100 ? 100 : i;
         VideoSetContrast(ConfigVideoContrast);
         return true;
     }
-    if (!strcasecmp(name, "Saturation")) {
-        int i;
-
-        i = atoi(value);
-        ConfigVideoSaturation = i > 100 ? 100 : i;
-        VideoSetSaturation(ConfigVideoSaturation);
-        return true;
-    }
-    if (!strcasecmp(name, "Gamma")) {
-        int i;
-
-        i = atoi(value);
-        ConfigGamma = i > 100 ? 100 : i;
-        VideoSetGamma(ConfigGamma);
-        return true;
-    }
-	if (!strcasecmp(name, "Temperature")) {
-        int i;
-
-        i = atoi(value);
-        ConfigTemperature = i > 100 ? 100 : i;
-        VideoSetTemperature(ConfigTemperature);
-        return true;
-    }
-    if (!strcasecmp(name, "TargetColorSpace")) {
-        VideoSetTargetColor(ConfigTargetColorSpace = atoi(value));
-        return true;
-    }
-    if (!strcasecmp(name, "Hue")) {
-        VideoSetHue(ConfigVideoHue = atoi(value));
-        return true;
-    }        
     if (!strcasecmp(name, "Denoise")) {
         ConfigVideoDenoise = atoi(value);
         VideoSetDenoise(ConfigVideoDenoise);

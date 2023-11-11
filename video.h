@@ -250,27 +250,6 @@ extern void VideoSetBrightness(int);
 /// Set contrast adjustment.
 extern void VideoSetContrast(int);
 
-/// Set saturation adjustment.
-extern void VideoSetSaturation(int);
-
-/// Set Gamma.
-extern void VideoSetGamma(int);
-
-/// Set Color Temp.
-extern void VideoSetTemperature(int);
-
-/// Set ColorSpace.
-extern void VideoSetTargetColor(int);
-
-/// Set hue adjustment.
-extern void VideoSetHue(int);
-
-/// Set Color Blindness.
-extern void VideoSetColorBlindness(int);
-
-/// Set Color Blindness Faktor
-extern void VideoSetColorBlindnessFaktor(int);
-
 /// Set video output position.
 extern void VideoSetOutputPosition(VideoHwDecoder *, int, int, int, int);
 
