@@ -130,7 +130,7 @@ static const AudioModule NoopModule;    ///< forward definition of noop module
 //----------------------------------------------------------------------------
 
 char AudioAlsaDriverBroken;             ///< disable broken driver message
-char AudioAlsaNoCloseOpen;              ///< disable alsa close/open fix
+char AudioAlsaNoCloseOpen=1;              ///< disable alsa close/open fix
 char AudioAlsaCloseOpenDelay;           ///< enable alsa close/open delay fix
 
 static const char *AudioModuleName;     ///< which audio module to use
@@ -2127,7 +2127,6 @@ uint64_t AudioGetwClock(void)
 */
 void AudioSetVolume(int volume)
 {
-
 
     AudioVolume = volume;
     AudioMute = !volume;
