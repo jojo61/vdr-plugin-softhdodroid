@@ -130,7 +130,7 @@ static const AudioModule NoopModule;    ///< forward definition of noop module
 //----------------------------------------------------------------------------
 
 char AudioAlsaDriverBroken;             ///< disable broken driver message
-char AudioAlsaNoCloseOpen=1;              ///< disable alsa close/open fix
+char AudioAlsaNoCloseOpen=0;              ///< disable alsa close/open fix
 char AudioAlsaCloseOpenDelay;           ///< enable alsa close/open delay fix
 
 static const char *AudioModuleName;     ///< which audio module to use

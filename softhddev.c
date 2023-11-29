@@ -2829,7 +2829,9 @@ const char *CommandLineHelp(void)
         "  -p device\taudio device for pass-through (hw:0,1 or /dev/dsp1)\n"
         "  -c channel\taudio mixer channel name (fe. PCM)\n" 
         "  -s\t\tstart in suspended mode\n"
-        "  -D\t\tstart in detached mode\n";
+        "  -D\t\tstart in detached mode\n"
+        "  -w workaround\tenable/disable workarounds\n"
+        "     alsa-no-close-open\tdisable close open to fix alsa no sound bug\n";
      
         
 }
@@ -2868,6 +2870,11 @@ int ProcessArgs(int argc, char *const argv[])
                 continue;
             case 'D':                  // start in detached mode
                 ConfigStartSuspended = -1;
+                continue;
+            case 'w': // workarounds
+                if (!strcasecmp("alsa-no-close-open", optarg)) {
+                    AudioAlsaNoCloseOpen = 1;
+                }
                 continue;
             case EOF:
                 break;
