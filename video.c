@@ -235,7 +235,7 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 
 /// Set Video Size
 int VideoSetGeometry(const char *geometry) {
-    XParseGeometry(geometry, &VideoWindowX, &VideoWindowY, &VideoWindowWidth, &VideoWindowHeight);
+	sscanf(geometry,"%dx%d",&VideoWindowWidth,&VideoWindowHeight);
 	NeedDRM = 1;
     return 0;
 }

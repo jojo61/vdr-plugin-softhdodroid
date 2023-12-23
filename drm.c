@@ -1,5 +1,4 @@
 #include <drm_fourcc.h>
-#include <gbm.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xf86drm.h>
