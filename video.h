@@ -235,6 +235,9 @@ extern const char *VideoGetDriverName(void);
 /// Set video geometry.
 extern int VideoSetGeometry(const char *);
 
+/// Set Refresh Rate
+extern void VideoSetRefresh(char *);
+
 /// Set 60Hz display mode.
 extern void VideoSet60HzMode(int);
 
@@ -387,4 +390,5 @@ extern void InternalClose(int );
 extern void InternalOpen(VideoHwDecoder *, int, double );
 extern void ProcessBuffer(VideoHwDecoder *, const AVPacket* );
 extern int SendCodecData(int , uint64_t , unsigned char* , int );
+extern void getKernelVersion();
 /// @}

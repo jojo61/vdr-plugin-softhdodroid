@@ -11,4 +11,5 @@ po/*.pot
 .includepath
 .settings
 .vscode
-
+amports/amstream.h.54
+amports/amstream.h.4

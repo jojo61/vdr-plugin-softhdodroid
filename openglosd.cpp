@@ -744,11 +744,13 @@ bool cOglOutputFb::Init(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
+
     if (DmaBufferHandle >= 0)
         glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, frameBufferImage);
 
     glGenFramebuffers(1, &fb);
     glBindFramebuffer(GL_FRAMEBUFFER, fb);
+    
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     GlxCheck();
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -1041,7 +1043,9 @@ cOglCmdCopyBufferToOutputFb::cOglCmdCopyBufferToOutputFb(cOglFb * fb, cOglOutput
 }
 
 unsigned char posd[3840*2160*4];
-extern int OsdShown;
+extern int OsdShown,myKernel;
+extern "C" int amlSetInt(char *, int);
+
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
@@ -1050,48 +1054,50 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         fb->BindRead();
         oFb->BindWrite();
 
-#if 1
-    GLfloat x2 = x + (GLfloat)fb->Width();
-    y = oFb->Height() - y;
-    GLfloat y2 = y - (GLfloat)fb->Height();
+        glClearColor(0,0,0,0) ;
+        glClear(GL_COLOR_BUFFER_BIT);
 
-    GLfloat texX1 = 0.0f;
-    GLfloat texX2 = 1.0f;
-    GLfloat texY1 = 1.0f;
-    GLfloat texY2 = 0.0f;
+        GLfloat x2 = x + (GLfloat)fb->Width();
+        y = oFb->Height() - y;
+        GLfloat y2 = y - (GLfloat)fb->Height();
 
-    GLfloat quadVertices[] = {
-        // Pos    // TexCoords
-       (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
-       (GLfloat)x ,  (GLfloat)y2,  texX1, texY2,          //left bottom
-       (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
-       (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
-       (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
-       (GLfloat)x2,  (GLfloat)y ,  texX2, texY1           //right top
-    };
+        GLfloat texX1 = 0.0f;
+        GLfloat texX2 = 1.0f;
+        GLfloat texY1 = 1.0f;
+        GLfloat texY2 = 0.0f;
 
-    VertexBuffers[vbTexture]->ActivateShader();
-    VertexBuffers[vbTexture]->SetShaderAlpha(255);
-    VertexBuffers[vbTexture]->SetShaderProjectionMatrix(oFb->Width(), oFb->Height());
-    VertexBuffers[vbTexture]->DisableBlending();
-    //VertexBuffers[vbTexture]->SetShaderBorderColor(bcolor);
+        GLfloat quadVertices[] = {
+            // Pos    // TexCoords
+        (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
+        (GLfloat)x ,  (GLfloat)y2,  texX1, texY2,          //left bottom
+        (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
+        (GLfloat)x ,  (GLfloat)y ,  texX1, texY1,          //left top
+        (GLfloat)x2,  (GLfloat)y2,  texX2, texY2,          //right bottom
+        (GLfloat)x2,  (GLfloat)y ,  texX2, texY1           //right top
+        };
 
-    glViewport(0, 0, oFb->Width(), oFb->Height());
-    if (!fb->BindTexture())
-        return false;
+        VertexBuffers[vbTexture]->ActivateShader();
+        VertexBuffers[vbTexture]->SetShaderAlpha(255);
+        VertexBuffers[vbTexture]->SetShaderProjectionMatrix(oFb->Width(), oFb->Height());
+        VertexBuffers[vbTexture]->DisableBlending();
+        //VertexBuffers[vbTexture]->SetShaderBorderColor(bcolor);
 
-    VertexBuffers[vbTexture]->Bind();
-    VertexBuffers[vbTexture]->SetVertexData(quadVertices);
-    VertexBuffers[vbTexture]->DrawArrays();
-    VertexBuffers[vbTexture]->Unbind();
-    VertexBuffers[vbTexture]->EnableBlending();
-    glFlush();
-#else
-    fb->Blit(x, y + fb->Height(), x + fb->Width(), y);
-#endif
+        glViewport(0, 0, oFb->Width(), oFb->Height());
+        if (!fb->BindTexture())
+            return false;
+
+        VertexBuffers[vbTexture]->Bind();
+        VertexBuffers[vbTexture]->SetVertexData(quadVertices);
+        VertexBuffers[vbTexture]->DrawArrays();
+        VertexBuffers[vbTexture]->Unbind();
+        VertexBuffers[vbTexture]->EnableBlending();
+        glFlush();
 
         oFb->Unbind();
         fb->BindRead();
+        if (myKernel == 5) {
+	        amlSetInt("/sys/class/graphics/fb0/blank",0 );
+        }
         return true;
     }
     //return true;

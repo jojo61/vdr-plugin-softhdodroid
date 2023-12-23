@@ -100,7 +100,8 @@ else
 OBJS = 
 endif
 
-
+_CFLAGS += $(shell pkg-config --cflags libdrm)
+LIBS += $(shell pkg-config --libs libdrm)
 
 ifeq ($(KODIBUILD),1)
 _CFLAGS += $(shell pkg-config --cflags glesv2)

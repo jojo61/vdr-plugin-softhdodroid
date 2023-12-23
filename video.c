@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/utsname.h>
 #include "ge2d.h"
 #include "ge2d_cmd.h"
 #include "ion.h"
@@ -94,6 +95,7 @@ static int VideoWindowX = 0;                ///< video output window x coordinat
 static int VideoWindowY = 0;                ///< video outout window y coordinate
 int VideoWindowWidth = 1920;       ///< video output window width
 int VideoWindowHeight = 1080;      ///< video output window height
+int NeedDRM = 0;
 static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
@@ -110,6 +112,8 @@ static int VideoCutLeftRight[VideoResolutionMax];
 
 char MyConfigDir[200];
 int locale_dot=0;
+
+int myKernel,myMajor,myMinor;
 
 
 static pthread_t VideoThread;           ///< video decode thread
@@ -228,6 +232,13 @@ const long ERROR_RECOVERY_MODE_IN = 0x20;
 
 /// Set soft start audio/video sync.
  void VideoSetSoftStartSync(int i) {};
+
+/// Set Video Size
+int VideoSetGeometry(const char *geometry) {
+    XParseGeometry(geometry, &VideoWindowX, &VideoWindowY, &VideoWindowWidth, &VideoWindowHeight);
+	NeedDRM = 1;
+    return 0;
+}
 
 /// Set fast channel switch.
  void VideoSetFastSwitch(int ConfigVideoFastSwitch) {
@@ -1009,6 +1020,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
  void VideoOsdExit(void) {};         ///< Cleanup osd.
 
+#include "drm.c"
 
  void VideoExit(void) {
 
@@ -1101,10 +1113,14 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
 
 	amlSetString("/sys/class/video/crop", "0 0 0 0");
+	if (myKernel == 4) {
+		amlSetString("/sys/class/amvecm/debug","3dlut close");
+		amlSetString("/sys/class/amvecm/debug","3dlut disable");
+		amlSetInt("/sys/class/graphics/fb0/blank", 0);
+	} else {
+		amlSetInt("/sys/class/graphics/fb0/blank", 1);
+	}
 
-	amlSetString("/sys/class/amvecm/debug","3dlut close");
-	amlSetString("/sys/class/amvecm/debug","3dlut disable");
-	amlSetInt("/sys/class/graphics/fb0/blank", 0);
  };            ///< Cleanup and exit video module.
 
 
@@ -1328,8 +1344,12 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 
 
 void ClearDisplay(void)
-{
-	amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
+{	
+	if (myKernel == 4) {
+		amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
+	} else {
+		amlSetInt("/sys/class/graphics/fb0/blank", 1);
+	}
 	OsdShown = 0;
     return;
 
@@ -1681,22 +1701,18 @@ bool getResolution(char *mode) {
 #define FBIOGET_OSD_DMABUF               0x46fc
 
 
+
  void VideoInit(const char *i)
 {
 
-
+	struct fb_var_screeninfo info = {0};
+	uint32_t h[3];
 	char mode[256];
 
 	timeBase.num = 1;
 	timeBase.den = 90000;
 
-#if 0
-	ge2d_fd = open("/dev/ge2d", O_RDWR);
-    if (ge2d_fd < 0)
-    {
-        printf("open /dev/ge2d failed.");
-    }
-#endif
+	getKernelVersion();
 
 	// Control device
 	cntl_handle = open(CODEC_CNTL_DEVICE, O_RDWR);
@@ -1743,18 +1759,27 @@ bool getResolution(char *mode) {
 		return;
 	}
 	amlSetInt("/sys/class/video/blackout_policy", 0);
+
+	if (NeedDRM && myKernel == 5) {
+		NeedDRM = 0;
+		VideoInitDrm();
+	}
+
 	amlGetString("/sys/class/display/mode",mode,sizeof(mode));
 
 	getResolution(mode);
 
-	// enable alpha setting
-
-	struct fb_var_screeninfo info;
-	uint32_t h[3];
-
 	amlSetInt("/sys/class/graphics/fb0/blank", 1);
 
+	if (myKernel == 5) {
+		char t[80];
+		sprintf(mode,"U:%dx%dp-0\n",VideoWindowWidth,VideoWindowHeight);
+		amlGetString("/sys/class/graphics/fb0/modes",t,sizeof(t)); // need to read the modes first
+		amlSetString("/sys/class/graphics/fb0/mode", mode);
+	}
+
 	fd = open("/dev/fb0", O_RDWR);
+
 	ioctl(fd, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
 	info.reserved[1] = 0;
@@ -1771,11 +1796,11 @@ bool getResolution(char *mode) {
 	info.transp.offset = 24;
 	info.transp.length = 8;
 	info.bits_per_pixel = 32;
-	Debug(3,"Initial Screen %d-%d\n",info.xres,info.yres);
-	info.xres = VideoWindowWidth-1;
-	info.yres = VideoWindowHeight-1;
-	info.xres_virtual = VideoWindowWidth-1;
-	info.yres_virtual = (VideoWindowHeight*2)-1;
+	Debug(3,"Initial Screen %d-%d set to %d-%d\n",info.xres,info.yres,VideoWindowWidth,VideoWindowHeight);
+	info.xres = VideoWindowWidth;
+	info.yres = VideoWindowHeight;
+	info.xres_virtual = VideoWindowWidth;
+	info.yres_virtual = (VideoWindowHeight*2);
 	info.nonstd = 1;
 	ioctl(fd, FBIOPUT_VSCREENINFO, &info);
 
@@ -1786,13 +1811,24 @@ bool getResolution(char *mode) {
 		DmaBufferHandle = h[1];
 	}
 	close(fd);
-
-	if (VideoWindowWidth < 1920) {    // is screen is only 1280 or smaller
-		OsdWidth = VideoWindowWidth;
-		OsdHeight = VideoWindowHeight;
+	if (myKernel == 5) {
+		   	OsdWidth = VideoWindowWidth;  
+			OsdHeight = VideoWindowHeight; 
 	} else {
-		OsdWidth = 1920;
-		OsdHeight = 1080;
+		if (VideoWindowWidth < 1920) {    // is screen is only 1280 or smaller
+			OsdWidth = VideoWindowWidth;
+			OsdHeight = VideoWindowHeight;
+		} else {	
+			OsdWidth = 1920;
+			OsdHeight = 1080;
+		}
+	}
+	
+	if (myKernel == 5) {
+		char t[80];
+		sprintf(mode,"U:%dx%dp-0\n",VideoWindowWidth,VideoWindowHeight);
+		amlGetString("/sys/class/graphics/fb0/modes",t,sizeof(t)); // need to read the modes first
+		amlSetString("/sys/class/graphics/fb0/mode", mode);
 	}
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
@@ -1831,15 +1867,15 @@ bool getResolution(char *mode) {
 	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
 	amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
 	amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
-	
-	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
-	amlSetString("/sys/class/graphics/fb0/free_scale_axis", fsaxis_str);
-	amlSetString("/sys/class/graphics/fb0/window_axis", waxis_str);
-	amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
-	amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
-	amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
+	if (myKernel == 4) {
+		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+		amlSetString("/sys/class/graphics/fb0/free_scale_axis", fsaxis_str);
+		amlSetString("/sys/class/graphics/fb0/window_axis", waxis_str);
+		amlSetInt("/sys/class/graphics/fb0/scale_width", OsdWidth);
+		amlSetInt("/sys/class/graphics/fb0/scale_height", OsdHeight);
+		amlSetInt("/sys/class/graphics/fb0/free_scale", 0x10001);
+	}
 	amlSetInt("/sys/class/graphics/fb0/blank", 0);
-	
 	amlSetString("/sys/class/amvecm/debug","sr enable");
 
 	GetApiLevel();
@@ -3160,50 +3196,54 @@ void amlTrickMode(int val)  // unused
 
 int amlGetBufferFree(int pip)
 {
-	//codecMutex.Lock();
+
+	struct am_ioctl_parm_ex_new {
+    union {
+        struct buf_status status;
+        struct vdec_status vstatus;
+        struct adec_status astatus;
+
+        struct userdata_poc_info_t data_userdata_info;
+        char data[112];
+
+    };
+    unsigned int cmd;
+    char reserved[4];
+	};
 
 	if (!isOpen)
 	{
-		//codecMutex.Unlock();
 		//printf("The codec is not open. %s\n",__FUNCTION__);
 		return 100;
 	}
 	int handle = OdroidDecoders[pip]->handle;
-
 	struct buf_status status;
+
 	if (apiLevel >= S905)	// S905
 	{
-		struct am_ioctl_parm_ex parm = { 0 };
-		parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
-
-		int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
-
-		//codecMutex.Unlock();
-
-		if (r < 0)
-		{
-			//printf("AMSTREAM_GET_EX_VB_STATUS failed.\n");
-			return 100;
+		if (myKernel == 4) {
+			struct am_ioctl_parm_ex parm = { 0 };
+			parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
+			int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
+			if (r < 0)
+			{
+				//printf("AMSTREAM_GET_EX_VB_STATUS failed.\n");
+				return 100;
+			}
+			memcpy(&status, &parm.status, sizeof(status));	
+		} else {
+			struct am_ioctl_parm_ex_new parm = { 0 };
+			parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
+			int r = ioctl(handle, 0xc07853c3, (unsigned long)&parm);
+			if (r < 0)
+			{
+				//printf("AMSTREAM_GET_EX_VB_STATUS failed.\n");
+				return 100;
+			}
+			memcpy(&status, &parm.status, sizeof(status));	
 		}
-
-		memcpy(&status, &parm.status, sizeof(status));
 	}
-	else	// S805
-	{
-		struct am_io_param am_io;
 
-		int r = ioctl(handle, AMSTREAM_IOC_VB_STATUS, (unsigned long)&am_io);
-
-		//codecMutex.Unlock();
-
-		if (r < 0)
-		{
-			//printf("AMSTREAM_IOC_VB_STATUS failed.\n");
-			return 100;
-		}
-
-		memcpy(&status, &am_io.status, sizeof(status));
-	}
 	//printf("STatus: write %u read %u free %d size %d data %d\n",status.write_pointer,status.read_pointer,status.free_len,status.size,status.data_len);
 	if (status.size)
 		return (status.free_len * 100) / status.size;
@@ -3214,13 +3254,15 @@ int amlGetBufferFree(int pip)
 
 int amlSetString(char *path, char *valstr)
 {
-  int fd = open(path, O_WRONLY, 0644);
+  int fd = open(path, O_WRONLY);
   int ret = 0;
   if (fd >= 0)
   {
-    if (write(fd, valstr, strlen(valstr)) < 0)
+    if (write(fd, valstr, strlen(valstr)) < 0) {
       ret = -1;
-    close(fd);
+	  perror("Error: ");
+	}
+	close(fd);
   }
   if (ret)
     Debug(3, "%s: error writing %s",__FUNCTION__, path);
@@ -3309,7 +3351,46 @@ bool amlHasRW(char *path)
 }
 
 
+void getKernelVersion() {
 
+	struct utsname buffer;
+    char *p;
+    long ver[16];
+    int i=0;
+
+    errno = 0;
+    if (uname(&buffer) != 0) {
+        printf("Error uname\n");
+		myKernel = 4;
+        return;
+    }
+
+    //printf("system name = %s\n", buffer.sysname);
+    //printf("node name   = %s\n", buffer.nodename);
+    //printf("release     = %s\n", buffer.release);
+    //printf("version     = %s\n", buffer.version);
+    //printf("machine     = %s\n", buffer.machine);
+
+#ifdef _GNU_SOURCE
+    //printf("domain name = %s\n", buffer.domainname);
+#endif
+
+    p = buffer.release;
+
+    while (*p) {
+        if (isdigit(*p)) {
+            ver[i] = strtol(p, &p, 10);
+            i++;
+        } else {
+            p++;
+        }
+    }
+	myKernel = ver[0];
+	myMajor = ver[1];
+	myMinor = ver[2];
+    //printf("Kernel %ld Major %ld Minor %ld\n", ver[0], ver[1], ver[2]);
+
+}
 
 #if 0
 void amlClearVideo()

@@ -2828,6 +2828,8 @@ const char *CommandLineHelp(void)
     return "  -a device\taudio device (fe. alsa: hw:0,0 oss: /dev/dsp)\n"
         "  -p device\taudio device for pass-through (hw:0,1 or /dev/dsp1)\n"
         "  -c channel\taudio mixer channel name (fe. PCM)\n" 
+        "  -g geometry\twindow geometry <w>x<h>\n"
+        "  -r Refresh\tRefreshrate for DRM (default is 50 Hz)\n"
         "  -s\t\tstart in suspended mode\n"
         "  -D\t\tstart in detached mode\n"
         "  -w workaround\tenable/disable workarounds\n"
@@ -2855,12 +2857,22 @@ int ProcessArgs(int argc, char *const argv[])
 #endif
 
     for (;;) {
-        switch (getopt(argc, argv, "-a:c:d:fg:p:S:sv:w:xDX:")) {
+        switch (getopt(argc, argv, "-a:c:d:r:fg:p:S:sv:w:xDX:")) {
             case 'a':                  // audio device for pcm
                 AudioSetDevice(optarg);
                 continue;
             case 'c':                  // channel of audio mixer
                 AudioSetChannel(optarg);
+                continue;
+            case 'r':                  // Video refresh rate
+                VideoSetRefresh(optarg);
+                continue;
+            case 'g': // geometry
+                if (VideoSetGeometry(optarg) < 0) {
+                    fprintf(stderr, _("Bad formated geometry please use: "
+                                      "[=][<width>{xX}<height>][{+-}<xoffset>{+-}<yoffset>]\n"));
+                    return 0;
+                }
                 continue;
 			case 'p':                  // pass-through audio device
                 AudioSetPassthroughDevice(optarg);
