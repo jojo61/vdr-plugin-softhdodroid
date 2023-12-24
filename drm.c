@@ -4,7 +4,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#define DRM_DEBUG
+//#define DRM_DEBUG
 
 //----------------------------------------------------------------------------
 //  DRM
@@ -76,6 +76,7 @@ const char *util_lookup_connector_type_name(unsigned int type) {
     return util_lookup_type_name(type, connector_type_names, ARRAY_SIZE(connector_type_names));
 }
 
+#if 0
 static uint64_t GetPropertyValue(int fd_drm, uint32_t objectID, uint32_t objectType, const char *propName) {
     uint32_t i;
     int found = 0;
@@ -133,6 +134,7 @@ static uint32_t GetPropertyID(int fd_drm, uint32_t objectID, uint32_t objectType
 #endif
     return value;
 }
+#endif
 
 static int SetPropertyRequest(drmModeAtomicReqPtr ModeReq, int fd_drm, uint32_t objectID, uint32_t objectType,
                               const char *propName, uint64_t value) {
@@ -193,8 +195,8 @@ static int FindDevice(VideoRender *render) {
     drmModeModeInfo *mode;
     drmModePlane *plane;
     drmModePlaneRes *plane_res;
-    drmModeObjectPropertiesPtr props;
-    uint32_t j, k;
+    
+    uint32_t j;
     uint64_t has_dumb;
     uint64_t has_prime;
     int i, ii = 0;
@@ -419,7 +421,7 @@ void VideoInitDrm() {
         fprintf(stderr, "cannot allocate atomic request (%d): %m\n", errno);
         return;
     }
-    printf("set CRTC %d of Connector %d aktiv\n", render->crtc_id, render->connector_id);
+    //printf("set CRTC %d of Connector %d aktiv\n", render->crtc_id, render->connector_id);
     SetPropertyRequest(ModeReq, render->fd_drm, render->crtc_id, DRM_MODE_OBJECT_CRTC, "MODE_ID", modeID);
     SetPropertyRequest(ModeReq, render->fd_drm, render->connector_id, DRM_MODE_OBJECT_CONNECTOR, "CRTC_ID",
                        render->crtc_id);
@@ -438,7 +440,7 @@ void VideoInitDrm() {
 }
 
 
-
+#if 0
 static void drm_clean_up() {
    
     if (!render)
@@ -447,3 +449,4 @@ static void drm_clean_up() {
     close(render->fd_drm);
     free(render);
 }
+#endif

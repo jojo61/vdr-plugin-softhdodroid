@@ -38,7 +38,7 @@
 #include <time.h>
 #include <signal.h>
 #include <linux/kd.h>
-//#include <X11/Xlib.h>
+#include <ctype.h>
 
 #include "codec_type.h"
 #include "amports/amstream.h"
@@ -1098,28 +1098,46 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	//close (ge2d_fd);
 	
 	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
-
 	// restore vfm mapping
-	amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
-	amlSetString("/sys/class/vfm/map","rm all");
-	sleep(1);
-	amlSetString("/sys/class/vfm/map","add default decoder amvideo");
-	amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
-	amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
-	amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
-	amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
-
-	// reset audio codec to 2 chan
-	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-
-	amlSetString("/sys/class/video/crop", "0 0 0 0");
 	if (myKernel == 4) {
+		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+		amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
+		amlSetString("/sys/class/vfm/map","rm all");
+		sleep(1);
+		amlSetString("/sys/class/vfm/map","add default decoder amvideo");
+		amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
+		amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
+		amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
+		amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
 		amlSetString("/sys/class/amvecm/debug","3dlut close");
 		amlSetString("/sys/class/amvecm/debug","3dlut disable");
+	} else {
+		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
+		amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
+		amlSetString("/sys/class/vfm/map","rm all");
+		sleep(1);
+		amlSetString("/sys/class/vfm/map","add default decoder amvideo");
+		amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
+		amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amlvideo ppmgr deinterlace amvideo");
+		amlSetString("/sys/class/vfm/map","add dvelpath dveldec dvel");
+		amlSetString("/sys/class/vfm/map","add dvblpath2 dvbldec2 videopip");
+		amlSetString("/sys/class/vfm/map","add dvelpath2 dveldec2 dvel");
+		amlSetString("/sys/class/vfm/map","add dvhdmiin dv_vdin amvideo");
+		amlSetString("/sys/class/vfm/map","add video-map-0 video1_block amvideo");
+		amlSetString("/sys/class/vfm/map","add video-map-1 video2_block videopip");
+	}
+	// reset audio codec to 2 chan
+	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+	
+	amlSetString("/sys/class/video/crop", "0 0 0 0");
+
+	if (myKernel == 4) {	
 		amlSetInt("/sys/class/graphics/fb0/blank", 0);
 	} else {
-		amlSetInt("/sys/class/graphics/fb0/blank", 1);
+		amlSetInt("/sys/class/graphics/fb0/blank", 0);
 	}
+
+	
 
  };            ///< Cleanup and exit video module.
 
@@ -3217,7 +3235,7 @@ int amlGetBufferFree(int pip)
 		return 100;
 	}
 	int handle = OdroidDecoders[pip]->handle;
-	struct buf_status status;
+	struct buf_status status = {0};
 
 	if (apiLevel >= S905)	// S905
 	{
