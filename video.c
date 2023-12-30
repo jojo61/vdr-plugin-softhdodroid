@@ -1095,9 +1095,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 	ioctl(fd_m, FBIOPUT_VSCREENINFO, &info);
 	close(fd_m);
 #endif
-	//close (ge2d_fd);
 	
-	amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 	// restore vfm mapping
 	if (myKernel == 4) {
 		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
@@ -1112,7 +1110,6 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		amlSetString("/sys/class/amvecm/debug","3dlut close");
 		amlSetString("/sys/class/amvecm/debug","3dlut disable");
 	} else {
-		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 		amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
 		amlSetString("/sys/class/vfm/map","rm all");
 		sleep(1);
@@ -1126,19 +1123,14 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 		amlSetString("/sys/class/vfm/map","add video-map-0 video1_block amvideo");
 		amlSetString("/sys/class/vfm/map","add video-map-1 video2_block videopip");
 	}
+
 	// reset audio codec to 2 chan
 	amlSetInt("/sys/class/audiodsp/digital_codec", 0);
 	
 	amlSetString("/sys/class/video/crop", "0 0 0 0");
 
-	if (myKernel == 4) {	
-		amlSetInt("/sys/class/graphics/fb0/blank", 0);
-	} else {
-		amlSetInt("/sys/class/graphics/fb0/blank", 0);
-	}
-
+	amlSetInt("/sys/class/graphics/fb0/blank", 0);
 	
-
  };            ///< Cleanup and exit video module.
 
 
