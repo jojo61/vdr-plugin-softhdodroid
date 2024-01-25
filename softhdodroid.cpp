@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "4.0"
+static const char *const VERSION = "4.1"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -637,6 +637,8 @@ public:
     virtual void Fill(tColor Color) { (void)Color; }
     virtual void DrawImage(const cPoint &Point, const cImage &Image) { (void)Point; (void)Image; }
     virtual void DrawImage(const cPoint &Point, int ImageHandle) { (void)Point; (void)ImageHandle; }
+    virtual void DrawScaledImage(const cPoint &Point, const cImage &Image, double FactorX = 1.0f, double FactorY = 1.0f, bool AntiAlias = false) { (void)Point; (void)Image; (void)FactorX; (void)FactorY; (void)AntiAlias; };
+    virtual void DrawScaledImage(const cPoint &Point, int ImageHandle, double FactorX = 1.0f, double FactorY = 1.0f, bool AntiAlias = false) { (void)Point; (void)ImageHandle;  (void)FactorX; (void)FactorY; (void)AntiAlias; };
     virtual void DrawPixel(const cPoint &Point, tColor Color) { (void)Point; (void)Color; }
     virtual void DrawBitmap(const cPoint &Point, const cBitmap &Bitmap, tColor ColorFg = 0, tColor ColorBg = 0, bool Overlay = false) {
         (void) Point; (void)Bitmap; (void)ColorFg; (void)ColorBg; (void)Overlay; }

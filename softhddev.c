@@ -2870,7 +2870,7 @@ int ProcessArgs(int argc, char *const argv[])
             case 'g': // geometry
                 if (VideoSetGeometry(optarg) < 0) {
                     fprintf(stderr, _("Bad formated geometry please use: "
-                                      "[=][<width>{xX}<height>][{+-}<xoffset>{+-}<yoffset>]\n"));
+                                      "<width>x<height>\n"));
                     return 0;
                 }
                 continue;
