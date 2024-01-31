@@ -1847,7 +1847,7 @@ void AudioEnqueue(const void *samples, int count)
         // forced start or enough video + audio buffered
         // for some exotic channels * 4 too small
 
-        if (AudioStartThreshold * 1.2  < n || (AudioVideoIsReady
+        if (AudioStartThreshold * 1.8  < n || (AudioVideoIsReady
                 //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back

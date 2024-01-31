@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "4.1"
+static const char *const VERSION = "4.2"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2798,7 +2798,7 @@ cPluginSoftHdDevice::~cPluginSoftHdDevice(void)
 {
     // dsyslog("[softhddev]%s:\n", __FUNCTION__);
 
-    ::SoftHdDeviceExit();
+   // ::SoftHdDeviceExit();
 
 
 }
@@ -2907,7 +2907,8 @@ void cPluginSoftHdDevice::Stop(void)
 
     //::Stop();
     // delete csoft;
-
+    cSoftOsdProvider::StopOpenGlThread();
+    ::SoftHdDeviceExit();
     csoft = NULL;
 }
 
