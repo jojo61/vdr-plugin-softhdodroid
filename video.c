@@ -2968,6 +2968,7 @@ int WriteData(int handle, unsigned char* data, int length)
 	return ret; //written;
 }
 
+extern char AudioVideoIsReady;
 Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
@@ -2986,6 +2987,8 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 			amlFreerun(1);
 			//amlReset();
 		}
+		if (!AudioVideoIsReady)
+			AudioVideoReady(pts);
 		lpts = pts & 0xffffffff;
 
 		CheckinPts(handle, pts);

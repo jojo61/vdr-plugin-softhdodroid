@@ -145,7 +145,7 @@ static const char *AudioMixerChannel;   ///< mixer channel name
 static char AudioDoingInit;             ///> flag in init, reduce error
 static volatile char AudioRunning;      ///< thread running / stopped
 static volatile char AudioPaused;       ///< audio paused
-static volatile char AudioVideoIsReady; ///< video ready start early
+char AudioVideoIsReady; ///< video ready start early
 static int AudioSkip;                   ///< skip audio to sync to video
 
 
@@ -1819,22 +1819,22 @@ void AudioEnqueue(const void *samples, int count)
                     skip = n;    // Clear Audio until Video PTS
                 } else  {
                     int i = 10;
-                    while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay - 10000 )) == 2 && i--) {
-                        usleep(5000);
+                    while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay )) == 2 && i--) {
+                        usleep(3000);
                     }
                 }
                 isRadio++;
             }
-            usleep(2000);
+            usleep(1000);
         }
         //        skip = AudioSkip;
         // FIXME: round to packet size
 
-        Debug(3, "audio: start? %4zdms skip %dms vpts: %#012" PRIx64 " apts  %#012" PRIx64 " Referenz %#012" PRIx64 "\n", (n * 1000)
-            / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
-            (skip * 1000)
-            / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
-            vpts,AudioRing[AudioRingWrite].PTS,AV_NOPTS_VALUE);
+        //Debug(3, "audio: start? %4zdms skip %dms vpts: %#012" PRIx64 " apts  %#012" PRIx64 " \n", (n * 1000)
+        //    / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
+        //    (skip * 1000)
+        //    / (AudioRing[AudioRingWrite].HwSampleRate * AudioRing[AudioRingWrite].HwChannels * AudioBytesProSample),
+        //    vpts,AudioRing[AudioRingWrite].PTS);
 
         if (skip) {
             if (n < (unsigned)skip) {
@@ -1847,7 +1847,7 @@ void AudioEnqueue(const void *samples, int count)
         // forced start or enough video + audio buffered
         // for some exotic channels * 4 too small
 
-        if (AudioStartThreshold * 1.8  < n || (AudioVideoIsReady
+        if (AudioStartThreshold * 4  < n || (AudioVideoIsReady
                 //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back
@@ -1858,7 +1858,7 @@ void AudioEnqueue(const void *samples, int count)
                 isRadio = 0;
             }
             pthread_cond_signal(&AudioStartCond);
-            Debug(3, "Start on AudioEnque Threshold %d n %d\n", AudioStartThreshold, n);
+            Debug(3, "Start on AudioEnque Threshold %d n %ld IsReady %d\n", AudioStartThreshold, n, AudioVideoIsReady);
         }
 
     }
@@ -1874,16 +1874,16 @@ void AudioEnqueue(const void *samples, int count)
 **
 **	@param pts	video presentation timestamp
 */
-void AudioVideoReady(int64_t pts)
+void AudioVideoReady(uint64_t pts)
 {
     int64_t audio_pts;
     size_t used;
-
+   
     if (AudioVideoIsReady) {
         return;
     }
 
-    if (pts == (int64_t) AV_NOPTS_VALUE) {
+    if (!pts || pts == (int64_t) AV_NOPTS_VALUE) {
         Debug(3, "audio: a/v start, no valid video\n");
         return;
     }
@@ -1891,7 +1891,7 @@ void AudioVideoReady(int64_t pts)
     if (!AudioRing[AudioRingWrite].HwSampleRate || !AudioRing[AudioRingWrite].HwChannels
         || AudioRing[AudioRingWrite].PTS == (int64_t) AV_NOPTS_VALUE) {
         Debug(3, "audio: a/v start, no valid audio\n");
-        AudioVideoIsReady = 1;
+        //AudioVideoIsReady = 1;
         return;
     }
     // Audio.PTS = next written sample time stamp

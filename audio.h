@@ -49,6 +49,7 @@ extern void AudioSetCompression(int, int);  ///< set compression parameters
 extern void AudioSetStereoDescent(int); ///< set stereo loudness descent
 
 extern void AudioSetDevice(const char *);   ///< set PCM audio device
+extern void AudioVideoReady(uint64_t);
 
     /// set pass-through device
 extern void AudioSetPassthroughDevice(const char *);
