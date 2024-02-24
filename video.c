@@ -2987,7 +2987,7 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 			amlFreerun(1);
 			//amlReset();
 		}
-		if (!AudioVideoIsReady)
+		if (!AudioVideoIsReady && !ConfigVideoFastSwitch)
 			AudioVideoReady(pts);
 		lpts = pts & 0xffffffff;
 
