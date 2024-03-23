@@ -256,33 +256,34 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 {
     AVCodec *audio_codec;
     
-    if (CodecPassthrough) {
-        switch (codec_id) {
-        case AV_CODEC_ID_MP2:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-            break;
-        case AV_CODEC_ID_AC3:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
-            break;
-        case AV_CODEC_ID_EAC3:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 4);
-            break;
-        case AV_CODEC_ID_AAC_LATM:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-            break;
-        case AV_CODEC_ID_AAC:
-                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-            break;
-        default:
-            Debug(3,"Unknown Audio Codec\n");
-            return;
+    if (myKernel == 4 ) {
+        if (CodecPassthrough) {
+            switch (codec_id) {
+            case AV_CODEC_ID_MP2:
+                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+                break;
+            case AV_CODEC_ID_AC3:
+                    amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+                break;
+            case AV_CODEC_ID_EAC3:
+                    amlSetInt("/sys/class/audiodsp/digital_codec", 4);
+                break;
+            case AV_CODEC_ID_AAC_LATM:
+                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+                break;
+            case AV_CODEC_ID_AAC:
+                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+                break;
+            default:
+                Debug(3,"Unknown Audio Codec\n");
+                return;
+            }
         }
+        else {
+            amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+        }
+        amlSetInt("/sys/class/audiodsp/digital_raw",CodecPassthrough ? 2: 0);
     }
-    else {
-        amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-    }
-    amlSetInt("/sys/class/audiodsp/digital_raw",CodecPassthrough ? 2: 0);
-    
 #if 0  
     AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
     if (audio_decoder->handle < 0)
@@ -584,7 +585,9 @@ void amlSetMixer(int codec) {
     snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
    
     snd_mixer_close(handle);
-    amlSetInt("/sys/class/audiodsp/digital_codec", codec);
+    if (myKernel == 4) {
+        amlSetInt("/sys/class/audiodsp/digital_codec", codec);
+    }
   }
 
 }

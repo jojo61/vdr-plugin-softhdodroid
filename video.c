@@ -1843,26 +1843,31 @@ bool getResolution(char *mode) {
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
 
+	if (myKernel == 4) {
+		// Check if H264-PIP is available
+		int fd1 = open("/dev/amstream_vframe", O_WRONLY);
+		int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
 
-	// Check if H264-PIP is available
-	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
-	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
+		if (fd2 >= 0 ) {
+			vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
+			char vfm_status[512];
+			use_pip = 1;
 
-	if (fd2 >= 0 ) {
-		vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
-		char vfm_status[512];
-		use_pip = 1;
-
-		codec_h_ioctl_set(fd2,AMSTREAM_SET_VFORMAT,amlFormat);
-		codec_h_ioctl_set(fd2,AMSTREAM_PORT_INIT,0);
-		if (amlGetString("/sys/class/vfm/map",vfm_status,sizeof(vfm_status)) == 0) {
-        	if (strstr(vfm_status,"mpeg12")) {
-				use_pip_mpeg2 = 1;
+			codec_h_ioctl_set(fd2,AMSTREAM_SET_VFORMAT,amlFormat);
+			codec_h_ioctl_set(fd2,AMSTREAM_PORT_INIT,0);
+			if (amlGetString("/sys/class/vfm/map",vfm_status,sizeof(vfm_status)) == 0) {
+				if (strstr(vfm_status,"mpeg12")) {
+					use_pip_mpeg2 = 1;
+				}
 			}
+			close (fd2);
 		}
-		close (fd2);
+		close(fd1);
 	}
-	close(fd1);
+	else { // Pip on Kernel 5.x is crashing and needs more debuging
+		use_pip = 0;
+		use_pip_mpeg2 = 0;
+	}
 
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};

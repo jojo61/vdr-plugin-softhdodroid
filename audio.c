@@ -2059,7 +2059,10 @@ int64_t AudioGetDelay(void)
 }
 
 int AudioGetBufferUsedbytes(void) {
-    return (int) RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
+    if (AudioRing[AudioRingWrite].RingBuffer)
+        return (int) RingBufferUsedBytes(AudioRing[AudioRingWrite].RingBuffer);
+    else
+        return 0;
 }
 
 

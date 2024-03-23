@@ -201,6 +201,8 @@ extern char VideoIgnoreRepeatPict;      ///< disable repeat pict warning
 extern int VideoAudioDelay;             ///< audio/video delay
 extern char ConfigStartX11Server;       ///< flag start the x11 server
 extern char MyConfigDir[];
+extern int myKernel,myMajor,myMinor;
+
 //----------------------------------------------------------------------------
 //  Prototypes
 //----------------------------------------------------------------------------
