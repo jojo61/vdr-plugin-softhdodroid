@@ -1186,26 +1186,24 @@ void VideoSetHdr2Sdr(int i)
 {
 
 	Hdr2Sdr = i;
-	if (Hdr2Sdr) {
-		Debug(3,"Enable HDR2SDR\n");
-		amlSetInt("/sys/module/am_vecm/parameters/hdr_mode", 1);
-	} else {
-		Debug(3,"Disable HDR2SDR\n");
-		amlSetInt("/sys/module/am_vecm/parameters/hdr_mode", 0);
-	}
+
+	Debug(3,Hdr2Sdr ? "Enable HDR2SDR\n" : "Disable HDR2SDR\n");
+	if (myKernel == 5)
+		amlSetInt("/sys/module/aml_media/parameters/hdr_mode", Hdr2Sdr ? 1 :0);
+	else
+		amlSetInt("/sys/module/am_vecm/parameters/hdr_mode", Hdr2Sdr ? 1 : 0);
 };
 
 void VideoSetDenoise(int i)
 {
 
 	NoiseReduction = i;
-	if (!NoiseReduction) {
-		Debug(3,"Disable Noise reduction\n");
-		amlSetString("/sys/module/di/parameters/nr2_en", "0");
-	} else {
-		Debug(3,"Enable Noise reduction\n");
-		amlSetString("/sys/module/di/parameters/nr2_en", "1");
-	}
+	
+	Debug(3,i ? "Enable Noice Reduction" : "Disable Noise reduction\n");
+	if (myKernel == 5)
+		amlSetString("/sys/module/aml_media/parameters/nr2_en", i ? "1" : "0");
+	else
+		amlSetString("/sys/module/di/parameters/nr2_en", i ?  "1" : "0");
 };
 
 void VideoDelHwDecoder(VideoHwDecoder * decoder)
@@ -1865,7 +1863,7 @@ bool getResolution(char *mode) {
 		close(fd1);
 	}
 	else { // Pip on Kernel 5.x is crashing and needs more debuging
-		use_pip = 0;
+		use_pip = 1;
 		use_pip_mpeg2 = 0;
 	}
 

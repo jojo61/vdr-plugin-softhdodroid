@@ -1958,7 +1958,7 @@ class cSoftHdMenu:public cOsdMenu
 void cSoftHdMenu::Create(void)
 {
     int current;
-
+    char t[256];
     current = Current();                // get current menu item index
     Clear();                            // clear the menu
 
@@ -1990,11 +1990,21 @@ void cSoftHdMenu::Create(void)
         }
         Add(new cOsdItem(hk(tr("PIP close")), osUser8));
     }
-
-    //Add(new cOsdItem(NULL, osUnknown, false));
-    //Add(new cOsdItem(NULL, osUnknown, false));
     
-    //   Add(new cOsdItem(cString::sprintf(tr(" Frame Process time %2.2fms"), frametime), osUnknown, false));
+    Add(new cOsdItem(NULL, osUnknown, false));
+    Add(new cOsdItem(NULL, osUnknown, false));
+    
+    amlGetString("/sys/class/amhdmitx/amhdmitx0/config",t,sizeof(t));
+
+    Add(new cOsdItem(cString::sprintf(tr(" Decoder Info:")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(t,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+    Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(NULL,"\n")),  osUnknown, false));
+
     SetCurrent(Get(current));           // restore selected menu entry
     Display();                          // display build menu
 }
