@@ -1210,7 +1210,6 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 {
 	Debug(3,"DelHWDecoder PIP %d ",decoder->pip);
 	if (decoder->pip && OdroidDecoders[1]->handle != -1) {
-		isPIP = false;
 		InternalClose(1);
 	}
 
@@ -1841,31 +1840,27 @@ bool getResolution(char *mode) {
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
 
-	if (myKernel == 4) {
-		// Check if H264-PIP is available
-		int fd1 = open("/dev/amstream_vframe", O_WRONLY);
-		int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
+	
+	// Check if H264-PIP is available
+	int fd1 = open("/dev/amstream_vframe", O_WRONLY);
+	int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
 
-		if (fd2 >= 0 ) {
-			vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
-			char vfm_status[512];
-			use_pip = 1;
-
-			codec_h_ioctl_set(fd2,AMSTREAM_SET_VFORMAT,amlFormat);
-			codec_h_ioctl_set(fd2,AMSTREAM_PORT_INIT,0);
-			if (amlGetString("/sys/class/vfm/map",vfm_status,sizeof(vfm_status)) == 0) {
-				if (strstr(vfm_status,"mpeg12")) {
-					use_pip_mpeg2 = 1;
-				}
-			}
-			close (fd2);
-		}
-		close(fd1);
-	}
-	else { // Pip on Kernel 5.x is crashing and needs more debuging
+	if (fd2 >= 0 ) {
+		vformat_t amlFormat = (vformat_t)VFORMAT_MPEG12;
+		char vfm_status[512];
 		use_pip = 1;
-		use_pip_mpeg2 = 0;
+
+		codec_h_ioctl_set(fd2,AMSTREAM_SET_VFORMAT,amlFormat);
+		codec_h_ioctl_set(fd2,AMSTREAM_PORT_INIT,0);
+		if (amlGetString("/sys/class/vfm/map",vfm_status,sizeof(vfm_status)) == 0) {
+			if (strstr(vfm_status,"mpeg12")) {
+				use_pip_mpeg2 = 1;
+			}
+		}
+		close (fd2);
 	}
+	close(fd1);
+	
 
 	char fsaxis_str[256] = {0};
 	char waxis_str[256] = {0};
@@ -3105,6 +3100,7 @@ void InternalClose(int pip)
 	int r;
 	int handle = OdroidDecoders[pip]->handle;
 	if (handle == -1 || handle == 0) {
+		printf("Internal Close pip %d mit Handle %d\n",pip,handle);
 		Debug(3,"Internal Close mit Handle %d\n",handle);
 		return;
 	}
@@ -3131,6 +3127,9 @@ void InternalClose(int pip)
 
 
 	OdroidDecoders[pip]->handle = -1;
+
+	if (pip)
+		isPIP = false;
 
 	if (!pip) {
 		isOpen = false;
