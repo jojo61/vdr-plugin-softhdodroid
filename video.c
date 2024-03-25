@@ -3118,9 +3118,10 @@ void InternalClose(int pip)
 		return;
 	}
 	if (pip) {
-
-		uint32_t nMode = 1;
-		ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
+		if (myKernel == 4) {
+			uint32_t nMode = 1;
+			ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
+		}
 		amlSetString("/sys/class/vfm/map","rm pip1");
 		amlSetString("/sys/class/vfm/map","rm vdec-map-1");
 		amlSetInt("/sys/class/video/pip_global_output",0);
