@@ -632,7 +632,7 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
     
     amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0);
 
-    if (!*passthrough)
+    if (!*passthrough && myKernel==4)
         amlSetInt("/sys/class/audiodsp/digital_codec",audio_decoder->HwChannels > 2 ? 6 : 0 );
     
     // channels/sample-rate not support?
