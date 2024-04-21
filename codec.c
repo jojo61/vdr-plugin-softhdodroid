@@ -542,19 +542,18 @@ void amlSetMixer(int codec) {
       return;
     }
     
-    /*
-    Debug(3,"CAESinkALSA - Set Spdif to HDMITX to spdif \n");
-    snd_mixer_selem_id_set_name(sid, "Spdif to HDMITX Select");
-    elem = snd_mixer_find_selem(handle, sid);
-    if (!elem) {
-        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
-            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
-        snd_mixer_close(handle);
-        return;
+    if (myKernel == 5) {
+        Debug(3,"CAESinkALSA - Set HDMITX Source to spdif \n");
+        snd_mixer_selem_id_set_name(sid, "HDMITX Audio Source Select");
+        elem = snd_mixer_find_selem(handle, sid);
+        if (!elem) {
+            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+            snd_mixer_close(handle);
+            return;
+        } else
+        snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // 0 = spdif  1= spdif_b
     }
-
-    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // 0 = spdif  1= spdif_b
-    */
 
     // set codec format for SPDIF-B
     Debug(3,"CAESinkALSA - Set codec for Spdif_b\n");
@@ -571,7 +570,7 @@ void amlSetMixer(int codec) {
 
     /* FALLTHROUGH */
 
-            // set codec format for SPDIF-A
+    // set codec format for SPDIF-A
     Debug(3,"CAESinkALSA - Set codec for spdif\n");
     snd_mixer_selem_id_set_name(sid, "Audio spdif format");
     elem = snd_mixer_find_selem(handle, sid);
@@ -583,11 +582,10 @@ void amlSetMixer(int codec) {
     }
 
     snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
-   
     snd_mixer_close(handle);
-    if (myKernel == 4) {
-        amlSetInt("/sys/class/audiodsp/digital_codec", codec);
-    }
+    
+    
+    
   }
 
 }
@@ -631,9 +629,12 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
         *passthrough = 1;
     }
     
-    if (!*passthrough) {
-        amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0);
-    }
+    
+    amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0);
+
+    if (!*passthrough)
+        amlSetInt("/sys/class/audiodsp/digital_codec",audio_decoder->HwChannels > 2 ? 6 : 0 );
+    
     // channels/sample-rate not support?
     if (err = AudioSetup(&audio_decoder->HwSampleRate, &audio_decoder->HwChannels, *passthrough)) {
 
