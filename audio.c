@@ -143,7 +143,7 @@ static char AudioAppendAES;             ///< flag automatic append AES
 static const char *AudioMixerDevice;    ///< mixer device name
 static const char *AudioMixerChannel;   ///< mixer channel name
 static char AudioDoingInit;             ///> flag in init, reduce error
-static volatile char AudioRunning;      ///< thread running / stopped
+volatile char AudioRunning;             ///< thread running / stopped
 static volatile char AudioPaused;       ///< audio paused
 char AudioVideoIsReady; ///< video ready start early
 static int AudioSkip;                   ///< skip audio to sync to video
@@ -1827,7 +1827,9 @@ void AudioEnqueue(const void *samples, int count)
             }
             usleep(1000);
         }
-        //        skip = AudioSkip;
+        if (ConfigVideoFastSwitch) {
+            skip = AudioSkip;
+        }
         // FIXME: round to packet size
 
         //Debug(3, "audio: start? %4zdms skip %dms vpts: %#012" PRIx64 " apts  %#012" PRIx64 " \n", (n * 1000)
@@ -1848,13 +1850,12 @@ void AudioEnqueue(const void *samples, int count)
         // for some exotic channels * 4 too small
 
         if (AudioStartThreshold * (ConfigVideoFastSwitch ? 1.8 : 4)  < n || (AudioVideoIsReady
-                //  if ((AudioVideoIsReady
                 && AudioStartThreshold < n)) {
             // restart play-back
             // no lock needed, can wakeup next time
             AudioRunning = 1;
+            FirstVPTS = 0;
             if (!ConfigVideoFastSwitch) {
-                FirstVPTS = 0;
                 isRadio = 0;
             }
             pthread_cond_signal(&AudioStartCond);
@@ -1878,7 +1879,7 @@ void AudioVideoReady(uint64_t pts)
 {
     int64_t audio_pts;
     size_t used;
-   
+
     if (AudioVideoIsReady) {
         return;
     }

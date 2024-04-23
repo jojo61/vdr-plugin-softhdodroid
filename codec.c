@@ -636,8 +636,7 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
         amlSetInt("/sys/class/audiodsp/digital_codec",audio_decoder->HwChannels > 2 ? 6 : 0 );
     
     // channels/sample-rate not support?
-    if (err = AudioSetup(&audio_decoder->HwSampleRate, &audio_decoder->HwChannels, *passthrough)) {
-
+    if ((err = AudioSetup(&audio_decoder->HwSampleRate, &audio_decoder->HwChannels, *passthrough))) {
         // try E-AC-3 none HBR
         audio_decoder->HwSampleRate /= 4;
         if (audio_ctx->codec_id != AV_CODEC_ID_EAC3

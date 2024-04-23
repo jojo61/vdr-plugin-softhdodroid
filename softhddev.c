@@ -75,6 +75,7 @@ static signed char ConfigStartSuspended;    ///< flag to start in suspend mode
 static pthread_mutex_t SuspendLockMutex;    ///< suspend lock mutex
 
 static volatile char StreamFreezed;     ///< stream freezed
+int m_PlayMode;                         ///<current play mode
 
 //////////////////////////////////////////////////////////////////////////////
 //  Audio
@@ -2008,9 +2009,6 @@ static void StopVideo(void)
     //restore decoder default settings
     amlSetInt("/sys/class/video/blackout_policy", 1);   //do this here to avoid freezing the last frame
     amlSetInt("/sys/class/tsync/slowsync_enable", 1);
-    amlSetInt("/sys/class/video/disable_video", 1);
-    //restore decoder default settings
-    amlSetInt("/sys/class/video/disable_video", 0);
     VideoStreamClose(MyVideoStream, 1);
     VideoExit();
     AudioSyncStream = NULL;
@@ -2419,11 +2417,9 @@ uint8_t *GrabImage(int *size, int jpeg, int quality, int width, int height)
 int SetPlayMode(int play_mode)
 {
     Debug(3, "Set Playmode %d\n", play_mode);
+    m_PlayMode = play_mode;
     switch (play_mode) {
         case 0:
-            if (ConfigVideoBlackPicture) {
-                amlSetInt("/sys/class/video/disable_video", 1);
-            }
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                Clear();
                MyVideoStream->ClearClose = 0;
@@ -2444,9 +2440,6 @@ int SetPlayMode(int play_mode)
         case 4:                        // video only from player, audio from decoder
         case 5:                        // pmExtern_THIS_SHOULD_BE_AVOIDED
             Play();
-            //if (ConfigVideoBlackPicture) {
-            //    amlSetInt("/sys/class/video/disable_video", 0);
-            //}
             break;
     }
     return 1;
@@ -2507,6 +2500,16 @@ void GetVideoSize(int *width, int *height, double *aspect)
 **
 **  Every single frame shall then be displayed the given number of
 **  times.
+**
+**  1 =  FastForward [3>>] or FastBackward [<<3]
+**  3 =  FastForward [2>>] or FastBackward [<<2]
+**  6 =  FastForward [1>>] or FastBackward [<<1]
+**  8 =  SlowForward [1|>]
+**  4 =  SlowForward [2|>]
+**  2 =  SlowForward [3|>]
+**  63 = SlowReverse [<|1]
+**  48 =  SlowReverse [<|2]
+**  24 =  SlowReverse [<|3]
 **
 **  @param speed    trick speed
 */
@@ -3268,6 +3271,3 @@ int PipPlayVideo(const uint8_t * data, int size)
 {
     return PlayVideo3(PipVideoStream, data, size);
 }
-
-
-

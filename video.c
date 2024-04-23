@@ -124,11 +124,14 @@ pthread_mutex_t OSDMutex;               ///< OSD update mutex
 
 /// Default audio/video delay
 int VideoAudioDelay;
+///<current play mode
+extern int m_PlayMode;
 
 ///< config values
 extern int ConfigVideoFastSwitch;
 extern int ConfigVideoBrightness;
 extern int ConfigVideoContrast;
+extern int ConfigVideoBlackPicture;
 
 enum ApiLevel
 {
@@ -196,10 +199,7 @@ uint64_t lpts;
 int inwrap=0;
 uint64_t TrickPTS;
 int myTrickSpeed= 0;
-
-bool doPauseFlag = false;
-bool doResumeFlag = false;
-
+int inTrickModeStillPicture = 0;
 
 AVRational timeBase;
 
@@ -1159,8 +1159,6 @@ void CodecVideoDelDecoder(VideoDecoder *decoder){
 	InternalClose(HwDecoder->pip);
  };
 
-extern void amlClearVBuf();
-/// Flush video buffers.
  void CodecVideoFlushBuffers(VideoDecoder *decoder) {
         amlReset();
 };
@@ -1296,6 +1294,8 @@ void ProcessClockBuffer(int handle)
 
 	}
 
+extern char AudioRunning;
+extern char AudioVideoIsReady;
 void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 {
 	int waiter=20000;
@@ -1305,10 +1305,16 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		ProcessBuffer(decoder->HwDecoder,avpkt);
 		return;
 	}
-
 	if (!decoder->HwDecoder->TrickSpeed) {
 		ProcessClockBuffer(handle);
 		TrickPTS=0;
+		if (!AudioRunning && ConfigVideoFastSwitch && !inTrickModeStillPicture) {
+			//printf("CodecVideoDecode: wait until AudioRunning\n");
+             		return;
+		}
+		if (!AudioVideoIsReady && !ConfigVideoFastSwitch) {
+			AudioVideoReady(avpkt->pts);
+		}
 	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
@@ -1316,12 +1322,11 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 				amlReset();
 				waiter = decoder->HwDecoder->TrickSpeed == 1 ? 40000:30000;
 			}
-			amlFreerun(1);
+			//amlFreerun(1); //already done in VideoSetTrickspeed
 			SetCurrentPCR(handle,avpkt->pts);
 			//printf("push buffer ohne sync PTS %ld\n",avpkt->pts);
 		}
 	}
-
 	ProcessBuffer(decoder->HwDecoder,avpkt);
 	//printf("Trickspeed %d\n",decoder->HwDecoder->TrickSpeed);
 
@@ -1765,7 +1770,6 @@ bool getResolution(char *mode) {
 		printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
 		return;
 	}
-	amlSetInt("/sys/class/video/blackout_policy", 0);
 
 	if (NeedDRM && myKernel == 5) {
 		NeedDRM = 0;
@@ -1783,9 +1787,6 @@ bool getResolution(char *mode) {
 		sprintf(mode,"U:%dx%dp-0\n",VideoWindowWidth,VideoWindowHeight);
 		amlGetString("/sys/class/graphics/fb0/modes",t,sizeof(t)); // need to read the modes first
 		amlSetString("/sys/class/graphics/fb0/mode", mode);
-		amlSetInt("/sys/module/aml_media/parameters/di_debug_flag",0);
-		amlSetString("/sys/class/deinterlace/di0/debug","di_debug_flag0x0");
-		amlSetInt("/sys/module/amvdec_h264/parameters/dec_control",4);
 	}
 
 	fd = open("/dev/fb0", O_RDWR);
@@ -1839,6 +1840,8 @@ bool getResolution(char *mode) {
 		sprintf(mode,"U:%dx%dp-0\n",VideoWindowWidth,VideoWindowHeight);
 		amlGetString("/sys/class/graphics/fb0/modes",t,sizeof(t)); // need to read the modes first
 		amlSetString("/sys/class/graphics/fb0/mode", mode);
+		amlSetInt("/sys/module/aml_media/parameters/di_debug_flag",0);
+		amlSetString("/sys/class/deinterlace/di0/debug","di_debug_flag0x0");
 	}
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
@@ -1888,6 +1891,8 @@ bool getResolution(char *mode) {
 	}
 	amlSetInt("/sys/class/graphics/fb0/blank", 0);
 	amlSetString("/sys/class/amvecm/debug","sr enable");
+	//disable fast POC (picture order count) like done in Kodi
+	amlSetInt("/sys/module/amvdec_h264/parameters/dec_control", 4);
 
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d MPEG2 PIP %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip,use_pip_mpeg2);
@@ -1941,8 +1946,6 @@ extern void DelPip(void);
 
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
-		amlSetInt("/sys/class/video/disable_video",0);
-
 		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
 		amlResume();
 		if (!isPIP) {
@@ -2051,11 +2054,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 	if (!pip) {
 		PIP_allowed = false;
+		amlSetInt("/sys/class/video/disable_video",0);
 	}
-
-	//if (!pip)
- 	//    amlSetInt("/sys/class/video/disable_video",0);
-
+	
 	switch (format)
 	{
 		case Hevc:
@@ -2270,23 +2271,6 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		}
 	}
 
-
-
-
-	//codec_h_control(pcodec->cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)enable);
-	
-
-#if 0
-	// Restore settings that Kodi tramples
-	r = ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEO_DISABLE, (unsigned long)VIDEO_DISABLE_NONE);
-	if (r != 0)
-	{
-		//printf("AMSTREAM_IOC_SET_VIDEO_DISABLE VIDEO_DISABLE_NONE failed.\n");
-	}
-
-#endif
-	//amlSetInt("/sys/class/video/disable_video",0);
-
 	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
 	if (!pip) {
 		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
@@ -2498,15 +2482,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 	uint64_t pts;
 	int len,b2;
 	int pip = hwdecoder->pip;
-	if (doResumeFlag)
-	{
-		//codec_resume(&codecContext);
-		amlResume();
-
-		doResumeFlag = false;
-	}
-
-
 	unsigned char* nalHeader = (unsigned char*)pkt->data;
 	len = pkt->size - 3;
 
@@ -2889,15 +2864,6 @@ if (hwdecoder->TrickSpeed ) {
 			printf("Codec not Supported\n");
 			return;
 	}
-
-
-	if (doPauseFlag)
-	{
-		//codec_pause(&codecContext);
-		//amlCodec.Pause();
-		doPauseFlag = false;
-	}
-
 	//playPauseMutex.Unlock();
 }
 
@@ -2969,14 +2935,14 @@ int WriteData(int handle, unsigned char* data, int length)
 	return ret; //written;
 }
 
+extern char AudioRunning;
 extern char AudioVideoIsReady;
 Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
 	Bool result = true;
-	
 
-    int handle = OdroidDecoders[pip]->handle;
+	int handle = OdroidDecoders[pip]->handle;
 
 	if ((pts) && !pip)
 	{
@@ -2988,8 +2954,6 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 			amlFreerun(1);
 			//amlReset();
 		}
-		if (!AudioVideoIsReady && !ConfigVideoFastSwitch)
-			AudioVideoReady(pts);
 		lpts = pts & 0xffffffff;
 
 		CheckinPts(handle, pts);
@@ -3089,8 +3053,13 @@ void amlReset()
 	if (!isOpen){
 		return;
 	}
-	// set the system blackout_policy to leave the last frame showing
-	//amlSetInt("/sys/class/video/blackout_policy", 0);
+	if (m_PlayMode == 0 && ConfigVideoBlackPicture) {
+		// set the system blackout_policy to show a black frame
+		amlSetInt("/sys/class/video/blackout_policy", 1);
+	} else {
+		// set the system blackout_policy to leave the last frame showing
+		amlSetInt("/sys/class/video/blackout_policy", 0);
+	}
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;
@@ -3107,7 +3076,6 @@ void InternalClose(int pip)
 		Debug(3,"Internal Close mit Handle %d\n",handle);
 		return;
 	}
-	//amlClearVideo();
 
 	r = close(handle);
 	if (r < 0)
@@ -3116,6 +3084,8 @@ void InternalClose(int pip)
 		printf("close handle failed PIP %d\n.",pip);
 		return;
 	}
+	
+
 	if (pip) {
 		if (myKernel == 4) {
 			uint32_t nMode = 1;
@@ -3191,7 +3161,7 @@ int amlFreerun(int val)
 	return 0;
 }
 
-void amlTrickMode(int val)  // unused
+void amlTrickMode(int val)  // used in StillPicture
 {
 	//codecMutex.Lock();
 
@@ -3209,6 +3179,8 @@ void amlTrickMode(int val)  // unused
 	if (r < 0)
 	{
 		printf("AMSTREAM_TRICKMODE failed. %d",val);
+	} else {
+		inTrickModeStillPicture = val;
 		return;
 	}
 }
