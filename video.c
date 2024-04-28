@@ -1318,7 +1318,11 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
-			if (!decoder->HwDecoder->Forward && videoFormat == Avc)  {
+			if ((!decoder->HwDecoder->Forward 
+					|| decoder->HwDecoder->TrickSpeed == 1
+                    || decoder->HwDecoder->TrickSpeed == 3
+                    || decoder->HwDecoder->TrickSpeed == 6)
+					&& videoFormat == Avc)  {
 				amlReset();
 				waiter = decoder->HwDecoder->TrickSpeed == 1 ? 40000:30000;
 			}
