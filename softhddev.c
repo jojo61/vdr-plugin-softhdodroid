@@ -2420,6 +2420,7 @@ int SetPlayMode(int play_mode)
     m_PlayMode = play_mode;
     switch (play_mode) {
         case 0:
+            isRadio=0;
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                Clear();
                MyVideoStream->ClearClose = 0;

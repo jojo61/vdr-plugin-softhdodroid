@@ -176,7 +176,7 @@ static int AudioStereoDescent;          ///< volume descent for stereo
 static int AudioVolume;                 ///< current volume (0 .. 1000)
 static int use_cec = 0;                 /// USe CEC Commands for volup and voldown
 static int AudioCECDev=0;               /// Audio CEC Device Number
-
+       int isRadio = 0;
 extern int VideoAudioDelay;             ///< import audio/video delay
 extern int ConfigVideoFastSwitch;      ///< config fast channel switch
 
@@ -1737,7 +1737,7 @@ void AudioEnqueue(const void *samples, int count)
 {
     size_t n;
     int16_t *buffer;
-    static int isRadio = 0;
+    
     uint64_t vpts;
 #ifdef noDEBUG
     static uint32_t last_tick;
@@ -1814,16 +1814,18 @@ void AudioEnqueue(const void *samples, int count)
                 if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
                     usleep(1000);
                     skip = n;   // Clear all audio until video is avail
+                    isRadio++;
                 }
                 else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
                     skip = n;    // Clear Audio until Video PTS
+                    isRadio=0;
                 } else  {
+                    isRadio=0;
                     int i = 10;
                     while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay )) == 2 && i--) {
                         usleep(3000);
                     }
                 }
-                isRadio++;
             }
             usleep(1000);
         }
