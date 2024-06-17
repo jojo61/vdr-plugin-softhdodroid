@@ -1022,6 +1022,8 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 #include "drm.c"
 
+extern char SuspendMode;
+
  void VideoExit(void) {
 
 	// Restore alpha setting
@@ -1032,8 +1034,10 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
 	//InternalClose(OdroidDecoders[0]->pip);
 
-	VideoThreadExit();
-	sleep(1);
+	if (SuspendMode == 0) {
+		VideoThreadExit();
+		sleep(1);
+	}
 
 	for (int i = 0; i < OdroidDecoderN; ++i) {
         if (OdroidDecoders[i]) {

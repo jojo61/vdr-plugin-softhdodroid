@@ -170,7 +170,7 @@ static volatile int DoMakePrimary;      ///< switch primary device to this
 #define NOT_SUSPENDED       0           ///< not suspend mode
 #define SUSPEND_NORMAL      1           ///< normal suspend mode
 #define SUSPEND_DETACHED    2           ///< detached suspend mode
-static signed char SuspendMode;         ///< suspend mode
+       signed char SuspendMode;         ///< suspend mode
 
 //////////////////////////////////////////////////////////////////////////////
 
