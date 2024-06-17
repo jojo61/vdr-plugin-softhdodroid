@@ -2576,8 +2576,8 @@ void Freeze(void)
 */
 void Mute(void)
 {
-    SkipAudio = 1;
-    AudioFlushBuffers();
+    //SkipAudio = 1;
+    //AudioFlushBuffers();
     //AudioSetVolume(0);
 }
 
