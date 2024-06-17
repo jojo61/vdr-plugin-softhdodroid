@@ -3273,3 +3273,9 @@ int PipPlayVideo(const uint8_t * data, int size)
 {
     return PlayVideo3(PipVideoStream, data, size);
 }
+
+int IsReplay(void)
+{
+    return !AudioSyncStream || AudioSyncStream->ClearClose;
+}
+

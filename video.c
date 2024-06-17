@@ -126,6 +126,7 @@ pthread_mutex_t OSDMutex;               ///< OSD update mutex
 int VideoAudioDelay;
 ///<current play mode
 extern int m_PlayMode;
+extern int IsReplay(void);
 
 ///< config values
 extern int ConfigVideoFastSwitch;
@@ -1751,7 +1752,7 @@ bool getResolution(char *mode) {
 		return;
 	}
 
-	VideoSetFastSwitch(ConfigVideoFastSwitch);
+	//VideoSetFastSwitch(ConfigVideoFastSwitch);
 	VideoSetBrightness(ConfigVideoBrightness);
 	VideoSetContrast(ConfigVideoContrast);
 
@@ -2060,9 +2061,13 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 
 	estimatedNextPts = 0;
 
+	VideoSetFastSwitch(IsReplay() ? 1 : ConfigVideoFastSwitch);
+
 	if (!pip) {
 		PIP_allowed = false;
-		amlSetInt("/sys/class/video/disable_video",0);
+		if (m_PlayMode != 0) {
+			amlSetInt("/sys/class/video/disable_video",0);
+		}
 	}
 	
 	switch (format)
