@@ -2838,7 +2838,8 @@ const char *CommandLineHelp(void)
         "  -s\t\tstart in suspended mode\n"
         "  -D\t\tstart in detached mode\n"
         "  -w workaround\tenable/disable workarounds\n"
-        "     alsa-no-close-open\tdisable close open to fix alsa no sound bug\n";
+        "     alsa-no-close-open\tdisable close open to fix alsa no sound bug\n"
+        "     use-spdif\tuse spdif instead of the default spdif_b\n";
      
         
 }
@@ -2891,6 +2892,9 @@ int ProcessArgs(int argc, char *const argv[])
             case 'w': // workarounds
                 if (!strcasecmp("alsa-no-close-open", optarg)) {
                     AudioAlsaNoCloseOpen = 1;
+                }
+                if (!strcasecmp("use-spdif", optarg)) {
+                    UseAudioSpdif = 1;
                 }
                 continue;
             case EOF:
