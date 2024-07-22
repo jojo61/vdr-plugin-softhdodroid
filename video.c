@@ -116,6 +116,12 @@ int locale_dot=0;
 int myKernel,myMajor,myMinor;
 
 
+#ifdef PERFTEST
+uint64_t last_time = 0,firstvpts,firstapts;
+#endif
+
+
+
 static pthread_t VideoThread;           ///< video decode thread
 //static pthread_cond_t VideoWakeupCond;  ///< wakeup condition variable
 //static pthread_mutex_t VideoMutex;      ///< video condition mutex
@@ -201,6 +207,8 @@ int inwrap=0;
 uint64_t TrickPTS;
 int myTrickSpeed= 0;
 int inTrickModeStillPicture = 0;
+int ratio;
+int pip_ratio;
 
 AVRational timeBase;
 
@@ -1276,7 +1284,13 @@ void ProcessClockBuffer(int handle)
 			inwrap=0;
 			Debug(3,"ende inwrap \n");
 		}
-
+#ifdef PERFTEST
+		if (last_time) {
+			printf("Channelswitch in %ld ms ",(GetusTicks() - last_time) / 1000);
+			printf("vpts   %#012" PRIx64 " apts %#012" PRIx64 " diff %dms \n", firstvpts,firstapts,(int)(firstapts-firstvpts)/90);
+			last_time = firstvpts = firstapts = 0;
+		}
+#endif
 		pts = (pts + VideoAudioDelay) & 0xffffffff;
 		//printf("pts   %#012" PRIx64 "  %#012" PRIx64 "  %#012" PRIx64 "  \n",pts, apts,vpts);
 		double drift = ((double)vpts - (double)pts) / (double)PTS_FREQ;
@@ -1722,7 +1736,6 @@ bool getResolution(char *mode) {
 #define FBIOGET_OSD_DMABUF               0x46fc
 
 
-
  void VideoInit(const char *i)
 {
 
@@ -1732,6 +1745,9 @@ bool getResolution(char *mode) {
 
 	timeBase.num = 1;
 	timeBase.den = 90000;
+	ratio = -1;
+	pip_ratio = -1;
+	hasVideo = 0;
 
 	getKernelVersion();
 
@@ -1906,6 +1922,7 @@ bool getResolution(char *mode) {
 	GetApiLevel();
 	Debug(3,"aml ApiLevel = %d  Screen %d-%d using OSD dma: %s H264-PIP: %d MPEG2 PIP %d\n",apiLevel,VideoWindowWidth,VideoWindowHeight,(DmaBufferHandle >= 0) ? "yes": "no",use_pip,use_pip_mpeg2);
 	ClearDisplay();
+	
 	// Load_Lut();
 };
 
@@ -2284,32 +2301,6 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 		}
 	}
 
-	uint32_t screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
-	if (!pip) {
-		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
-	} else {
-		r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &screenMode);
-		//screenMode = (uint32_t) VIDEO_DISABLE_NONE;
-		//r |= ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &screenMode);
-	}
-	if (r != 0)
-	{
-		printf("AMSTREAM_IOC_SET_SCREEN_MODE VIDEO_WIDEOPTION_NORMAL failed");
-		return;
-	}
-#if 0
-	if (pip) {
-		int res;
-		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_GET_VIDEO_OUTPUT, &res);
-		printf("Videooutput %d\n",res);
-		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_SET_VIDEOPIP_OUTPUT, 1);
-		ioctl(cntl_handle, AMSTREAM_IOC_GLOBAL_GET_VIDEOPIP_OUTPUT, &res);
-		printf("VideoPIPoutput %d\n",res);
-		ioctl(cntl_handle, AMSTREAM_IOC_GET_PIP_ZORDER, &res);
-		printf("VideoPIPZorder %d\n",res);
-	}
-#endif
-
 	isOpen = true;
 }
 
@@ -2490,8 +2481,6 @@ void SetCrop(int codec) {
 void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 {
 	//playPauseMutex.Lock();
-	static int ratio=3;
-	uint32_t screenMode;
 	uint64_t pts;
 	int len,b2;
 	int pip = hwdecoder->pip;
@@ -2500,6 +2489,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 
 	if (isFirstVideoPacket)
 	{
+
 #if 0
 		printf("Header (pkt.size=%x):\n", pkt->size);
 		for (int j = 0; j < 16; ++j)	//nalHeaderLength
@@ -2521,7 +2511,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			isAnnexB = true;
 			isShortStartCode = false;
 		}
-		ratio=3;
+		
 
 #if 1
 		switch(hwdecoder->Format) {
@@ -2631,109 +2621,28 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 		}
 
 		//amlCodec.SetSyncThreshold(pts);
-
+#ifdef PERFTEST
+		if (last_time) {
+			printf("Channelswitch to first video chunk %ld ms\n",(GetusTicks() - last_time) / 1000);
+		}
+		firstvpts = pkt->pts;
+#endif
 		isFirstVideoPacket = false;
 
 	}
-	else {
-		if (hwdecoder->Format == Mpeg2 && !pip &&
-			nalHeader[0] == 0 &&
-			nalHeader[1] == 0 &&
-			nalHeader[2] == 1 &&
-			nalHeader[3] == 0xb3) {						// Sequence Header
+	if (hwdecoder->Format == Mpeg2 &&
+		nalHeader[0] == 0 &&
+		nalHeader[1] == 0 &&
+		nalHeader[2] == 1 &&
+		nalHeader[3] == 0xb3) {					// Sequence Header
 			int r = (nalHeader[7] >> 4) & 0x0f;  		// Get Ratio
-			//printf("Got Ratio %d\n",r);
-			if (r == 2 && r != ratio) {
-				//printf("Set Ratio %d\n",r);
-				ratio = 2;
-				screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3;
-				ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
-			} else if (r == 3 && r != ratio) {
-				//printf("Set Ratio %d\n",r);
-				ratio = 3;
-				screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
-				ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
-			}
-		}
+			if (pip ? pip_ratio : ratio != r)
+				SetScreenMode(r, pip);
 	}
-
-#if 0
-nalHeader = (unsigned char*)pkt->data;
-	len = pkt->size - 3;
-if (hwdecoder->TrickSpeed ) {
-	//Debug(3,"Check in  PTS  %#012" PRIx64 "\n",pkt->pts);
-	switch(hwdecoder->Format) {
-			case Hevc:
-						{
-							int nal_unit_type;
-
-							while (len--) {
-								if (nalHeader[0] == 0 &&
-									nalHeader[1] == 0 &&
-									nalHeader[2] == 1) {
-										nal_unit_type = ((nalHeader[3] >> 1)  & 0x3f);  		// Get Frame Type
-										printf("HEVC Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
-										if (nal_unit_type != 0x20) {
-											nalHeader++;
-											continue;
-										}
-										else {
-											break;
-										}
-								}
-								else {
-									nalHeader++;										// wait for I-Frame
-								}
-							}
-							if (len <= 0) {
-								//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
-								//return;
-							}
-							else {
-								//printf("H265 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
-							}
-						}
-						break;
-			case Avc:
-			{
-				int nal_unit_type;
-				nalHeader = (unsigned char*)pkt->data;
-				//printf("start with len %d\n",pkt->size);
-				while (len--) {
-					if (nalHeader[0] == 0 &&
-						nalHeader[1] == 0 &&
-						nalHeader[2] == 1) {
-							nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
-							printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
-							if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
-								nalHeader++;
-								continue;
-
-							}
-							else {
-								nalHeader++;
-								continue;
-							}
-					}
-					else {
-						nalHeader++;										// wait for I-Frame
-					}
-				}
-				if (len <= 0) {
-					//printf("No I-Frame found PTS:%04lx len %d (%d) -> %d\n",pkt->pts,len,pkt->size,nal_unit_type);
-				}
-				else {
-					//printf("H264 Unit Type %d  PTS %04lx\n",nal_unit_type,pkt->pts);
-				}
-			}
-			break;
-			default:
-				break;
-
+	else if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
+		if (pip ? pip_ratio : ratio != 3)
+			SetScreenMode(3, pip);
 	}
-	printf("\n");
-}
-#endif
 
 	pts = 0;
 
@@ -3066,9 +2975,13 @@ void amlReset()
 	if (!isOpen){
 		return;
 	}
+#ifdef PERFTEST
+	last_time = GetusTicks();
+#endif
 	if (m_PlayMode == 0 && ConfigVideoBlackPicture) {
 		// set the system blackout_policy to show a black frame
 		amlSetInt("/sys/class/video/blackout_policy", 1);
+		
 	} else {
 		// set the system blackout_policy to leave the last frame showing
 		amlSetInt("/sys/class/video/blackout_policy", 0);
@@ -3154,23 +3067,12 @@ void amlSetVideoAxis(int pip, int x, int y, int width, int height)
 
 int amlFreerun(int val)
 {
-	//codecMutex.Lock();
-
-	if (!isOpen)
-	{
-		//codecMutex.Unlock();
-		//printf("The codec is not open. %s\n",__FUNCTION__);
-		return 1;
-	}
-	int r = ioctl(cntl_handle, AMSTREAM_IOC_SET_FREERUN_MODE,(unsigned long)val);
-	//int r = ioctl(cntl_handle, AMSTREAM_IOC_TRICKMODE ,val);
-	//codecMutex.Unlock();
-
-	if (r < 0)
-	{
-		printf("AMSTREAM_FREERUN failed. %d",val);
-		return 1;
-	}
+/*
+	During replay actions it can happen that the device is after
+	a Clear() not fast enough open, because amlReset calls InternalClose/InternalOpen.
+	Using the sysfs call instead of an ioctl fixes this issue
+*/
+	amlSetInt("/sys/class/video/freerun_mode", val);
 	return 0;
 }
 
@@ -3396,6 +3298,41 @@ void getKernelVersion() {
 
 }
 
+void SetScreenMode(int aspect, int pip)
+{
+	uint32_t screenMode;
+	int r;
+
+	if (!isOpen) {
+		printf("The codec is not open. %s\n",__FUNCTION__);
+		return;
+	}
+	if (aspect == 3) {
+		screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
+	} else {
+		screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3;
+	}
+
+	if (pip) {
+		if (aspect != pip_ratio) {
+			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &screenMode);
+			if (r != 0) {
+				Debug(3, "AMSTREAM_IOC_SET_PIP_SCREEN_MODE failed, errno=%d", errno);
+			} else {
+				pip_ratio = aspect;
+			}
+		}
+	} else {
+		if (aspect != ratio) {
+			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
+			if (r != 0) {
+				Debug(3, "AMSTREAM_IOC_SET_SCREEN_MODE failed, errno=%d", errno);
+			} else {
+				ratio = aspect;
+			}
+		}
+	}
+}
 #if 0
 void amlClearVideo()
 {

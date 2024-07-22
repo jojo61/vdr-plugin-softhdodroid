@@ -202,6 +202,7 @@ extern int VideoAudioDelay;             ///< audio/video delay
 extern char ConfigStartX11Server;       ///< flag start the x11 server
 extern char MyConfigDir[];
 extern int myKernel,myMajor,myMinor;
+extern int hasVideo;
 
 //----------------------------------------------------------------------------
 //  Prototypes
@@ -393,4 +394,6 @@ extern void InternalOpen(VideoHwDecoder *, int, double );
 extern void ProcessBuffer(VideoHwDecoder *, const AVPacket* );
 extern int SendCodecData(int , uint64_t , unsigned char* , int );
 extern void getKernelVersion();
+extern void SetScreenMode(int, int);
+
 /// @}

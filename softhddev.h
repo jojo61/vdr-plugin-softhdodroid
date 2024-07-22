@@ -108,6 +108,8 @@ extern "C"
     extern void PipStop(void);
     /// Pip play video packet
     extern int PipPlayVideo(const uint8_t *, int);
+    /// Check if Replay
+    extern int IsReplay(void);
     #ifdef __cplusplus
 }
 #endif

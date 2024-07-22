@@ -76,6 +76,7 @@ static pthread_mutex_t SuspendLockMutex;    ///< suspend lock mutex
 
 static volatile char StreamFreezed;     ///< stream freezed
 int m_PlayMode;                         ///<current play mode
+int hasVideo;                            /// stream has Video
 
 //////////////////////////////////////////////////////////////////////////////
 //  Audio
@@ -1013,7 +1014,7 @@ int PlayAudio(const uint8_t * data, int size, uint8_t id)
     if (NewAudioStream) {
         // this clears the audio ringbuffer indirect, open and setup does it
         CodecAudioClose(MyAudioDecoder);
-        AudioFlushBuffers();
+        //AudioFlushBuffers();
         AudioSetBufferTime(ConfigAudioBufferTime);
         AudioCodecID = AV_CODEC_ID_NONE;
         AudioChannelID = -1;
@@ -1244,7 +1245,7 @@ int PlayTsAudio(const uint8_t * data, int size)
     if (NewAudioStream) {
         // this clears the audio ringbuffer indirect, open and setup does it
         CodecAudioClose(MyAudioDecoder);
-        AudioFlushBuffers();
+        //AudioFlushBuffers();
         // max time between audio packets 200ms + 24ms hw buffer
         AudioSetBufferTime(ConfigAudioBufferTime);
         AudioCodecID = AV_CODEC_ID_NONE;
@@ -2122,6 +2123,7 @@ int PlayVideo3(VideoStream * stream, const uint8_t * data, int size)
     int z;
     int l;
     
+    hasVideo = 1;
 
     if (!stream->Decoder) {             // no x11 video started
         return size;
@@ -2420,7 +2422,7 @@ int SetPlayMode(int play_mode)
     m_PlayMode = play_mode;
     switch (play_mode) {
         case 0:
-            isRadio=0;
+            hasVideo = 0;
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                Clear();
                MyVideoStream->ClearClose = 0;
