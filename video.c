@@ -1286,8 +1286,8 @@ void ProcessClockBuffer(int handle)
 		}
 #ifdef PERFTEST
 		if (last_time) {
-			printf("Channelswitch in %ld ms ",(GetusTicks() - last_time) / 1000);
-			printf("vpts   %#012" PRIx64 " apts %#012" PRIx64 " diff %dms \n", firstvpts,firstapts,(int)(firstapts-firstvpts)/90);
+			printf("Channelswitch in %ld ms \n",(GetusTicks() - last_time) / 1000);
+			//printf("firstvpts  %#012" PRIx64 "  apts %#012" PRIx64 " diff %dms \n", firstvpts,firstapts,(int)(firstapts-firstvpts)/90);
 			last_time = firstvpts = firstapts = 0;
 		}
 #endif
@@ -2616,8 +2616,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			lpts=0;
 			inwrap=0;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
-			uint64_t dpts = pkt->pts & 0xffffffff;
-			SetCurrentPCR(hwdecoder->handle,dpts);
+			//uint64_t dpts = pkt->pts & 0xffffffff;
+			//SetCurrentPCR(hwdecoder->handle,dpts);
 		}
 
 		//amlCodec.SetSyncThreshold(pts);

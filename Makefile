@@ -14,6 +14,7 @@
 
 
 CONFIG :=  -DDEBUG 		# remove # to enable debug output
+#CONFIG +=  -DPERFTEST
 
 
 # set to 1 if build in Kodi environment

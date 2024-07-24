@@ -180,7 +180,7 @@ extern int VideoAudioDelay;             ///< import audio/video delay
 extern int ConfigVideoFastSwitch;      ///< config fast channel switch
 
 /// default ring buffer size ~2s 8ch 16bit (3 * 5 * 7 * 8)
-static const unsigned AudioRingBufferSize = 3 * 5 * 7 * 8 * 2 * 1000;
+static const unsigned AudioRingBufferSize = 3 * 5 * 7 * 8 * 1000;
 
 static int AudioChannelsInHw[9];        ///< table which channels are supported
 enum _audio_rates
@@ -621,7 +621,7 @@ static void AudioResample(const int16_t * in, int in_chan, int frames, int16_t *
 //  ring buffer
 //----------------------------------------------------------------------------
 
-#define AUDIO_RING_MAX 8                ///< number of audio ring buffers
+#define AUDIO_RING_MAX 4                ///< number of audio ring buffers
 
 /**
 **	Audio ring buffer.
@@ -645,6 +645,7 @@ static int AudioRingWrite;              ///< audio ring write pointer
 static int AudioRingRead;               ///< audio ring read pointer
 static atomic_t AudioRingFilled;        ///< how many of the ring is used
 static unsigned AudioStartThreshold;    ///< start play, if filled
+char AudioTemp[200 * 1024];               /// Temp Buffer for playout
 
 /**
 **	Add sample-rate, number of channels change to ring.
@@ -781,10 +782,14 @@ static int AlsaPlayRingbuffer(void)
 {
     int first;
 
+#ifdef PERFTEST
+    static uint64_t mytime=0;
+#endif
+
     first = 1;
     for (;;) {                          // loop for ring buffer wrap
         int avail;
-        int n;
+        int n,m,wrap;
         int err;
         int frames;
         const void *p;
@@ -825,8 +830,14 @@ static int AlsaPlayRingbuffer(void)
             Debug(4, "audio: break state '%s'\n", snd_pcm_state_name(snd_pcm_state(AlsaPCMHandle)));
             break;
         }
-
+        m = RingBufferUsedBytes(AudioRing[AudioRingRead].RingBuffer);
         n = RingBufferGetReadPointer(AudioRing[AudioRingRead].RingBuffer, &p);
+        if (m != n) {
+            wrap = 1;
+            n = m;
+        } else {   
+            wrap = 0;
+        }
         if (!n) {                       // ring buffer empty
             if (first) {                // only error on first loop
                 Debug(4, "audio: empty buffers %d\n", avail);
@@ -842,6 +853,10 @@ static int AlsaPlayRingbuffer(void)
         if (!avail) {                   // full or buffer empty
             break;
         }
+        if (wrap) {
+            avail = RingBufferRead(AudioRing[AudioRingRead].RingBuffer,&AudioTemp[0],avail);
+            p = &AudioTemp[0];
+        }
         // muting pass-through AC-3, can produce disturbance
         if (AudioMute || (AudioSoftVolume && !AudioRing[AudioRingRead].Passthrough)) {
             // FIXME: quick&dirty cast
@@ -849,6 +864,7 @@ static int AlsaPlayRingbuffer(void)
             // FIXME: if not all are written, we double amplify them
         }
         frames = snd_pcm_bytes_to_frames(AlsaPCMHandle, avail);
+        
 #ifdef DEBUG
         if (avail != snd_pcm_frames_to_bytes(AlsaPCMHandle, frames)) {
             Error(_("audio: bytes lost -> out of sync\n"));
@@ -856,6 +872,13 @@ static int AlsaPlayRingbuffer(void)
 #endif
 
         for (;;) {
+#ifdef PERFTEST1
+    
+   // if (((GetusTicks()-mytime) / 1000) > 20) {
+        printf("Ring %d avail %d n %d frames %d Audio diff %ldms \n ",AudioRingRead,avail,n,frames,(GetusTicks()-mytime) / 1000);
+   // }
+    mytime = GetusTicks();
+#endif
             if (AlsaUseMmap) {
                 err = snd_pcm_mmap_writei(AlsaPCMHandle, p, frames);
             } else {
@@ -886,7 +909,8 @@ static int AlsaPlayRingbuffer(void)
             }
             break;
         }
-        RingBufferReadAdvance(AudioRing[AudioRingRead].RingBuffer, avail);
+        if (!wrap) 
+            RingBufferReadAdvance(AudioRing[AudioRingRead].RingBuffer, avail);
         first = 0;
 
     }
@@ -1730,6 +1754,7 @@ extern uint64_t firstapts;
 #endif
 extern int SetCurrentPCR(int , uint64_t );
 extern int hasVideo;
+extern uint64_t last_time;
 /**
 **	Place samples in audio output queue.
 **
@@ -1742,6 +1767,15 @@ void AudioEnqueue(const void *samples, int count)
     int16_t *buffer;
     
     uint64_t vpts;
+    
+#ifdef PERFTEST1
+    static uint64_t mytime;
+    if (((GetusTicks()-mytime) / 1000) > 120 || count < 4608) {
+        printf("Count %d Enqueue diff %ldms\n",count,(GetusTicks()-mytime) / 1000);
+    }
+    mytime = GetusTicks();
+#endif
+
 #ifdef noDEBUG
     static uint32_t last_tick;
     uint32_t tick;
@@ -1815,10 +1849,15 @@ void AudioEnqueue(const void *samples, int count)
             if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
                 //usleep(1000);
                 skip = n;   // Clear all audio until video is avail
+                //printf("%d No PTS in %ld ms \n",n,(GetusTicks() - last_time) / 1000);
             }
             else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
                 skip = n;    // Clear Audio until Video PTS
+                //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
             }
+            //else {
+                //printf("store %ld of %d Audio in %ld ms \n",n,AudioStartThreshold,(GetusTicks() - last_time) / 1000);
+            //}
 #if 0
             else {
                 //printf("AudioEnque: SetCurrentPCR %#012" PRIx64 "\n", AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay);
@@ -1865,7 +1904,8 @@ void AudioEnqueue(const void *samples, int count)
                 }
 #ifdef PERFTEST
                 firstapts =  (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay );
-                printf("AVR %d new firstapts  %#012" PRIx64 " \n",AudioVideoIsReady,firstapts);
+                //printf("AVR %d new firstapts  %#012" PRIx64 " \n",AudioVideoIsReady,firstapts);
+                printf("Set PCR PTS in %ld ms \n",(GetusTicks() - last_time) / 1000);
 #endif
             }
 #endif
