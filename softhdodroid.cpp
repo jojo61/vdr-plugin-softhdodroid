@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "4.15"
+static const char *const VERSION = "4.16"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -1363,7 +1363,6 @@ void cMenuSetupSoft::Store(void)
     VideoSetStudioLevels(ConfigVideoStudioLevels);
     SetupStore("BlackPicture", ConfigVideoBlackPicture = BlackPicture);
     SetupStore("FastSwitch", ConfigVideoFastSwitch = FastSwitch);
-    VideoSetFastSwitch(ConfigVideoFastSwitch);
     SetupStore("Brightness", ConfigVideoBrightness = Brightness);
     VideoSetBrightness(ConfigVideoBrightness);
     SetupStore("Contrast", ConfigVideoContrast = Contrast);

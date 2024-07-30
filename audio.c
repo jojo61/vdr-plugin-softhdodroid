@@ -1767,6 +1767,7 @@ void AudioEnqueue(const void *samples, int count)
     int16_t *buffer;
     
     uint64_t vpts;
+    static int sw=0;
     
 #ifdef PERFTEST1
     static uint64_t mytime;
@@ -1853,7 +1854,13 @@ void AudioEnqueue(const void *samples, int count)
             }
             else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
                 skip = n;    // Clear Audio until Video PTS
-                //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
+#ifdef PERFTEST
+                if (!sw) {
+                   //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
+                   printf("Audio vorlauf ist %ldms \n",(vpts - AudioRing[AudioRingWrite].PTS) / 90);
+                   sw = 1;
+                }
+#endif
             }
             //else {
                 //printf("store %ld of %d Audio in %ld ms \n",n,AudioStartThreshold,(GetusTicks() - last_time) / 1000);
@@ -1906,6 +1913,7 @@ void AudioEnqueue(const void *samples, int count)
                 firstapts =  (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay );
                 //printf("AVR %d new firstapts  %#012" PRIx64 " \n",AudioVideoIsReady,firstapts);
                 printf("Set PCR PTS in %ld ms \n",(GetusTicks() - last_time) / 1000);
+                sw = 0;
 #endif
             }
 #endif
@@ -1928,8 +1936,8 @@ void AudioEnqueue(const void *samples, int count)
 */
 void AudioVideoReady(uint64_t pts)
 {
-    int64_t audio_pts;
-    size_t used;
+    //int64_t audio_pts;
+    //size_t used;
 
     if (AudioVideoIsReady) {
         return;

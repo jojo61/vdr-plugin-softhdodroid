@@ -194,7 +194,6 @@ bool isAnnexB = false;
 bool isShortStartCode = false;
 bool isExtraDataSent = false;
 uint64_t FirstVPTS;
-uint64_t estimatedNextPts = 0;
 int Hdr2Sdr = 0;
 int NoiseReduction = 1;
 int use_pip=0,use_pip_mpeg2=0;
@@ -209,6 +208,7 @@ int myTrickSpeed= 0;
 int inTrickModeStillPicture = 0;
 int ratio;
 int pip_ratio;
+int CurrentSyncThresh;
 
 AVRational timeBase;
 
@@ -249,9 +249,17 @@ int VideoSetGeometry(const char *geometry) {
     return 0;
 }
 
-/// Set fast channel switch.
- void VideoSetFastSwitch(int ConfigVideoFastSwitch) {
-	amlSetInt("/sys/class/tsync/slowsync_enable",ConfigVideoFastSwitch);
+/// Set syncthresh
+ void VideoSetSyncThresh(int SyncThresh) {
+	 //codec_set_cntl_syncthresh: "Set sync threshold control which defines the starting system time (hold video or not) when playing" 
+	if (CurrentSyncThresh != SyncThresh) {
+		int r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCTHRESH, (unsigned long) SyncThresh);
+		if (r != 0)	{
+			printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
+			return;
+		}
+		CurrentSyncThresh = SyncThresh;
+	}
 };
 
 /// Set brightness adjustment.
@@ -1287,7 +1295,7 @@ void ProcessClockBuffer(int handle)
 #ifdef PERFTEST
 		if (last_time) {
 			printf("Channelswitch in %ld ms \n",(GetusTicks() - last_time) / 1000);
-			//printf("firstvpts  %#012" PRIx64 "  apts %#012" PRIx64 " diff %dms \n", firstvpts,firstapts,(int)(firstapts-firstvpts)/90);
+			printf("firstvpts  %#012" PRIx64 "  apts %#012" PRIx64 " diff %dms \n", firstvpts,firstapts,(int)(firstapts-firstvpts)/90);
 			last_time = firstvpts = firstapts = 0;
 		}
 #endif
@@ -1313,7 +1321,6 @@ void ProcessClockBuffer(int handle)
 
 	}
 
-extern char AudioRunning;
 extern char AudioVideoIsReady;
 void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 {
@@ -1325,15 +1332,11 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 		return;
 	}
 	if (!decoder->HwDecoder->TrickSpeed) {
-		ProcessClockBuffer(handle);
-		TrickPTS=0;
-		if (!AudioRunning && ConfigVideoFastSwitch && !inTrickModeStillPicture) {
-			//printf("CodecVideoDecode: wait until AudioRunning\n");
-             		return;
-		}
-		if (!AudioVideoIsReady && !ConfigVideoFastSwitch) {
+		if (!AudioVideoIsReady) {
 			AudioVideoReady(avpkt->pts);
 		}
+		ProcessClockBuffer(handle);
+		TrickPTS=0;
 	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
@@ -1748,6 +1751,7 @@ bool getResolution(char *mode) {
 	ratio = -1;
 	pip_ratio = -1;
 	hasVideo = 0;
+	CurrentSyncThresh = -1;
 
 	getKernelVersion();
 
@@ -1768,9 +1772,10 @@ bool getResolution(char *mode) {
 		return;
 	}
 
-	//VideoSetFastSwitch(ConfigVideoFastSwitch);
 	VideoSetBrightness(ConfigVideoBrightness);
 	VideoSetContrast(ConfigVideoContrast);
+	
+	amlSetInt("/sys/class/tsync/slowsync_enable",0); //fix in case previous plugin version set this to 1
 
 	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCENABLE, (unsigned long)1);
 	if (r != 0)
@@ -1786,14 +1791,6 @@ bool getResolution(char *mode) {
 			//codecMutex.Unlock();
 			printf("AMSTREAM_IOC_AVTHRESH failed.\n");
 			return;
-	}
-
-	r = ioctl(cntl_handle, AMSTREAM_IOC_SYNCTHRESH, (unsigned long)1);
-	if (r != 0)
-	{
-		//codecMutex.Unlock();
-		printf("AMSTREAM_IOC_SYNCTHRESH failed.\n");
-		return;
 	}
 
 	if (NeedDRM && myKernel == 5) {
@@ -1970,6 +1967,8 @@ extern void DelPip(void);
 		InternalClose(pip);
 	}
 
+	amlSetInt("/sys/class/video/disable_video",0);
+	
 	InternalOpen (decoder->HwDecoder,videoFormat, FrameRate);
 	if (!pip) {
 		//SetCurrentPCR(decoder->HwDecoder->handle,avpkt->pts);
@@ -2076,15 +2075,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	vformat_t amlFormat = (vformat_t)0;
 	dec_sysinfo_t am_sysinfo = { 0 };
 
-	estimatedNextPts = 0;
 
-	VideoSetFastSwitch(IsReplay() ? 1 : ConfigVideoFastSwitch);
+	VideoSetSyncThresh(IsReplay() ? 0 : ConfigVideoFastSwitch ? 0 : 1);
 
 	if (!pip) {
 		PIP_allowed = false;
-		if (m_PlayMode != 0) {
-			amlSetInt("/sys/class/video/disable_video",0);
-		}
 	}
 	
 	switch (format)
@@ -2650,8 +2645,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 	{
 		double timeStamp = av_q2d(timeBase) * pkt->pts;
 		pts = (uint64_t)(timeStamp * PTS_FREQ);
-
-		estimatedNextPts = pkt->pts + 3600; // pkt->duration;
 		lastTimeStamp = timeStamp;
 	}
 
@@ -2857,8 +2850,6 @@ int WriteData(int handle, unsigned char* data, int length)
 	return ret; //written;
 }
 
-extern char AudioRunning;
-extern char AudioVideoIsReady;
 Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 {
 	//printf("AmlVideoSink: SendCodecData - pts=%lu, data=%p, length=0x%x\n", pts, data, length);
@@ -2989,7 +2980,6 @@ void amlReset()
 	InternalClose(0);
 	FirstVPTS = AV_NOPTS_VALUE;
 	isFirstVideoPacket = true;
-	estimatedNextPts = 0;
 	InternalOpen(OdroidDecoders[0], videoFormat,FrameRate);
 }
 
