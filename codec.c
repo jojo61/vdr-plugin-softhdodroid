@@ -612,7 +612,7 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
     int err;
 
     audio_ctx = audio_decoder->AudioCtx;
-    Debug(3, "codec/audio:Chanlayout %lx  format change %s %dHz *%d Codec ID %d channels%s%s%s%s%s\n",audio_ctx->channel_layout,
+    Debug(3, "codec/audio:Chanlayout %lx  Downmix %d format change %s %dHz *%d Codec ID %d channels%s%s%s%s%s\n",audio_ctx->channel_layout,CodecDownmix,
         av_get_sample_fmt_name(audio_ctx->sample_fmt), audio_ctx->sample_rate, audio_ctx->channels,
         audio_ctx->codec_id,
         CodecPassthrough & CodecPCM ? " PCM" : "", CodecPassthrough & CodecMPA ? " MPA" : "",
@@ -621,7 +621,7 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
 
     *passthrough = 0;
     audio_decoder->SampleRate = audio_ctx->sample_rate;
-    audio_decoder->HwSampleRate = audio_ctx->sample_rate;
+    audio_decoder->HwSampleRate = audio_ctx->sample_rate < 44100 ? 48000 : audio_ctx->sample_rate;
     audio_decoder->Channels = audio_ctx->channels;
     audio_decoder->HwChannels = CodecDownmix ? 2 : audio_ctx->channels;
     audio_decoder->Passthrough = CodecPassthrough;
@@ -938,7 +938,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 #else
     audio_decoder->Resample = swr_alloc();
     av_opt_set_channel_layout(audio_decoder->Resample, "in_channel_layout",audio_ctx->channel_layout, 0);
-    av_opt_set_channel_layout(audio_decoder->Resample, "out_channel_layout", CodecDownmix ? AV_CH_LAYOUT_STEREO : audio_ctx->channel_layout,  0);
+    av_opt_set_channel_layout(audio_decoder->Resample, "out_channel_layout", CodecDownmix ? AV_CHANNEL_LAYOUT_STEREO_DOWNMIX : audio_ctx->channel_layout,  0);
     av_opt_set_int(audio_decoder->Resample, "in_sample_rate",     audio_ctx->sample_rate,                0);
     av_opt_set_int(audio_decoder->Resample, "out_sample_rate",    audio_ctx->sample_rate,                0);
     av_opt_set_sample_fmt(audio_decoder->Resample, "in_sample_fmt",  audio_ctx->sample_fmt, 0);
@@ -967,15 +967,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 void CodecAudioDecode(AudioDecoder * audio_decoder, const AVPacket * avpkt)
 {
     AVCodecContext *audio_ctx = audio_decoder->AudioCtx;
-#if 0
-    int ret = write(audio_decoder->handle, avpkt->data, avpkt->size);
 
-    if (avpkt->pts != (int64_t) AV_NOPTS_VALUE) {
-        CheckinPts(audio_decoder->handle, avpkt->pts);
-        printf("pts %lx\n",avpkt->pts);
-    }
-    //return;
-#endif 
     if (audio_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
         int ret;
         AVPacket pkt[1];
@@ -1010,6 +1002,7 @@ void CodecAudioDecode(AudioDecoder * audio_decoder, const AVPacket * avpkt)
                 CodecAudioUpdateFormat(audio_decoder);
             }
             if (!audio_decoder->HwSampleRate || !audio_decoder->HwChannels) {
+                printf("unsupported sample format\n");
                 return;                 // unsupported sample format
             }
             if (CodecAudioPassthroughHelper(audio_decoder, avpkt)) {

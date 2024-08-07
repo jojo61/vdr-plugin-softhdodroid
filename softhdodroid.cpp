@@ -1137,12 +1137,12 @@ void cMenuSetupSoft::Create(void)
        		
         Add(new cMenuEditBoolItem(tr("Pass-through default"), &AudioPassthroughDefault, trVDR("off"), trVDR("on")));
 		if (AudioPassthroughDefault) {
-        	Add(new cMenuEditBoolItem(tr("\040\040PCM pass-through"), &AudioPassthroughPCM, trVDR("no"), trVDR("yes")));
+        	Add(new cMenuEditBoolItem(tr("\040\040PCM 5.1 pass-through"), &AudioPassthroughPCM, trVDR("no"), trVDR("yes")));
         	Add(new cMenuEditBoolItem(tr("\040\040AC-3 pass-through"), &AudioPassthroughAC3, trVDR("no"), trVDR("yes")));
         	Add(new cMenuEditBoolItem(tr("\040\040E-AC-3 pass-through"), &AudioPassthroughEAC3, trVDR("no"),trVDR("yes")));
 		} else {
-        	Add(new cMenuEditBoolItem(tr("Enable (E-)AC-3 (decoder) downmix"), &AudioDownmix, trVDR("no"), trVDR("yes")));
-		}
+            Add(new cMenuEditBoolItem(tr("Enable 5.1 to Stereo downmix"), &AudioDownmix, trVDR("no"), trVDR("yes")));
+        }
 #ifdef USE_CEC
         Add(new cMenuEditBoolItem(tr("Volume control"), &AudioSoftvol, tr("CEC"), tr("Software")));
         Add(new cMenuEditIntItem(tr("Audio CEC Device (TV=0)"), &AudioCECDevice, 0, 15));
