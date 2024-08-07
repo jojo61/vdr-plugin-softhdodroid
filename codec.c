@@ -944,7 +944,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
     av_opt_set_channel_layout(audio_decoder->Resample, "in_channel_layout",audio_ctx->channel_layout, 0);
     av_opt_set_channel_layout(audio_decoder->Resample, "out_channel_layout", CodecDownmix ? AV_CHANNEL_LAYOUT_STEREO_DOWNMIX : audio_ctx->channel_layout,  0);
     av_opt_set_int(audio_decoder->Resample, "in_sample_rate",     audio_ctx->sample_rate,                0);
-    av_opt_set_int(audio_decoder->Resample, "out_sample_rate",    audio_ctx->HwSampleRate,                0);
+    av_opt_set_int(audio_decoder->Resample, "out_sample_rate",    audio_decoder->HwSampleRate,                0);
     av_opt_set_sample_fmt(audio_decoder->Resample, "in_sample_fmt",  audio_ctx->sample_fmt, 0);
     av_opt_set_sample_fmt(audio_decoder->Resample, "out_sample_fmt", AV_SAMPLE_FMT_S16,  0);
 #endif
