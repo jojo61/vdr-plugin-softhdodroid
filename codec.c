@@ -932,7 +932,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 #define AV_CH_LAYOUT_STEREO_DOWNMIX AV_CH_LAYOUT_STEREO
 #endif 
 
-#ifdef USE_SWRESAMPLE
+#ifdef USE_SWRESAMPLE 
 #if LIBSWRESAMPLE_VERSION_INT < AV_VERSION_INT(4,5,100) 
     audio_decoder->Resample = swr_alloc_set_opts(audio_decoder->Resample, 
                                 CodecDownmix ? AV_CH_LAYOUT_STEREO_DOWNMIX : audio_ctx->channel_layout , 
