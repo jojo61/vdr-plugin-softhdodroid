@@ -203,7 +203,6 @@ const uint64_t PTS_FREQ = 90000;
 int64_t LastPTS;
 uint64_t lpts;
 int inwrap=0;
-uint64_t TrickPTS;
 int myTrickSpeed= 0;
 int inTrickModeStillPicture = 0;
 int ratio;
@@ -370,36 +369,7 @@ void VideoOsdClear(void) {
 
 
 uint64_t VideoGetClock(const VideoHwDecoder *decoder) {
-#if 1
-	if (myTrickSpeed) {
-
-		while (TrickPTS == 0) {
-			//Debug(3,"wait for  Trick PTS %#012" PRIx64 " \n",TrickPTS);
-		   usleep(2000);
-		}
-		usleep(200);
-		//Debug(3,"read Trick PTS %#012" PRIx64 " \n",TrickPTS);
-		return TrickPTS;
-	}
-#endif
 	return LastPTS;
-#if 0
-	uint64_t PTS = atomic_read(&LastPTS);
-	uint64_t RealPTS;
-	int i=100;
-
-	while ((RealPTS = GetCurrentVPts(0)) == 0 && i--) {
-		printf("wait for  Real PTS  \n");
-		usleep(10000);
-	}
-	if (RealPTS > 0) {
-	   PTS &= 0xffffffff00000000;
-	   PTS |= RealPTS;
-	   //Debug(3,"read fixed PTS %#012" PRIx64 " diff  %d \n",PTS,PTS - SavePTS);
-	}
-	usleep(2000);
-	return PTS;
-#endif
  };
 
 
@@ -443,12 +413,12 @@ void VideoSetTrickSpeed(VideoHwDecoder *decoder, int speed, int forward) {
 
 	Debug(3,"set trickspeed to %d\n",speed);
 	decoder->TrickSpeed = speed;
-    decoder->Forward = forward;
-    if (speed) {
+	decoder->Forward = forward;
+	if (speed) {
 		amlFreerun(1);
 		myTrickSpeed=1;
-        decoder->Closing = 0;
-    } else {
+		decoder->Closing = 0;
+	} else {
 		myTrickSpeed=0;
 		amlFreerun(0);
 	}
@@ -1336,15 +1306,14 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 			AudioVideoReady(avpkt->pts);
 		}
 		ProcessClockBuffer(handle);
-		TrickPTS=0;
 	}
 	else {
 		if (avpkt->pts != AV_NOPTS_VALUE) {
-			if ((!decoder->HwDecoder->Forward 
-					|| decoder->HwDecoder->TrickSpeed == 1
-                    || decoder->HwDecoder->TrickSpeed == 3
-                    || decoder->HwDecoder->TrickSpeed == 6)
-					&& videoFormat == Avc)  {
+			if ((!decoder->HwDecoder->Forward
+			   || decoder->HwDecoder->TrickSpeed == 1
+			   || decoder->HwDecoder->TrickSpeed == 3
+			   || decoder->HwDecoder->TrickSpeed == 6)
+			   && videoFormat == Avc)  {
 				amlReset();
 				waiter = decoder->HwDecoder->TrickSpeed == 1 ? 40000:30000;
 			}
@@ -1367,7 +1336,6 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 			waiter = waiter <0 ? -waiter:waiter;
 			waiter = waiter == 0 ? 25000 : waiter;
 #endif
-			TrickPTS = avpkt->pts;
 			//printf("Trickspeed wait %d diff = %ld\n",waiter,diff);
 			usleep(waiter*decoder->HwDecoder->TrickSpeed);
 
@@ -2085,7 +2053,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	switch (format)
 	{
 		case Hevc:
-			hwdecoder->handle = open("/dev/amstream_hevc", flags);
+			if (myKernel == 5 && myMajor == 4) {
+				hwdecoder->handle = open("/dev/amstream_hevc_frame", flags);
+			} else {
+				hwdecoder->handle = open("/dev/amstream_hevc", flags);
+			}
 			Debug(3,"AmlVideoSink - VIDEO/HEVC\n");
 
 			amlFormat = VFORMAT_HEVC;
@@ -2248,7 +2220,10 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		if (!pip) {
 			//codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
-			if (format == Avc) {
+			if (myKernel == 5 && myMajor == 4 && format == Hevc) {
+				amlSetString("/sys/class/vfm/map","add pip0 vdec.h265.00  ppmgr deinterlace amvideo");
+			} 
+			else if (format == Avc) {
 				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.h264.00  ppmgr deinterlace amvideo");
 			}
@@ -2611,8 +2586,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			lpts=0;
 			inwrap=0;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
-			//uint64_t dpts = pkt->pts & 0xffffffff;
-			//SetCurrentPCR(hwdecoder->handle,dpts);
+			uint64_t dpts = pkt->pts & 0xffffffff;
+			SetCurrentPCR(hwdecoder->handle,dpts);
 		}
 
 		//amlCodec.SetSyncThreshold(pts);
@@ -2794,13 +2769,19 @@ void CheckinPts(int handle, uint64_t pts)
 		return;
 	}
 
-
-	// truncate to 32bit
-	//pts &= 0xffffffff;
-
 	if (apiLevel >= S905)	// S905
 	{
-		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
+		//codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
+		if (myKernel == 5 && myMajor == 4) {
+			r = ioctl(handle,AMSTREAM_IOC_TSTAMP_uS64,&pts);
+			if (r < 0) {
+				printf("AMSTREAM_IOC_TSTAMP failed\n");
+				return;
+			}
+		} else {
+			codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
+		}
+		
 #if 0
 		int cmd_new = AMSTREAM_IOC_SET;
 		unsigned long parm_new;

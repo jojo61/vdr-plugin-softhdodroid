@@ -2456,12 +2456,15 @@ int SetPlayMode(int play_mode)
 */
 int64_t GetSTC(void)
 {
-    if (MyVideoStream->HwDecoder) {
-        return VideoGetClock(MyVideoStream->HwDecoder);
+
+    if (MyVideoStream->HwDecoder && hasVideo) {
+            return VideoGetClock(MyVideoStream->HwDecoder);
+    } else {
+            return AudioGetClock();
     }
     // could happen during dettached
     Warning(_("softhddev: %s called without hw decoder\n"), __FUNCTION__);
-    return AV_NOPTS_VALUE;
+    return -1;
 }
 
 /**
@@ -2578,9 +2581,9 @@ void Freeze(void)
 */
 void Mute(void)
 {
-    
-    //SkipAudio = 1;
-    //AudioFlushBuffers();
+
+    SkipAudio = 1;
+    AudioFlushBuffers();
     //AudioSetVolume(0);
 }
 
