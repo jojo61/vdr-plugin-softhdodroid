@@ -2171,7 +2171,7 @@ uint64_t AudioGetClock(void)
             return AudioRing[AudioRingRead].PTS + 0 * 90 - delay;
         }
     }
-    return -1;
+    return 0;
 }
 uint64_t AudioGetwClock(void)
 {
