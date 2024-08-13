@@ -2460,15 +2460,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 	if (isFirstVideoPacket)
 	{
 
-#if 0
-		printf("Header (pkt.size=%x):\n", pkt->size);
-		for (int j = 0; j < 16; ++j)	//nalHeaderLength
-		{
-			printf("%02x ", nalHeader[j]);
-		}
-		printf("\n");
-		printf("PTS %04lx\n",pkt->pts);
-#endif
 		if (nalHeader[0] == 0 && nalHeader[1] == 0 &&
 			nalHeader[2] == 1)
 		{
@@ -2482,8 +2473,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			isShortStartCode = false;
 		}
 		
-
-#if 1
 		switch(hwdecoder->Format) {
 			case Hevc:
 						{
@@ -2580,14 +2569,16 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			default:
 				break;
 		}
-#endif
+
 		if (!pip) {
 			FirstVPTS = pkt->pts;
 			lpts=0;
 			inwrap=0;
 			Debug(3,"first vpts: %#012" PRIx64 "\n",FirstVPTS & 0xffffffff);
-			uint64_t dpts = pkt->pts & 0xffffffff;
-			SetCurrentPCR(hwdecoder->handle,dpts);
+			if (myKernel == 5 && myMajor == 4 && hwdecoder->Format == Hevc) {
+				uint64_t dpts = pkt->pts & 0xffffffff;
+				SetCurrentPCR(hwdecoder->handle,dpts);
+			}
 		}
 
 		//amlCodec.SetSyncThreshold(pts);
@@ -2772,15 +2763,9 @@ void CheckinPts(int handle, uint64_t pts)
 	if (apiLevel >= S905)	// S905
 	{
 		//codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
-		if (myKernel == 5 && myMajor == 4) {
-			r = ioctl(handle,AMSTREAM_IOC_TSTAMP_uS64,&pts);
-			if (r < 0) {
-				printf("AMSTREAM_IOC_TSTAMP failed\n");
-				return;
-			}
-		} else {
-			codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
-		}
+		
+		codec_h_ioctl_set(handle,AMSTREAM_SET_TSTAMP,(unsigned long)pts);
+		
 		
 #if 0
 		int cmd_new = AMSTREAM_IOC_SET;
