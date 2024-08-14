@@ -88,7 +88,7 @@ typedef struct
     uint32_t y1;
 } VdpRect;
 
-OdroidDecoder *OdroidDecoders[2];  ///< open decoder streams
+static OdroidDecoder *OdroidDecoders[2];  ///< open decoder streams
 static int OdroidDecoderN = 0;				 // Numer of decoders
 //static struct timespec OdroidFrameTime;  ///< time of last display
 static int VideoWindowX = 0;                ///< video output window x coordinate
@@ -125,7 +125,7 @@ uint64_t last_time = 0,firstvpts,firstapts;
 static pthread_t VideoThread;           ///< video decode thread
 //static pthread_cond_t VideoWakeupCond;  ///< wakeup condition variable
 //static pthread_mutex_t VideoMutex;      ///< video condition mutex
-//static pthread_mutex_t VideoLockMutex;  ///< video lock mutex
+static pthread_mutex_t VideoLockMutex;  ///< video lock mutex
 pthread_mutex_t OSDMutex;               ///< OSD update mutex
 
 /// Default audio/video delay
@@ -184,9 +184,9 @@ int width;
 int height;
 double FrameRate = 25.0;
 int apiLevel;
-int isOpen = false;
+static int isOpen = false;
 int isRunning = false;
-int isPIP = false;
+static int isPIP = false;
 int PIP_allowed = false;
 double lastTimeStamp = -1;
 bool isFirstVideoPacket = true;
@@ -1013,33 +1013,33 @@ extern char SuspendMode;
 
  void VideoExit(void) {
 
-	// Restore alpha setting
 	int fd_m;
 	struct fb_var_screeninfo info;
 
 	Debug(3,"VideoExit");
 
-	//InternalClose(OdroidDecoders[0]->pip);
-
-	if (SuspendMode == 0) {
+	//if (SuspendMode == 0) {
 		VideoThreadExit();
-		sleep(1);
-	}
-
+		//sleep(1);
+	//}
+#if 0
 	for (int i = 0; i < OdroidDecoderN; ++i) {
         if (OdroidDecoders[i]) {
             VideoDelHwDecoder(OdroidDecoders[i]);
             OdroidDecoders[i] = NULL;
         }
     }
+#endif
     OdroidDecoderN = 0;
-
-	int r = close(cntl_handle);
-	if (r < 0)
-	{
-		//codecMutex.Unlock();
-		printf("close cntl_handle failed.");
-		//return;
+	if (cntl_handle != -1) {
+		int r = close(cntl_handle);
+		if (r < 0)
+		{
+			//codecMutex.Unlock();
+			printf("close cntl_handle failed.");
+			//return;
+		}
+		cntl_handle = -1;
 	}
 
 // Set text mode
@@ -1061,6 +1061,7 @@ extern char SuspendMode;
 #endif
 	amlSetInt("/sys/class/graphics/fb0/blank", 1);
 #if 1
+	// Restore alpha setting
 	fd_m = open("/dev/fb0", O_RDWR);
 	ioctl(fd_m, FBIOGET_VSCREENINFO, &info);
 	info.reserved[0] = 0;
@@ -1092,7 +1093,7 @@ extern char SuspendMode;
 		amlSetInt("/sys/class/graphics/fb0/free_scale", 0);
 		amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
 		amlSetString("/sys/class/vfm/map","rm all");
-		sleep(1);
+		//sleep(1);
 		amlSetString("/sys/class/vfm/map","add default decoder amvideo");
 		amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
 		amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amvideo");
@@ -1103,7 +1104,7 @@ extern char SuspendMode;
 	} else {
 		amlSetString("/sys/class/vfm/map","rm pip0");   // make it save
 		amlSetString("/sys/class/vfm/map","rm all");
-		sleep(1);
+		//sleep(1);
 		amlSetString("/sys/class/vfm/map","add default decoder amvideo");
 		amlSetString("/sys/class/vfm/map","add default_amlvideo2 vdin1 amlvideo2.1");
 		amlSetString("/sys/class/vfm/map","add dvblpath dvbldec amlvideo ppmgr deinterlace amvideo");
@@ -1199,6 +1200,7 @@ void VideoDelHwDecoder(VideoHwDecoder * decoder)
 {
 	Debug(3,"DelHWDecoder PIP %d ",decoder->pip);
 	if (decoder->pip && OdroidDecoders[1]->handle != -1) {
+		printf("delhwdecoder\n");
 		InternalClose(1);
 	}
 
@@ -1412,15 +1414,14 @@ void VideoThreadExit(void)
         if (pthread_cancel(VideoThread)) {
             Debug(3, "video: can't queue cancel video display thread\n");
         }
-        usleep(200000);                 // 200ms
+        //usleep(200000);                 // 200ms
         if (pthread_join(VideoThread, &retval) || retval != PTHREAD_CANCELED) {
             Debug(3, "video: can't cancel video decoder thread\n");
         }
 
-
         VideoThread = 0;
         //pthread_cond_destroy(&VideoWakeupCond);
-        //pthread_mutex_destroy(&VideoLockMutex);
+        pthread_mutex_destroy(&VideoLockMutex);
         //pthread_mutex_destroy(&VideoMutex);
         //pthread_mutex_destroy(&OSDMutex);
 
@@ -1470,12 +1471,12 @@ void OdroidDisplayHandlerThread(void)
 					decoder->Closing = -1;
 				}
 			}
-			usleep(10 * 1000);
+			usleep(1000);
 
 		}
 	}
 
-    usleep(5000);
+    usleep(1000);
 	return;
 }
 
@@ -1505,7 +1506,7 @@ void VideoThreadInit(void)
 {
 
  //   pthread_mutex_init(&VideoMutex, NULL);
- //   pthread_mutex_init(&VideoLockMutex, NULL);
+    pthread_mutex_init(&VideoLockMutex, NULL);
  //   pthread_mutex_init(&OSDMutex, NULL);
  //   pthread_cond_init(&VideoWakeupCond, NULL);
     pthread_create(&VideoThread, NULL, VideoDisplayHandlerThread, NULL);
@@ -2049,7 +2050,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	if (!pip) {
 		PIP_allowed = false;
 	}
-	
+	pthread_mutex_lock(&VideoLockMutex);
 	switch (format)
 	{
 		case Hevc:
@@ -2095,6 +2096,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 			break;
 		default:
 			Debug(3,"AmlVideoSink - VIDEO/UNKNOWN(%d)\n", (int)format);
+			pthread_mutex_unlock(&VideoLockMutex);
             return;
 
 	}
@@ -2105,6 +2107,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
         return;
 	}
 	handle = hwdecoder->handle;
+	pthread_mutex_unlock(&VideoLockMutex);
 	hwdecoder->Format = format;
 
 	// Set video format
@@ -2952,10 +2955,13 @@ void amlReset()
 void InternalClose(int pip)
 {
 	int r;
+	
+	pthread_mutex_lock(&VideoLockMutex);
 	int handle = OdroidDecoders[pip]->handle;
 	if (handle == -1 || handle == 0) {
 		printf("Internal Close pip %d mit Handle %d\n",pip,handle);
 		Debug(3,"Internal Close mit Handle %d\n",handle);
+		pthread_mutex_unlock(&VideoLockMutex);
 		return;
 	}
 
@@ -2963,7 +2969,8 @@ void InternalClose(int pip)
 	if (r < 0)
 	{
 		//codecMutex.Unlock();
-		printf("close handle failed PIP %d\n.",pip);
+		printf("close handle failed PIP %d %s\n.",pip,strerror(errno));
+		pthread_mutex_unlock(&VideoLockMutex);
 		return;
 	}
 	
@@ -2991,6 +2998,7 @@ void InternalClose(int pip)
 	}
 
 	Debug(3,"internal close pip %d",pip);
+	pthread_mutex_unlock(&VideoLockMutex);
 }
 
 void amlSetVideoAxis(int pip, int x, int y, int width, int height)
