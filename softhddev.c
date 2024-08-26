@@ -1527,7 +1527,7 @@ static void VideoNextPacket(VideoStream * stream, int codec_id)
 
     // intialize next package to use
     VideoResetPacket(stream);
-    //VideoDecodeInput(stream);
+   
 }
 
 #if 0
@@ -1852,7 +1852,6 @@ int VideoPollInput(VideoStream * stream)
         Debug(3, "Clear buffer request in Poll\n");
         if (stream->Decoder) {
             CodecVideoFlushBuffers(stream->Decoder);
-//            VideoResetStart(stream->HwDecoder);
         }
         stream->ClearBuffers = 0;
         return 1;
@@ -1895,7 +1894,6 @@ int VideoDecodeInput(VideoStream * stream)
         if (stream->Decoder) {
             CodecVideoFlushBuffers(stream->Decoder);
             Debug(3, "Clear buffer request in Decode\n");
-            VideoResetStart(stream->HwDecoder);
         }
         stream->ClearBuffers = 0;
         return 1;

@@ -43,7 +43,7 @@ CONFIG += -DUSE_OPENGLOSD
 ### The version number of this plugin (taken from the main source file):
 
 VERSION = $(shell grep 'static const char \*const VERSION *=' softhdodroid.cpp | awk '{ print $$7 }' | sed -e 's/[";]//g')
-GIT_REV = $(shell git describe --always 2>/dev/null)
+GIT_REV ?= $(shell git describe --always 2>/dev/null)
 ### The name of the distribution archive:
 
 ### The directory environment:

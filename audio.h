@@ -58,9 +58,9 @@ extern void AudioSetAutoAES(int);       ///< set automatic AES flag handling
 extern void AudioInit(void);            ///< setup audio module
 extern void AudioExit(void);            ///< cleanup and exit audio module
 
-extern int cec_init();
-extern int cec_send_command(int ,char *);
-extern int cec_exit();
+int cec_init();
+int cec_exit();
+int ProcessCommandTX(char *);
 
 //----------------------------------------------------------------------------
 //  Variables

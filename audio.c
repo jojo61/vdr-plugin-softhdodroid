@@ -1097,6 +1097,7 @@ static void AlsaSetVolume(int volume)
 {
 #ifdef USE_CEC
     static int vol = -1;
+    char command[20];
 
     if (use_cec) {
         if (vol == -1 && volume) {
@@ -1104,10 +1105,16 @@ static void AlsaSetVolume(int volume)
         }
         if (volume) {
             if (vol > volume) {
-                cec_send_command(AudioCECDev,"down");
+                //cec_send_command(AudioCECDev,"down");
+                sprintf(command,"1%1d:44:42",AudioCECDev);
+                //Debug(3,"CEC Command %s\n",command);
+                ProcessCommandTX(command);
             }
             if(vol < volume) {
-                cec_send_command(AudioCECDev,"up");
+                sprintf(command,"1%1d:44:41",AudioCECDev);
+                //Debug(3,"CEC Command %s\n",command);
+                ProcessCommandTX(command);
+                //cec_send_command(AudioCECDev,"up");
             }
             vol = volume;
         }
@@ -2496,6 +2503,7 @@ void AudioInit(void)
 #ifdef USE_CEC
     if (!AudioSoftVolume) {
         use_cec = cec_init();
+        Debug(3,"CEC Init %d\n",use_cec);
     }
     else {
         use_cec = 0;

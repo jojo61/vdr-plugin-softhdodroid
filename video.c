@@ -1471,7 +1471,7 @@ void OdroidDisplayHandlerThread(void)
 					decoder->Closing = -1;
 				}
 			}
-			usleep(1000);
+			//usleep(1000);
 
 		}
 	}
@@ -1612,12 +1612,6 @@ VideoDecoder *CodecVideoNewDecoder(VideoHwDecoder * hw_decoder)
     return decoder;
 }
 
-void VideoResetStart(VideoHwDecoder * hw_decoder)
-{
-
-    Debug(3, "video: reset start\n");
-
-}
 
 void VideoSetClock(VideoHwDecoder * decoder, int64_t pts)
 {
