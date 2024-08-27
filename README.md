@@ -1,7 +1,7 @@
 @file README.txt		@brief A software UHD output device for VDR
 
 
-Copyright (c) 2021 by jojo61.  All Rights Reserved.
+Copyright (c) 2024 by jojo61.  All Rights Reserved.
 
 Contributor(s):
 
@@ -21,15 +21,17 @@ GNU Affero General Public License for more details.
 
 A software and GPU emulated UHD output device plugin for VDR.
 
-    o Video hardware decoder ODROID
+    o Video hardware decoder Amlogic
     o Audio FFMpeg / Alsa / Analog
     o Audio FFMpeg / Alsa / Digital
-    o Audio Amp control via CEC
+    o Audio Amp/TV control via CEC
     o HDMI/SPDIF pass-through
     o Suspend / Dettach 
 
 
-This is a Device driver for Odroid-n2(plus) Hardware.  SD, HD and UHD is working.
+This is a Device driver for Amlogic Hardware.  SD, HD and UHD is suported.
+Working devices are: Odroid-N2+, Tanix X3, X96Max+ and almost all other devices where 
+Coreelec is working.
 
 Good luck
 jojo61
@@ -96,6 +98,9 @@ Commandline:
     -p DigitalAudiodevice  e.g. plughw:CARD=AMLAUGESOUND,DEV=2  (usually not needed)
 	-s Start in suspended Mode
 	-D Start in detached Mode
+	-g widthxheight        e.g. 3840x2160        only supported in Kernel 5.x
+	-r Refresh Rate        e.g. 60 default is 50 only supported in Kernel 5.x
+	-w use-spdif           use spdif instead of the default spdif_b
 
 	Normaly you do not need any Parameters. The Audiodevices have sensible defaults.
 
@@ -105,8 +110,8 @@ Commandline:
 SVDRP:
 ------
 
-	Use 'svdrpsend.pl plug softhddevice HELP'
-	or 'svdrpsend plug softhddevice HELP' to see the SVDRP commands help
+	Use 'svdrpsend.pl plug softhdodroid HELP'
+	or 'svdrpsend plug softhdodroid HELP' to see the SVDRP commands help
 	and which are supported by the plugin.
 
 Keymacros:

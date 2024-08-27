@@ -1859,8 +1859,9 @@ void AudioEnqueue(const void *samples, int count)
                 skip = n;   // Clear all audio until video is avail
                 //printf("%d No PTS in %ld ms \n",n,(GetusTicks() - last_time) / 1000);
             }
-            else if ((unsigned long)AudioRing[AudioRingWrite].PTS  < vpts) {
+            else if ((uint64_t)AudioRing[AudioRingWrite].PTS  < vpts) {
                 skip = n;    // Clear Audio until Video PTS
+          
 #ifdef PERFTEST
                 if (!sw) {
                    //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
