@@ -73,7 +73,7 @@ typedef enum {
     VIDEO_DEC_FORMAT_MAX
 } vdec_type_t;
 
-typedef enum {
+enum vformat_e {
     VFORMAT_UNKNOWN = -1,
     VFORMAT_MPEG12 = 0,
     VFORMAT_MPEG4,
@@ -95,7 +95,7 @@ typedef enum {
 /*add new here before.*/
     VFORMAT_MAX,
     VFORMAT_UNSUPPORT = VFORMAT_MAX
-} vformat_t;
+};
 
 #define IS_VFMT_VALID(vfmt) ((vfmt > VFORMAT_UNKNOWN) && (vfmt < VFORMAT_MAX))
 #define IS_NEED_VDEC_INFO(vfmt) ((vfmt == VFORMAT_MPEG4) || (vfmt == VFORMAT_REAL))

@@ -52,7 +52,7 @@
 #ifndef AFORMAT_H
 #define AFORMAT_H
 
-typedef enum {
+enum aformat_e {
     AFORMAT_UNKNOWN = -1,
     AFORMAT_MPEG   = 0,
     AFORMAT_PCM_S16LE = 1,
@@ -88,7 +88,7 @@ typedef enum {
     AFORMAT_UNSUPPORT ,
     AFORMAT_MAX
 
-} aformat_t;
+};
 
 #define AUDIO_EXTRA_DATA_SIZE   (8192)
 #define IS_AFMT_VALID(afmt) ((afmt > AFORMAT_UNKNOWN) && (afmt < AFORMAT_MAX))

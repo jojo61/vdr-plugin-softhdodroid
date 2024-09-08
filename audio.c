@@ -1854,7 +1854,7 @@ void AudioEnqueue(const void *samples, int count)
         if (!ConfigVideoFastSwitch && hasVideo) {
             vpts = FirstVPTS;
 
-            if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE) {
+            if (vpts == AV_NOPTS_VALUE || AudioRing[AudioRingWrite].PTS == AV_NOPTS_VALUE || !vpts) {
                 //usleep(1000);
                 skip = n;   // Clear all audio until video is avail
                 //printf("%d No PTS in %ld ms \n",n,(GetusTicks() - last_time) / 1000);
@@ -1910,20 +1910,18 @@ void AudioEnqueue(const void *samples, int count)
             // no lock needed, can wakeup next time
             AudioRunning = 1;
             FirstVPTS = 0;
-#if 1
             if (!ConfigVideoFastSwitch) {
                 //printf("AudioEnque: SetCurrentPCR %#012" PRIx64 "\n", AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay);
                 int i = 10;
                 while (SetCurrentPCR(0, (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay )) == 2 && i--) {
                     usleep(3000);
                 }
+            }
 #ifdef PERFTEST
                 firstapts =  (uint64_t)(AudioRing[AudioRingWrite].PTS - AudioBufferTime * 90 + VideoAudioDelay );
                 //printf("AVR %d new firstapts  %#012" PRIx64 " \n",AudioVideoIsReady,firstapts);
                 printf("Set PCR PTS in %ld ms \n",(GetusTicks() - last_time) / 1000);
                 sw = 0;
-#endif
-            }
 #endif
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "audio: Start on AudioEnque Threshold %d n %ld IsReady %d\n", AudioStartThreshold, n, AudioVideoIsReady);
