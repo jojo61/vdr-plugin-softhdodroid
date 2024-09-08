@@ -2928,7 +2928,7 @@ void amlTrickMode(int val)  // used in StillPicture
 int amlGetBufferFree(int pip)
 {
 
-	struct am_ioctl_parm_ex_new {
+    struct am_ioctl_parm_ex_new {
     union {
         struct buf_status status;
         struct vdec_status vstatus;
@@ -2940,7 +2940,17 @@ int amlGetBufferFree(int pip)
     };
     unsigned int cmd;
     char reserved[4];
-	};
+    };
+
+    struct am_ioctl_parm_ex_old {
+    union {
+        struct buf_status status;
+        char data[24];
+
+    };
+    unsigned int cmd;
+    char reserved[4];
+    };
 
 	if (!isOpen)
 	{
@@ -2949,13 +2959,13 @@ int amlGetBufferFree(int pip)
 	}
 	int handle = OdroidDecoders[pip]->handle;
 	struct buf_status status = {0};
-
 	if (apiLevel >= S905)	// S905
 	{
 		if (myKernel == 4) {
-			struct am_ioctl_parm_ex parm = { 0 };
+			struct am_ioctl_parm_ex_old parm = { 0 };
+			printf("size of parm %ld \n",sizeof(parm));
 			parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
-			int r = ioctl(handle, AMSTREAM_IOC_GET_EX, (unsigned long)&parm);
+			int r = ioctl(handle,0xc02053c3, (unsigned long)&parm);
 			if (r < 0)
 			{
 				//printf("AMSTREAM_GET_EX_VB_STATUS failed.\n");
