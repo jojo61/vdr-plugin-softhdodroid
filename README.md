@@ -30,7 +30,7 @@ A software and GPU emulated UHD output device plugin for VDR.
 
 
 This is a Device driver for Amlogic Hardware.  SD, HD and UHD is suported.
-Working devices are: Odroid-N2+, Tanix X3, X96Max+ and almost all other devices where 
+Working devices are: Odroid-N2+, Tanix TX3, X96Max+ and almost all other devices where 
 Coreelec is working.
 
 Good luck
