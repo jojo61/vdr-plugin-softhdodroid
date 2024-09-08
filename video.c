@@ -2963,7 +2963,6 @@ int amlGetBufferFree(int pip)
 	{
 		if (myKernel == 4) {
 			struct am_ioctl_parm_ex_old parm = { 0 };
-			printf("size of parm %ld \n",sizeof(parm));
 			parm.cmd = AMSTREAM_GET_EX_VB_STATUS;
 			int r = ioctl(handle,0xc02053c3, (unsigned long)&parm);
 			if (r < 0)
