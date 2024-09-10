@@ -1781,19 +1781,6 @@ static void NewPip(int channel_nr)
         return;
     }
 
-
-#ifdef DEBUG
-    // is device replaying?
-    cMutex mutex;
-    cMutexLock mutexLock(&mutex);
-    bool control = cControl::Control(mutexLock);
-
-    if (cDevice::PrimaryDevice()->Replaying() && control) {
-        dsyslog("[softhddev]%s: replay active\n", __FUNCTION__);
-        // FIXME: need to find PID
-    }
-#endif
-
     if (!channel_nr) {
         channel_nr = cDevice::CurrentChannel();
     }
