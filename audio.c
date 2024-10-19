@@ -104,6 +104,8 @@
 //----------------------------------------------------------------------------
 //  Declarations
 //----------------------------------------------------------------------------
+typedef int Bool;
+#define bool Bool
 
 /**
 **	Audio output module structure and typedef.
@@ -1105,16 +1107,16 @@ static void AlsaSetVolume(int volume)
         }
         if (volume) {
             if (vol > volume) {
-                //cec_send_command(AudioCECDev,"down");
+                cec_send_command(AudioCECDev,"down");
                 sprintf(command,"1%1d:44:42",AudioCECDev);
                 //Debug(3,"CEC Command %s\n",command);
-                ProcessCommandTX(command);
+                //ProcessCommandTX(command);
             }
             if(vol < volume) {
                 sprintf(command,"1%1d:44:41",AudioCECDev);
                 //Debug(3,"CEC Command %s\n",command);
-                ProcessCommandTX(command);
-                //cec_send_command(AudioCECDev,"up");
+                //ProcessCommandTX(command);
+                cec_send_command(AudioCECDev,"up");
             }
             vol = volume;
         }
@@ -1560,6 +1562,7 @@ static int AudioNextRing(void)
     return 1;
 }
 
+extern bool isFirstVideoPacket;
 /**
 **	Audio play thread.
 **
@@ -1644,6 +1647,8 @@ static void *AudioPlayHandlerThread(void *dummy)
                 // underrun, and no new ring buffer, goto sleep.
                 if (!atomic_read(&AudioRingFilled)) {
                     Debug(3, "audio: HandlerThread Underrun with no new data\n");
+                     if (!ConfigVideoFastSwitch)
+                        isFirstVideoPacket = 1;
                     break;
                 }
 
@@ -1762,6 +1767,7 @@ extern uint64_t firstapts;
 extern int SetCurrentPCR(int , uint64_t );
 extern int hasVideo;
 extern uint64_t last_time;
+
 /**
 **	Place samples in audio output queue.
 **
@@ -1774,7 +1780,7 @@ void AudioEnqueue(const void *samples, int count)
     int16_t *buffer;
     
     uint64_t vpts;
-    static int sw=0;
+   
     
 #ifdef PERFTEST1
     static uint64_t mytime;
@@ -1863,6 +1869,7 @@ void AudioEnqueue(const void *samples, int count)
                 skip = n;    // Clear Audio until Video PTS
           
 #ifdef PERFTEST
+                static int sw=0;
                 if (!sw) {
                    //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
                    printf("Audio vorlauf ist %ldms \n",(vpts - AudioRing[AudioRingWrite].PTS) / 90);

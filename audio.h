@@ -61,6 +61,7 @@ extern void AudioExit(void);            ///< cleanup and exit audio module
 int cec_init();
 int cec_exit();
 int ProcessCommandTX(char *);
+int cec_send_command(int ,char *);
 
 //----------------------------------------------------------------------------
 //  Variables

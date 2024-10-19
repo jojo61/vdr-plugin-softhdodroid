@@ -51,6 +51,7 @@ extern "C" {
     int cec_init();
     int cec_exit();
     int ProcessCommandTX(char *);
+    int cec_send_command(int, char*);
 }
 
 using namespace CEC;
@@ -84,6 +85,30 @@ int ProcessCommandTX(char *arguments)
     g_parser->Transmit(bytes);
 
     return 0;
+}
+
+int cec_send_command(int dev,char *buffer) {
+    
+    cec_command tx;
+
+    tx.initiator = (cec_logical_address)1;
+    tx.destination = (cec_logical_address)dev;
+    tx.ack = 0; 
+    tx.eom = 0;
+    tx.opcode = CEC_OPCODE_USER_CONTROL_PRESSED;
+    tx.parameters.size = 1;
+    tx.opcode_set = 1;
+    tx.transmit_timeout = 1000;
+
+    if (strcmp("up",buffer) == 0) {
+        tx.parameters.data[0]= CEC_USER_CONTROL_CODE_VOLUME_UP;
+    } else {
+        tx.parameters.data[0]= CEC_USER_CONTROL_CODE_VOLUME_DOWN;
+    }
+    g_parser->Transmit(tx);
+
+    return 0;
+
 }
 
 int cec_init() {
