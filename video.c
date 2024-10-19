@@ -113,7 +113,8 @@ static int VideoCutLeftRight[VideoResolutionMax];
 char MyConfigDir[200];
 int locale_dot=0;
 
-int myKernel,myMajor,myMinor;
+int myKernel,myMajor,myMinor;			/// Kernel Version
+int dovi;								/// Supports Dolby Vision
 
 
 #ifdef PERFTEST
@@ -594,6 +595,26 @@ void Load_Lut() {
 
 
 }
+
+// check dolby vision support
+bool aml_support_dolby_vision()
+{
+  static int support_dv = -1;
+  char version[500];
+
+  if (support_dv == -1)
+  {
+	if (!amlGetInt("/sys/class/amdolby_vision/support_info",&support_dv)) {
+      if (support_dv == 7) {
+        if (!amlGetString("/sys/class/amdolby_vision/ko_info",version,500))
+          Debug(4, "Amlogic Dolby Vision info: %s", version);
+      }
+	}
+  }
+
+  return (support_dv == 7);
+}
+
 
 /// Grab screen raw.
  uint8_t *VideoGrabService(int *size, int *width, int *height) {
@@ -1697,6 +1718,15 @@ bool getResolution(char *mode) {
 
 	getKernelVersion();
 
+	dovi = aml_support_dolby_vision();
+	if (dovi) {
+		amlSetString("/sys/module/aml_media/parameters/dolby_vision_enable","Y");  // Enable Dolby Vision
+		Debug(3,"Dolby Vision Enabled");
+	} else {
+		Debug(3,"No Dolby Vision Support");
+	}
+
+
 	// Control device
 	cntl_handle = open(CODEC_CNTL_DEVICE, O_RDWR);
 	if (cntl_handle < 0)
@@ -2024,7 +2054,11 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		case Hevc:
 			if (myKernel == 5 && myMajor == 4) {
-				hwdecoder->handle = open("/dev/amstream_hevc_frame", flags);
+				if (dovi) {
+					hwdecoder->handle = open("/dev/amstream_dves_hevc_frame", flags); 
+				} else {
+					hwdecoder->handle = open("/dev/amstream_hevc_frame", flags); 
+				}
 			} else {
 				hwdecoder->handle = open("/dev/amstream_hevc", flags);
 			}
