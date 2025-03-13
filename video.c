@@ -2093,7 +2093,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				PIP_allowed = true;
 				hwdecoder->handle = open("/dev/amstream_vframe", flags);
 			} else {
-				hwdecoder->handle = open("/dev/amstream_vbuf", flags);
+				hwdecoder->handle = open("/dev/amstream_vframe", flags);
 				if (use_pip && !pip && isPIP) {
 					DelPip();
 				}
@@ -2174,7 +2174,8 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.h264.00  ppmgr deinterlace amvideo");
 			}
-			else if (use_pip_mpeg2 && (format == Mpeg2)) {
+			else if (format == Mpeg2) {
+				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.mpeg12.00 ppmgr deinterlace  amvideo");
 			}
 		}
