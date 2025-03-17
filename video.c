@@ -101,6 +101,7 @@ static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width
 static int OsdHeight;                   ///< osd height
 int OsdShown = 0;
+int OsdIsClosing = 0;
 static void (*VideoEventCallback)(void) = NULL; /// callback function to notify
 
 /// Default cut top and bottom in pixels
@@ -1353,12 +1354,15 @@ void CodecVideoDecode(VideoDecoder * decoder, const AVPacket * avpkt)
 
 void ClearDisplay(void)
 {	
+	OsdIsClosing = 1;
 	if (myKernel == 4) {
 		amlSetInt("/sys/class/graphics/fb0/osd_clear", 1);
 	} else {
 		amlSetInt("/sys/class/graphics/fb0/blank", 1);
 	}
+	usleep(20000);
 	OsdShown = 0;
+	OsdIsClosing = 0;
     return;
 
 }

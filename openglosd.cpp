@@ -1043,11 +1043,14 @@ cOglCmdCopyBufferToOutputFb::cOglCmdCopyBufferToOutputFb(cOglFb * fb, cOglOutput
 }
 
 unsigned char posd[3840*2160*4];
-extern int OsdShown,myKernel;
+extern int OsdShown,OsdIsClosing,myKernel;
 extern "C" int amlSetInt(char *, int);
 
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
+    if (OsdIsClosing)
+        return true;
+
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
     OsdShown = 1;
     if (DmaBufferHandle >= 0) {
