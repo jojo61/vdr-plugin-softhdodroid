@@ -1724,8 +1724,9 @@ bool getResolution(char *mode) {
 
 	dovi = aml_support_dolby_vision();
 	if (dovi) {
-		amlSetString("/sys/module/aml_media/parameters/dolby_vision_enable","Y");  // Enable Dolby Vision
-		Debug(3,"Dolby Vision Enabled");
+		// FIXME if enabled then HDR is not working. Needs to be enabled only when DV stream is played 
+		amlSetString("/sys/module/aml_media/parameters/dolby_vision_enable","N");  // Disable Dolby Vision
+		Debug(3,"Dolby Vision Supported");
 	} else {
 		Debug(3,"No Dolby Vision Support");
 	}
@@ -1780,12 +1781,14 @@ bool getResolution(char *mode) {
 
 	amlSetInt("/sys/class/graphics/fb0/blank", 1);
 
+#if 0
 	if (myKernel == 5) {
 		char t[80];
 		sprintf(mode,"U:%dx%dp-0\n",4096,2160);
 		amlGetString("/sys/class/graphics/fb0/modes",t,sizeof(t)); // need to read the modes first
 		amlSetString("/sys/class/graphics/fb0/mode", mode);
 	}
+#endif
 
 	fd = open("/dev/fb0", O_RDWR);
 
