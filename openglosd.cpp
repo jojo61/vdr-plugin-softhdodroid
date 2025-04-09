@@ -1048,9 +1048,10 @@ extern "C" int amlSetInt(char *, int);
 
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
-    if (OsdIsClosing)
+    static int Opening=0;
+    if (OsdIsClosing || Opening)
         return true;
-
+    Opening = 1;
     eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
     OsdShown = 1;
     if (DmaBufferHandle >= 0) {
@@ -1086,8 +1087,10 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         //VertexBuffers[vbTexture]->SetShaderBorderColor(bcolor);
 
         glViewport(0, 0, oFb->Width(), oFb->Height());
-        if (!fb->BindTexture())
+        if (!fb->BindTexture()) {
+            Opening = 0;
             return false;
+        }
 
         VertexBuffers[vbTexture]->Bind();
         VertexBuffers[vbTexture]->SetVertexData(quadVertices);
@@ -1099,8 +1102,10 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         oFb->Unbind();
         fb->BindRead();
         if (myKernel == 5) {
+            usleep(25000);
 	        amlSetInt("/sys/class/graphics/fb0/blank",0 );
         }
+        Opening = 0;
         return true;
     }
     //return true;

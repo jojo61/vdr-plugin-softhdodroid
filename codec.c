@@ -500,7 +500,7 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
     }
 }
 
-void amlSetMixer(int codec) {
+void amlSetMixer(int codec, int passthrough) {
     
   int err;
   int cardNr = 0;
@@ -555,8 +555,12 @@ void amlSetMixer(int codec) {
                 snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
             snd_mixer_close(handle);
             return;
-        } else
-        snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, UseAudioSpdif ? 0 : 1 ); // 0 = spdif  1= spdif_b
+        } else {
+            if (passthrough)
+                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, UseAudioSpdif ? 0 : 1 ); // 0 = spdif  1= spdif_b
+            else
+                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0,1); 
+        }
         Debug(3,"CAESinkALSA - Set SPDIF CLK Fine Setting \n");
         snd_mixer_selem_id_set_name(sid, "SPDIF CLK Fine Setting");
         elem = snd_mixer_find_selem(handle, sid);
@@ -566,7 +570,7 @@ void amlSetMixer(int codec) {
             snd_mixer_close(handle);
             return;
         } else
-        snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // SPDIF CLK FINE Setting to 0
+            snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // SPDIF CLK FINE Setting to 0
     }
 
     // set codec format for SPDIF-B
@@ -657,7 +661,7 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
     }
     
     
-    amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0);
+    amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0, *passthrough);
 
     if (!*passthrough && myKernel==4)
         amlSetInt("/sys/class/audiodsp/digital_codec",audio_decoder->HwChannels > 2 ? 6 : 0 );
