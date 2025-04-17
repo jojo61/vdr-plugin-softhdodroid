@@ -209,6 +209,7 @@ int myTrickSpeed= 0;
 int inTrickModeStillPicture = 0;
 int ratio;
 int pip_ratio;
+int ratio_checked = 0;
 int CurrentSyncThresh;
 
 AVRational timeBase;
@@ -1910,6 +1911,7 @@ extern void DelPip(void);
  void CodecVideoOpen(VideoDecoder *decoder, int codec_id, AVPacket *avpkt)
  {
 	int pip = decoder->HwDecoder->pip;
+	ratio_checked = 0;
 	switch (codec_id)
 	{
 	case AV_CODEC_ID_MPEG2VIDEO:
@@ -2515,10 +2517,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			if (pip ? pip_ratio : ratio != r)
 				SetScreenMode(r, pip);
 	}
-	else if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
-		if (pip ? pip_ratio : ratio != 3)
-			SetScreenMode(3, pip);
-	}
 
 	pts = 0;
 
@@ -2657,6 +2655,23 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 		default:
 			printf("Codec not Supported\n");
 			return;
+	}
+	if ((hwdecoder->Format == Avc || hwdecoder->Format == Hevc) && !ratio_checked){
+		char vdec_status[512];
+		if (amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status)) >= 0 &&
+			*vdec_status && !strstr(vdec_status,"No vdec") && scan_str(vdec_status,"frame count : ") > 0) {
+			ratio_checked = 1;
+			if (scan_str(vdec_status,"ratio_control : ") != 9000) {
+				if (pip ? pip_ratio : ratio != 2) {
+					SetScreenMode(2, pip);
+				}
+			}
+			else {
+				if (pip ? pip_ratio : ratio != 3) {
+					SetScreenMode(3, pip);
+				}
+			}
+		}
 	}
 	//playPauseMutex.Unlock();
 }
