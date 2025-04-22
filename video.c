@@ -1083,6 +1083,8 @@ extern char SuspendMode;
 	}
 #endif
 	amlSetInt("/sys/class/graphics/fb0/blank", 1);
+	if (myKernel == 5)
+		close(fd);
 #if 1
 	// Restore alpha setting
 	fd_m = open("/dev/fb0", O_RDWR);
@@ -1823,7 +1825,9 @@ bool getResolution(char *mode) {
 	} else {
 		DmaBufferHandle = h[1];
 	}
-	close(fd);
+	if (myKernel == 4)
+		close(fd);
+		
 	if (myKernel == 5) {
 		   	OsdWidth = VideoWindowWidth;  
 			OsdHeight = VideoWindowHeight; 
