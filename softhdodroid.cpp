@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "5.09"
+static const char *const VERSION = "5.10"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -1949,6 +1949,7 @@ void cSoftHdMenu::Create(void)
 {
     int current;
     char t[256];
+    char path[] = "/sys/class/amhdmitx/amhdmitx0/config";
     current = Current();                // get current menu item index
     Clear();                            // clear the menu
 
@@ -1984,7 +1985,7 @@ void cSoftHdMenu::Create(void)
     Add(new cOsdItem(NULL, osUnknown, false));
     Add(new cOsdItem(NULL, osUnknown, false));
 
-    amlGetString("/sys/class/amhdmitx/amhdmitx0/config",t,sizeof(t));
+    amlGetString(path,t,sizeof(t));
 
     Add(new cOsdItem(cString::sprintf(tr(" Decoder Info:")),  osUnknown, false));
     Add(new cOsdItem(cString::sprintf(tr(" %s"), strtok(t,"\n")),  osUnknown, false));

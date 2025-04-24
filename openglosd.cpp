@@ -1049,6 +1049,7 @@ extern "C" int amlSetInt(char *, int);
 bool cOglCmdCopyBufferToOutputFb::Execute(void)
 {
     static int Opening=0;
+    char path[] = "/sys/class/graphics/fb0/blank";
     if (OsdIsClosing || Opening)
         return true;
     Opening = 1;
@@ -1103,7 +1104,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         fb->BindRead();
         if (myKernel == 5) {
             usleep(25000);
-	        amlSetInt("/sys/class/graphics/fb0/blank",0 );
+	        amlSetInt(path, 0 );
         }
         Opening = 0;
         return true;
@@ -1114,8 +1115,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     fb->BindRead();
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    if (posd)
-        glReadPixels(0, 0, fb->Width(), fb->Height(), GL_RGBA, GL_UNSIGNED_BYTE, posd);
+    glReadPixels(0, 0, fb->Width(), fb->Height(), GL_RGBA, GL_UNSIGNED_BYTE, posd);
     glFlush();
 
      // Allocate a buffer
@@ -1982,7 +1982,7 @@ int cOglThread::StoreImage(const cImage & image)
     tColor *argb = MALLOC(tColor, imgSize);
 
     if (!argb) {
-        esyslog("[softhddev]memory allocation of %ld kb for OSD image failed", (imgSize * sizeof(tColor)) / 1024);
+        esyslog("[softhddev]memory allocation of %d kb for OSD image failed", (imgSize * sizeof(tColor)) / 1024);
         ClearSlot(slot);
         slot = 0;
         return 0;

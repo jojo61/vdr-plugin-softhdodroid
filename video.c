@@ -2521,7 +2521,12 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			if (pip ? pip_ratio : ratio != r)
 				SetScreenMode(r, pip);
 	}
-
+#if 0
+	else if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
+		if (pip ? pip_ratio : ratio != 3)
+			SetScreenMode(3, pip);
+	}
+#endif
 	pts = 0;
 
 	if (pkt->pts != AV_NOPTS_VALUE)
@@ -2660,10 +2665,13 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			printf("Codec not Supported\n");
 			return;
 	}
+
 	if ((hwdecoder->Format == Avc || hwdecoder->Format == Hevc) && !ratio_checked){
 		char vdec_status[512];
 		if (amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status)) >= 0 &&
-			*vdec_status && !strstr(vdec_status,"No vdec") && scan_str(vdec_status,"frame count : ") > 0) {
+		  		*vdec_status && 
+		  		!strstr(vdec_status,"No vdec") && 
+		 		 scan_str(vdec_status,"frame count : ") > 160) {
 			ratio_checked = 1;
 			if (scan_str(vdec_status,"ratio_control : ") != 9000) {
 				if (pip ? pip_ratio : ratio != 2) {
