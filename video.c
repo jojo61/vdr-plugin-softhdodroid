@@ -2671,9 +2671,12 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 		if (amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status)) >= 0 &&
 		  		*vdec_status && 
 		  		!strstr(vdec_status,"No vdec") && 
-		 		 scan_str(vdec_status,"frame count : ") > 160) {
+		 		 scan_str(vdec_status,"frame count : ") > 1) {
 			ratio_checked = 1;
-			if (scan_str(vdec_status,"ratio_control : ") != 9000) {
+			//if (scan_str(vdec_status,"ratio_control : ") != 9000) {
+			if ((scan_str(vdec_status,"frame height : ") == 480 || scan_str(vdec_status,"frame height : ") == 576) &&
+				scan_str(vdec_status,"ratio_control : ") == 0) { //SDTV with 4:3 content detected
+
 				if (pip ? pip_ratio : ratio != 2) {
 					SetScreenMode(2, pip);
 				}

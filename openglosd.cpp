@@ -1963,7 +1963,7 @@ int cOglThread::StoreImage(const cImage & image)
         return 0;
     }
 
-    int imgSize = image.Width() * image.Height();
+    long int imgSize = image.Width() * image.Height();
     int newMemUsed = imgSize * sizeof(tColor) + memCached;
 
     if (newMemUsed > maxCacheSize) {
@@ -1982,7 +1982,7 @@ int cOglThread::StoreImage(const cImage & image)
     tColor *argb = MALLOC(tColor, imgSize);
 
     if (!argb) {
-        esyslog("[softhddev]memory allocation of %d kb for OSD image failed", (imgSize * sizeof(tColor)) / 1024);
+        esyslog("[softhddev]memory allocation of %ld kb for OSD image failed", (imgSize * sizeof(tColor)) / 1024);
         ClearSlot(slot);
         slot = 0;
         return 0;
