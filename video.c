@@ -2373,6 +2373,262 @@ void SetCrop(int codec) {
 	Debug(3,"Set Crop to %s\n",s);
 }
 
+#if 0
+uint32_t sps_parser_offset;
+
+uint32_t sps_parser_read_bits(char *buffer, uint32_t count) {
+	uint32_t result = 0;
+	uint8_t index = (sps_parser_offset / 8);
+	uint8_t bitNumber = (sps_parser_offset - (index * 8));
+	uint8_t outBitNumber = count - 1;
+	for (uint8_t c = 0; c < count; c++) {
+		if (buffer[index] << bitNumber & 0x80) {
+			result |= (1 << outBitNumber);
+		}
+		if (++bitNumber > 7) { bitNumber = 0; index++; }
+		outBitNumber--;
+	}
+	sps_parser_offset += count;
+	return result;
+}
+
+uint32_t sps_parser_read_ueg(char* buffer) {
+    uint32_t bitcount = 0;
+
+    for (;;) {
+    	if (sps_parser_read_bits(buffer, 1) == 0) {
+	        bitcount++;
+    	} else {
+    		// bitOffset--;
+    		break;
+    	}
+    }
+
+    	// bitOffset --;
+    uint32_t result = 0;
+    if (bitcount) {
+    	uint32_t val = sps_parser_read_bits(buffer, bitcount);
+        result = (uint32_t) ((1 << bitcount) - 1 + val);
+    }
+
+    return result;
+}
+
+int32_t sps_parser_read_eg(char* buffer) {
+	uint32_t value = sps_parser_read_ueg(buffer);
+	if (value & 0x01) {
+		return (value + 1) / 2;
+	} else {
+		return -(value / 2);
+	}
+}
+
+void sps_parser_skipScalingList(char* buffer, uint8_t count) {
+	uint32_t deltaScale, lastScale = 8, nextScale = 8;
+	for (uint8_t j = 0; j < count; j++) {
+		if (nextScale != 0) {
+			deltaScale = sps_parser_read_eg(buffer);
+			nextScale = (lastScale + deltaScale + 256) % 256;
+		}
+		lastScale = (nextScale == 0 ? lastScale : nextScale);
+	}
+}
+
+int sar_num,sar_den;
+void sps_parser(char *buffer,int *width,int *height,int *sar) {
+
+	uint8_t profileIdc = 0;
+	uint32_t pict_order_cnt_type = 0;
+	uint32_t picWidthInMbsMinus1 = 0;
+	uint32_t picHeightInMapUnitsMinus1 = 0;
+	uint8_t frameMbsOnlyFlag = 0;
+	uint32_t frameCropLeftOffset = 0;
+	uint32_t frameCropRightOffset = 0;
+	uint32_t frameCropTopOffset = 0;
+	uint32_t frameCropBottomOffset = 0;
+	uint32_t aspect_ratio_idc =0;
+
+	sps_parser_offset = 0;
+	//sps_parser_base64_decode(buffer);
+	//sps_parser_read_bits(buffer, 8);
+	profileIdc = sps_parser_read_bits(buffer, 8);
+	sps_parser_read_bits(buffer, 16);
+	sps_parser_read_ueg(buffer);
+
+	if (profileIdc == 100 || profileIdc == 110 || profileIdc == 122 ||
+		profileIdc == 244 || profileIdc == 44 || profileIdc == 83 ||
+		profileIdc == 86 || profileIdc == 118 || profileIdc == 128) {
+		uint32_t chromaFormatIdc = sps_parser_read_ueg(buffer);
+		if (chromaFormatIdc == 3) sps_parser_read_bits(buffer, 1);
+		sps_parser_read_ueg(buffer);
+		sps_parser_read_ueg(buffer);
+		sps_parser_read_bits(buffer, 1);
+
+		if (sps_parser_read_bits(buffer, 1)) {
+			uint8_t e = chromaFormatIdc != 3 ? 8 : 12;
+			for (uint8_t i = 0; i < e; i++) {
+				if (sps_parser_read_bits(buffer, 1)) {
+					if (i < 6) {
+						sps_parser_skipScalingList(buffer, 16);
+					} else {
+						sps_parser_skipScalingList(buffer, 64);
+					}
+				}
+			}
+		}
+	}
+
+	sps_parser_read_ueg(buffer);
+	pict_order_cnt_type = sps_parser_read_ueg(buffer);
+
+	if (pict_order_cnt_type == 0) {
+		sps_parser_read_ueg(buffer);
+	} else if (pict_order_cnt_type == 1) {
+		sps_parser_read_bits(buffer, 1);
+		sps_parser_read_eg(buffer);
+		sps_parser_read_eg(buffer);
+		for (uint32_t i = 0; i < sps_parser_read_ueg(buffer); i++) {
+			sps_parser_read_eg(buffer);
+		}
+	}
+
+	sps_parser_read_ueg(buffer);
+	sps_parser_read_bits(buffer, 1);
+	picWidthInMbsMinus1 = sps_parser_read_ueg(buffer);
+	picHeightInMapUnitsMinus1 = sps_parser_read_ueg(buffer);
+	frameMbsOnlyFlag = sps_parser_read_bits(buffer, 1);
+	if (!frameMbsOnlyFlag) sps_parser_read_bits(buffer, 1);
+	sps_parser_read_bits(buffer, 1);
+	if (sps_parser_read_bits(buffer, 1)) {
+		frameCropLeftOffset = sps_parser_read_ueg(buffer);
+		frameCropRightOffset = sps_parser_read_ueg(buffer);
+		frameCropTopOffset = sps_parser_read_ueg(buffer);
+		frameCropBottomOffset = sps_parser_read_ueg(buffer);
+	}
+
+	*width = (((picWidthInMbsMinus1 + 1) * 16) - frameCropLeftOffset * 2 - frameCropRightOffset * 2);
+	*height = ((2 - frameMbsOnlyFlag) * (picHeightInMapUnitsMinus1 + 1) * 16) - ((frameMbsOnlyFlag ? 2 : 4) * (frameCropTopOffset + frameCropBottomOffset));
+
+	if (sps_parser_read_bits(buffer, 1)) {  // VUI Present ?
+		if (sps_parser_read_bits(buffer, 1)) {  // aspect_radio_present ?
+			aspect_ratio_idc = sps_parser_read_bits(buffer,8);
+		}
+		if (aspect_ratio_idc == 255) {
+			sar_num = sps_parser_read_bits(buffer,16);
+			sar_den = sps_parser_read_bits(buffer,16);
+		}
+	}
+
+	*sar = aspect_ratio_idc;
+	return;
+	
+}
+
+static int set_ratio_h264(const char* buf, int len, int pip)
+{
+	struct {
+		int num;
+		int den;
+	} par;
+	int width,height,sar,mode=3;
+
+	par.num = 1;
+	par.den = 1;
+
+	buf+=4;
+	
+	sps_parser(buf,&width,&height,&sar);
+	if (!width || !height) {
+		width = 16;
+		height = 9;
+	}
+	
+	switch (sar) {
+		case 0:
+		case 1:
+		default:
+			par.num = 1;
+			par.den = 1;
+			break;
+		case 2:
+			par.num = 12;
+			par.den = 11;
+			break;
+		case 3:
+			par.num = 10;
+			par.den = 11;
+			break;
+		case 4:
+			par.num = 16;
+			par.den = 11;
+			break;
+		case 5:
+			par.num = 40;
+			par.den = 33;
+			break;
+		case 6:
+			par.num = 24;
+			par.den = 11;
+			break;
+		case 7:
+			par.num = 20;
+			par.den = 11;
+			break;
+		case 8:
+			par.num = 32;
+			par.den = 11;
+			break;
+		case 9:
+			par.num = 80;
+			par.den = 33;
+			break;
+		case 10:
+			par.num = 18;
+			par.den = 11;
+			break;
+		case 11:											// 4 : 3
+			par.num = 15;
+			par.den = 11;
+			break;
+		case 12:
+			par.num = 64;
+			par.den = 33;
+			break;
+		case 13:
+			par.num = 160;
+			par.den = 99;
+			break;
+		case 14:
+			par.num = 4;
+			par.den = 3;
+			break;
+		case 15:
+			par.num = 3;
+			par.den = 2;
+			break;
+		case 16:
+			par.num = 2;
+			par.den = 1;
+			break;	
+		case 255:
+			par.num = sar_num;
+			par.den = sar_den;
+			break;
+	}
+
+	if ((float)((float) par.num / (float) par.den * (float)width / (float)height) > 1.7) { // 16 : 9 aspect
+				mode = VIDEO_WIDEOPTION_16_9;
+			}
+			else {							
+				mode = VIDEO_WIDEOPTION_4_3;
+			}
+	if (pip ? pip_ratio != mode : ratio != mode) {
+		SetScreenMode(mode, pip);
+		Debug(3,"width = %d height = %d  par %d:%d DAR %f\n", width,height,par.num,par.den,(float)((float) par.num / (float) par.den * (float)width / (float)height));
+	}
+}
+#endif
+
 void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 {
 	//playPauseMutex.Lock();
@@ -2442,8 +2698,8 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 										nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
 										//printf("Got Unit Type %d (%02x)\n",nal_unit_type,nalHeader[3]);
 										if (nal_unit_type == 5 || nal_unit_type == 7 || nal_unit_type == 8) {
+											//Debug(3,"Got Nal %d\n",nal_unit_type);
 											break;
-
 										}
 										else {
 											nalHeader++;
@@ -2518,15 +2774,40 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 		nalHeader[2] == 1 &&
 		nalHeader[3] == 0xb3) {					// Sequence Header
 			int r = (nalHeader[7] >> 4) & 0x0f;  		// Get Ratio
-			if (pip ? pip_ratio : ratio != r)
+			if (pip ? pip_ratio != r : ratio != r)
 				SetScreenMode(r, pip);
 	}
 #if 0
-	else if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
-		if (pip ? pip_ratio : ratio != 3)
-			SetScreenMode(3, pip);
+	if (hwdecoder->Format == Avc) {
+		int nal_unit_type;
+		nalHeader = (unsigned char*)pkt->data;
+		len = pkt->size - 3;
+		while (len--) {
+			if (nalHeader[0] == 0 &&
+				nalHeader[1] == 0 &&
+				nalHeader[2] == 1) {
+					nal_unit_type = (nalHeader[3] & 0x1f);  		// Get Frame Type
+					if (nal_unit_type == 7) {
+						//Debug(3,"Got Nal %d len %d\n",nal_unit_type,len);
+						set_ratio_h264(nalHeader,len,pip);
+						break;
+					}
+					else {
+						nalHeader++;
+					}
+			}
+			else {
+				nalHeader++;										// wait for I-Frame
+			}
+		}
 	}
 #endif
+
+	if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
+		if (pip ? pip_ratio != 0 : ratio != 0)
+			SetScreenMode(0, pip);
+	}
+
 	pts = 0;
 
 	if (pkt->pts != AV_NOPTS_VALUE)
@@ -2580,24 +2861,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 				{
 					switch (videoFormat)
 					{
-#if 0
-						case Avc:
-						{
-							// Copy AnnexB data if NAL unit type is 5
-							nal_unit_type = nalHeader[nalHeaderLength] & 0x1F;
-
-							if (!isExtraDataSent || nal_unit_type == 5)
-							{
-								ConvertH264ExtraDataToAnnexB();
-
-								SendCodecData(pts, &videoExtraData[0], videoExtraData.size());
-								//amlCodec.SendData(pts, &videoExtraData[0], videoExtraData.size());
-							}
-
-							isExtraDataSent = true;
-						}
-						break;
-#endif
 						case Hevc:
 						{
 							nal_unit_type = (nalHeader[nalHeaderLength] >> 1) & 0x3f;
@@ -2666,29 +2929,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			return;
 	}
 
-	if ((hwdecoder->Format == Avc || hwdecoder->Format == Hevc) && !ratio_checked){
-		char vdec_status[512];
-		if (amlGetString("/sys/class/vdec/vdec_status",vdec_status,sizeof(vdec_status)) >= 0 &&
-		  		*vdec_status && 
-		  		!strstr(vdec_status,"No vdec") && 
-		 		 scan_str(vdec_status,"frame count : ") > 1) {
-			ratio_checked = 1;
-			//if (scan_str(vdec_status,"ratio_control : ") != 9000) {
-			if ((scan_str(vdec_status,"frame height : ") == 480 || scan_str(vdec_status,"frame height : ") == 576) &&
-				scan_str(vdec_status,"ratio_control : ") == 0) { //SDTV with 4:3 content detected
-
-				if (pip ? pip_ratio : ratio != 2) {
-					SetScreenMode(2, pip);
-				}
-			}
-			else {
-				if (pip ? pip_ratio : ratio != 3) {
-					SetScreenMode(3, pip);
-				}
-			}
-		}
-	}
-	//playPauseMutex.Unlock();
 }
 
 void CheckinPts(int handle, uint64_t pts)
@@ -3213,12 +3453,16 @@ void SetScreenMode(int aspect, int pip)
 		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
+#if 0
 	if (aspect == 3) {
 		screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
 	} else {
 		screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3;
 	}
-
+	screenMode = (uint32_t)VIDEO_WIDEOPTION_NORMAL;
+#endif
+	screenMode = aspect;
+	
 	if (pip) {
 		if (aspect != pip_ratio) {
 			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &screenMode);
