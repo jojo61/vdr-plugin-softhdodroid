@@ -1963,6 +1963,12 @@ extern void DelPip(void);
 		    amlSetVideoAxis(0,winx,winy,winx+winw,winy+winh);
 		}
 	}
+	if (codec_id == AV_CODEC_ID_MPEG2VIDEO){
+		SetScreenMode(VIDEO_WIDEOPTION_16_9, pip);
+	}
+	else {
+		SetScreenMode(VIDEO_WIDEOPTION_NORMAL, pip);
+	}
 };
 
 
@@ -2803,11 +2809,6 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 	}
 #endif
 
-	if (hwdecoder->Format == Avc || hwdecoder->Format == Hevc){
-		if (pip ? pip_ratio != 0 : ratio != 0)
-			SetScreenMode(0, pip);
-	}
-
 	pts = 0;
 
 	if (pkt->pts != AV_NOPTS_VALUE)
@@ -3446,26 +3447,17 @@ void getKernelVersion() {
 
 void SetScreenMode(int aspect, int pip)
 {
-	uint32_t screenMode;
 	int r;
 
 	if (!isOpen) {
 		printf("The codec is not open. %s\n",__FUNCTION__);
 		return;
 	}
-#if 0
-	if (aspect == 3) {
-		screenMode = (uint32_t)VIDEO_WIDEOPTION_16_9;
-	} else {
-		screenMode = (uint32_t)VIDEO_WIDEOPTION_4_3;
-	}
-	screenMode = (uint32_t)VIDEO_WIDEOPTION_NORMAL;
-#endif
-	screenMode = aspect;
+
 	
 	if (pip) {
 		if (aspect != pip_ratio) {
-			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &screenMode);
+			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_PIP_SCREEN_MODE, &aspect);
 			if (r != 0) {
 				Debug(3, "AMSTREAM_IOC_SET_PIP_SCREEN_MODE failed, errno=%d", errno);
 			} else {
@@ -3474,7 +3466,7 @@ void SetScreenMode(int aspect, int pip)
 		}
 	} else {
 		if (aspect != ratio) {
-			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &screenMode);
+			r = ioctl(cntl_handle, AMSTREAM_IOC_SET_SCREEN_MODE, &aspect);
 			if (r != 0) {
 				Debug(3, "AMSTREAM_IOC_SET_SCREEN_MODE failed, errno=%d", errno);
 			} else {
