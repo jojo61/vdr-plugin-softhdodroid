@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
 #include <math.h>
@@ -104,8 +105,6 @@
 //----------------------------------------------------------------------------
 //  Declarations
 //----------------------------------------------------------------------------
-typedef int Bool;
-#define bool Bool
 
 /**
 **	Audio output module structure and typedef.
@@ -180,6 +179,7 @@ static int use_cec = 0;                 /// USe CEC Commands for volup and voldo
 static int AudioCECDev=0;               /// Audio CEC Device Number
 extern int VideoAudioDelay;             ///< import audio/video delay
 extern int ConfigVideoFastSwitch;      ///< config fast channel switch
+extern int IsReplay(void);
 
 /// default ring buffer size ~2s 8ch 16bit (3 * 5 * 7 * 8)
 static const unsigned AudioRingBufferSize = 3 * 5 * 7 * 8 * 1000;
@@ -783,10 +783,6 @@ static int AlsaRatio;                   ///< internal -> mixer ratio * 1000
 static int AlsaPlayRingbuffer(void)
 {
     int first;
-
-#ifdef PERFTEST
-    static uint64_t mytime=0;
-#endif
 
     first = 1;
     for (;;) {                          // loop for ring buffer wrap
@@ -1650,7 +1646,7 @@ static void *AudioPlayHandlerThread(void *dummy)
                 if (!atomic_read(&AudioRingFilled)) {
                     Debug(3, "audio: HandlerThread Underrun with no new data\n");
                      if (!ConfigVideoFastSwitch)
-                        isFirstVideoPacket = 1;
+                        isFirstVideoPacket = true;
                     break;
                 }
 
@@ -1792,6 +1788,10 @@ void AudioEnqueue(const void *samples, int count)
     mytime = GetusTicks();
 #endif
 
+#ifdef PERFTEST
+    static int sw;
+#endif
+    
 #ifdef noDEBUG
     static uint32_t last_tick;
     uint32_t tick;
@@ -1871,7 +1871,7 @@ void AudioEnqueue(const void *samples, int count)
                 skip = n;    // Clear Audio until Video PTS
           
 #ifdef PERFTEST
-                static int sw=0;
+                sw=0;
                 if (!sw) {
                    //printf("%ld too small PTS apts  %#012" PRIx64 " vpts  %#012" PRIx64 " in %ld ms \n",n,AudioRing[AudioRingWrite].PTS,vpts ,(GetusTicks() - last_time) / 1000);
                    printf("Audio vorlauf ist %ldms \n",(vpts - AudioRing[AudioRingWrite].PTS) / 90);
@@ -1898,7 +1898,7 @@ void AudioEnqueue(const void *samples, int count)
 #endif
         }
         
-        if (ConfigVideoFastSwitch) {
+        if (ConfigVideoFastSwitch || IsReplay()) {
             skip = AudioSkip;
         }
         
