@@ -1841,9 +1841,10 @@ bool getResolution(char *mode) {
 		}
 	}
 	
-	if (myKernel == 5) {
+	if (myKernel == 5 ) {
 		amlSetInt("/sys/module/aml_media/parameters/di_debug_flag",0);
-		amlSetString("/sys/class/deinterlace/di0/debug","di_debug_flag0x0");
+		if (myMinor == 4) 
+			amlSetString("/sys/class/deinterlace/di0/debug","di_debug_flag0x0");
 	}
 
 
@@ -2076,7 +2077,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	switch (format)
 	{
 		case Hevc:
-			if (myKernel == 5 && myMajor == 4) {
+			if (myKernel == 5) {
 				if (dovi) {
 					hwdecoder->handle = open("/dev/amstream_dves_hevc_frame", flags); 
 				} else {
@@ -2181,8 +2182,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	{
 		if (!pip) {
 			//codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
-			if (myKernel == 5 && myMajor == 4 && format == Hevc) {
-				amlSetString("/sys/class/vfm/map","add pip0 vdec.h265.00   amvideo");
+			if (myKernel == 5 && format == Hevc) {
+				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
+				amlSetString("/sys/class/vfm/map","add pip0 vdec.h265.00 amvideo");
 
 			} 
 			else if (format == Hevc) {
@@ -3413,8 +3415,8 @@ void getKernelVersion() {
 
     errno = 0;
     if (uname(&buffer) != 0) {
-        printf("Error uname\n");
-		myKernel = 4;
+        Debug(3,"Error uname  assume Kernel 5\n");
+		myKernel = 5;
         return;
     }
 
@@ -3441,7 +3443,8 @@ void getKernelVersion() {
 	myKernel = ver[0];
 	myMajor = ver[1];
 	myMinor = ver[2];
-    //printf("Kernel %ld Major %ld Minor %ld\n", ver[0], ver[1], ver[2]);
+    Debug(3,"Kernel %ld Major %ld Minor %ld\n", ver[0], ver[1], ver[2]);
+	
 
 }
 
