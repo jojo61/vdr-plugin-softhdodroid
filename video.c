@@ -2666,6 +2666,7 @@ void ProcessBuffer(VideoHwDecoder *hwdecoder, const AVPacket* pkt)
 			case Hevc:
 						{
 							int nal_unit_type;
+							VideoSetHdr2Sdr(Hdr2Sdr);  // Update HDR2SDR Setting is needed
 							nalHeader = (unsigned char*)pkt->data;
 							while (len--) {
 								if (nalHeader[0] == 0 &&
