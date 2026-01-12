@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
 #include <string.h>
@@ -61,6 +62,7 @@
 #ifdef USE_ALSA
 #include <alsa/asoundlib.h>
 #endif
+
 #ifdef USE_OSS
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -101,6 +103,7 @@
 #include "misc.h"
 #include "audio.h"
 
+extern int myKernel;
 
 //----------------------------------------------------------------------------
 //  Declarations
@@ -1022,7 +1025,7 @@ static snd_pcm_t *AlsaOpenPCM(int passthrough)
         device = "default";
     }
     if (!AudioDoingInit) {              // reduce blabla during init
-        Info(_("audio: using %sdevice '%s'\n"), passthrough ? "pass-through " : "", device);
+        Debug(3,"audio: using %sdevice '%s'\n", passthrough ? "pass-through " : "", device);
     }
     //
     // for AC3 pass-through try to set the non-audio bit, use AES0=6
@@ -1045,9 +1048,12 @@ static snd_pcm_t *AlsaOpenPCM(int passthrough)
 #endif
     }
     // open none blocking; if device is already used, we don't want wait
-    if ((err = snd_pcm_open(&handle, device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0) {
-        Error(_("audio: playback open '%s' error: %s\n"), device, snd_strerror(err));
-        return NULL;
+    if ((err = snd_pcm_open(&handle, device, 
+        SND_PCM_STREAM_PLAYBACK, 
+        (SND_PCM_NONBLOCK | SND_PCM_NO_AUTO_FORMAT | SND_PCM_NO_AUTO_CHANNELS | SND_PCM_NO_AUTO_RESAMPLE)
+        )) < 0) {
+           Error(_("audio: playback open '%s' error: %s\n"), device, snd_strerror(err));
+           return NULL;
     }
 
     if ((err = snd_pcm_nonblock(handle, 0)) < 0) {
@@ -1066,6 +1072,8 @@ static void AlsaInitPCM(void)
     snd_pcm_t *handle;
     snd_pcm_hw_params_t *hw_params;
     int err;
+
+    snd_config_update();
 
     if (!(handle = AlsaOpenPCM(0))) {
         return;
@@ -1222,6 +1230,212 @@ static int64_t AlsaGetDelay(void)
     return pts;
 }
 
+snd_pcm_chmap_t* alsa_create_channel_map(unsigned int channels)
+{
+  assert(channels);
+
+  size_t size = offsetof(snd_pcm_chmap_t, pos[channels]);
+  assert(size >= sizeof(snd_pcm_chmap_t));
+
+  snd_pcm_chmap_t* map = (snd_pcm_chmap_t*) calloc(1, size);
+  assert(map);
+
+  enum snd_pcm_chmap_position layout[8] = {
+    SND_CHMAP_FL, SND_CHMAP_FR, SND_CHMAP_LFE, SND_CHMAP_FC, 
+    SND_CHMAP_RL, SND_CHMAP_RR, SND_CHMAP_SL, SND_CHMAP_SR 
+  };
+
+  map->channels = channels;
+  unsigned int i;
+  for (i = 0 ; i < map->channels ; ++i) {
+    map->pos[i] = layout[i];
+  }
+
+  return map;
+}
+
+extern int amlSetInt(char*, int);
+
+void AlsaSetChanMap(int channels,int set) {
+
+    snd_pcm_chmap_t* map = snd_pcm_get_chmap(AlsaPCMHandle);
+    if (!map) {
+        Debug(3,"Couldn't get channel map.\n");
+        //return;
+    } else {
+        for (int i = 0 ; i < map->channels ; ++i) {
+        //Debug(3,"map->pos[%d] = %d\n", i, map->pos[i]);
+        }
+        free(map);
+    }
+    if (!set)
+        return;
+        
+    map = alsa_create_channel_map(channels);
+
+    //Debug(3,"New channel map:");
+    for (int i = 0 ; i < map->channels ; ++i) {
+        //Debug(3,"map->pos[%d] = %d\n", i, map->pos[i]);
+    }
+    int r = snd_pcm_set_chmap(AlsaPCMHandle, map);
+
+    if (r) {
+        Debug(3,"[%d] Set channel map failed.\n", r);
+    }
+    
+    free(map);
+
+    if (myKernel==4) {
+        amlSetInt("/sys/class/audiodsp/digital_codec",channels > 2 ? 6 : 0 );
+        amlSetInt("/sys/class/audiodsp/digital_raw",0);
+    }
+}
+extern int UseAudioSpdif;
+void alsaSetMixer(int channels, int passthrough) {
+    
+  int err;
+  int cardNr = 0;
+  int codec = channels > 2 ? 6 : 0;
+  
+  if (cardNr >= 0)
+  {
+    snd_mixer_t *handle = NULL;
+    snd_mixer_elem_t *elem;
+    snd_mixer_selem_id_t *sid;
+
+    char card[64] = { 0 };
+    sprintf(card, "hw:%i", cardNr);
+
+    Debug(3,"CAESinkALSA - Use card \"%s\" and set codec format %d\n", card,codec );
+
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+
+    if ((err = snd_mixer_open(&handle, 0)) < 0)
+    {
+      Debug(3, "CAESinkALSA- can not open Mixer: %s\n", snd_strerror(err));
+      return;
+    }
+
+    if ((err = snd_mixer_attach(handle, card)) < 0)
+    {
+      Debug(3, "CAESinkALSA - Mixer attach %s error: %s", card, snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+
+    if ((err = snd_mixer_selem_register(handle, NULL, NULL)) < 0)
+    {
+      Debug(3, "CAESinkALSA - Mixer register error: %s", snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+
+    if ((err = snd_mixer_load(handle)) < 0)
+    {
+      Debug(3, "CAESinkALSA- Mixer %s load error: %s", card, snd_strerror(err));
+      snd_mixer_close(handle);
+      return;
+    }
+    
+    if (myKernel == 5) {
+        Debug(3,"CAESinkALSA - Set HDMITX Source to spdif_b \n");
+        snd_mixer_selem_id_set_name(sid, "HDMITX Audio Source Select");
+        elem = snd_mixer_find_selem(handle, sid);
+        if (!elem) {
+            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+            snd_mixer_close(handle);
+            return;
+        } else {
+            if (passthrough)
+                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, UseAudioSpdif ? 0 : 1 ); // 0 = spdif  1= spdif_b
+            else
+                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0,1); 
+        }
+        Debug(3,"CAESinkALSA - Set SPDIF CLK Fine Setting \n");
+        snd_mixer_selem_id_set_name(sid, "SPDIF CLK Fine Setting");
+        elem = snd_mixer_find_selem(handle, sid);
+        if (!elem) {
+            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+            snd_mixer_close(handle);
+            return;
+        } else
+            snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // SPDIF CLK FINE Setting to 0
+
+        // set codec format for I2S HDMIX
+        Debug(3,"CAESinkALSA - Set codec for I2S HDMITX\n");
+        snd_mixer_selem_id_set_name(sid, "Audio I2S to HDMITX Format");
+        elem = snd_mixer_find_selem(handle, sid);
+        if (!elem) {
+            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+            snd_mixer_close(handle);
+            return;
+        }
+        snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
+    }
+
+    // set codec format for SPDIF-B
+    Debug(3,"CAESinkALSA - Set codec for Spdif_b\n");
+    snd_mixer_selem_id_set_name(sid, "Audio spdif_b format");
+    elem = snd_mixer_find_selem(handle, sid);
+    if (!elem) {
+        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+        snd_mixer_close(handle);
+        return;
+    }
+
+    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
+
+    /* FALLTHROUGH */
+
+    // set codec format for SPDIF-A
+    Debug(3,"CAESinkALSA - Set codec for spdif\n");
+    snd_mixer_selem_id_set_name(sid, "Audio spdif format");
+    elem = snd_mixer_find_selem(handle, sid);
+    if (!elem) {
+        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
+            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
+        snd_mixer_close(handle);
+        return;
+    }
+
+    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
+    snd_mixer_close(handle);
+    
+  }
+
+}
+
+void list_all_supported_layouts(snd_pcm_t *handle) {
+    snd_pcm_chmap_query_t **maps = snd_pcm_query_chmaps(handle);
+    if (!maps) return;
+
+    for (snd_pcm_chmap_query_t **p = maps; *p; p++) {
+        snd_pcm_chmap_query_t *v = *p;
+        Debug(3,"Verfügbarer Typ: %s, Kanäle: %d\n", 
+               snd_pcm_chmap_type_name(v->type), v->map.channels);
+               printf("  Layout: [ ");
+        for (unsigned int c = 0; c < v->map.channels; c++) {
+            // Hole die Position des aktuellen Kanals
+            unsigned int pos = v->map.pos[c];
+            
+            // Wandle die Position in einen Namen um (z.B. "FL", "FR")
+            const char *ch_name = snd_pcm_chmap_name(pos);
+            
+            if (ch_name) {
+                Debug(3,"%s %d", ch_name,pos);
+            } else {
+                Debug(3,"UNKNOWN ");
+            }
+        }
+    }
+    snd_pcm_free_chmaps(maps);
+}
+
 /**
 **	Setup alsa audio for requested format.
 **
@@ -1239,8 +1453,12 @@ static int AlsaSetup(int *freq, int *channels, int passthrough)
 {
     snd_pcm_uframes_t buffer_size;
     snd_pcm_uframes_t period_size;
+    snd_pcm_hw_params_t *hw_params;
+
     int err;
     int delay;
+
+    Debug(3,"AlsaSetup: Freq %d Channels %d Passthrough %d ",*freq,*channels,passthrough);
 
     if (!AlsaPCMHandle) {               // alsa not running yet
         // FIXME: if open fails for fe. pass-through, we never recover
@@ -1257,71 +1475,87 @@ static int AlsaSetup(int *freq, int *channels, int passthrough)
         if (AudioAlsaCloseOpenDelay) {
             usleep(50 * 1000);          // 50ms delay for alsa recovery
         }
+        // Set Mixer before open
+        alsaSetMixer(*channels,passthrough);
         // FIXME: can use multiple retries
         if (!(handle = AlsaOpenPCM(passthrough))) {
+            Debug(3,"Alsa reopen failed");
             return -1;
         }
+        usleep(50 * 1000);
         AlsaPCMHandle = handle;
         //Debug(3, "audio: %s ]\n", __FUNCTION__);
     }
-
-    for (;;) {
-        if ((err =
-                snd_pcm_set_params(AlsaPCMHandle, SND_PCM_FORMAT_S16,
-                    AlsaUseMmap ? SND_PCM_ACCESS_MMAP_INTERLEAVED : SND_PCM_ACCESS_RW_INTERLEAVED, *channels, *freq, 1,
-                    96 * 1000))) {
-            // try reduced buffer size (needed for sunxi)
-            // FIXME: alternativ make this configurable
-            if ((err =
-                    snd_pcm_set_params(AlsaPCMHandle, SND_PCM_FORMAT_S16,
-                        AlsaUseMmap ? SND_PCM_ACCESS_MMAP_INTERLEAVED : SND_PCM_ACCESS_RW_INTERLEAVED, *channels,
-                        *freq, 1, 72 * 1000))) {
-
-                /*
-                   if ( err == -EBADFD ) {
-                   snd_pcm_close(AlsaPCMHandle);
-                   AlsaPCMHandle = NULL;
-                   continue;
-                   }
-                 */
-
-                if (!AudioDoingInit) {
-                    Error(_("audio: set params error: %s\n"), snd_strerror(err));
-                }
-                // FIXME: must stop sound, AudioChannels ... invalid
-                return -1;
-            }
-        }
-        break;
+#if 0
+    err = snd_pcm_set_params(AlsaPCMHandle, SND_PCM_FORMAT_S16,
+                AlsaUseMmap ? SND_PCM_ACCESS_MMAP_INTERLEAVED : SND_PCM_ACCESS_RW_INTERLEAVED, 
+                *channels, *freq, 1,96 * 1000);
+    
+    if (err < 0) {
+        Error(_("audio: set params error: %s\n"), snd_strerror(err));    
+    }
+#else
+    snd_pcm_hw_params_alloca(&hw_params);
+    
+    memset(hw_params, 0, snd_pcm_hw_params_sizeof());
+    err = snd_pcm_hw_params_any(AlsaPCMHandle, hw_params);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params any failed: %s\n"), snd_strerror(err));
+    }
+    err = snd_pcm_hw_params_set_access(AlsaPCMHandle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params access failed: %s\n"), snd_strerror(err));
+    }
+    err = snd_pcm_hw_params_set_format(AlsaPCMHandle, hw_params, SND_PCM_FORMAT_S16);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params format failed: %s\n"), snd_strerror(err));
+    }
+    err = snd_pcm_hw_params_set_rate(AlsaPCMHandle, hw_params, *freq, 0);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params rate failed: %s\n"), snd_strerror(err));
+    }
+    period_size = 1152;
+    buffer_size = 4608;
+    err = snd_pcm_hw_params_set_period_size_near(AlsaPCMHandle, hw_params, &period_size, NULL);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params period failed: %s\n"), snd_strerror(err));
+    }
+    err = snd_pcm_hw_params_set_buffer_size_near(AlsaPCMHandle, hw_params, &buffer_size);
+    if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params buffer_size failed: %s\n"), snd_strerror(err));
+    }
+    err = snd_pcm_hw_params_set_channels(AlsaPCMHandle, hw_params, *channels);
+     if (err < 0) {
+        Error(_("audio: snd_pcm_hw_params channels failed: %s\n"), snd_strerror(err));
     }
 
-    // this is disabled, no advantages!
-    if (0) {                            // no underruns allowed, play silence
-        snd_pcm_sw_params_t *sw_params;
-        snd_pcm_uframes_t boundary;
-
-        snd_pcm_sw_params_alloca(&sw_params);
-        err = snd_pcm_sw_params_current(AlsaPCMHandle, sw_params);
-        if (err < 0) {
-            Error(_("audio: snd_pcm_sw_params_current failed: %s\n"), snd_strerror(err));
-        }
-        if ((err = snd_pcm_sw_params_get_boundary(sw_params, &boundary)) < 0) {
-            Error(_("audio: snd_pcm_sw_params_get_boundary failed: %s\n"), snd_strerror(err));
-        }
-        Debug(4, "audio: boundary %lu frames\n", boundary);
-        if ((err = snd_pcm_sw_params_set_stop_threshold(AlsaPCMHandle, sw_params, boundary)) < 0) {
-            Error(_("audio: snd_pcm_sw_params_set_silence_size failed: %s\n"), snd_strerror(err));
-        }
-        if ((err = snd_pcm_sw_params_set_silence_size(AlsaPCMHandle, sw_params, boundary)) < 0) {
-            Error(_("audio: snd_pcm_sw_params_set_silence_size failed: %s\n"), snd_strerror(err));
-        }
-        if ((err = snd_pcm_sw_params(AlsaPCMHandle, sw_params)) < 0) {
-            Error(_("audio: snd_pcm_sw_params failed: %s\n"), snd_strerror(err));
-        }
+    err = snd_pcm_hw_params_test_channels(AlsaPCMHandle, hw_params, *channels); // check if channels are correct
+    if (err >= 0)
+    {
+      Debug(3,"Alsa Device Supports %d channels",*channels);
     }
+    else
+        Error(_("audio: snd_pcm_hw_test_channels failed: %s\n"), snd_strerror(err));
+
+    err = snd_pcm_hw_params(AlsaPCMHandle,hw_params); // set hw parameters
+    if (err < 0) {
+        Error(_("audio: set hw params error: %s\n"), snd_strerror(err));    
+    }
+
+    //list_all_supported_layouts(AlsaPCMHandle);
+
+    if (!passthrough)
+        AlsaSetChanMap(*channels,1);
+#endif
+
+    snd_pcm_prepare(AlsaPCMHandle);
+
+    
+
     // update buffer
 
     snd_pcm_get_params(AlsaPCMHandle, &buffer_size, &period_size);
+    Debug(3,"Buffersize %ld Period %ld",buffer_size,period_size);
     Debug(3, "audio: buffer size %lu %zdms, period size %lu %zdms\n", buffer_size,
         snd_pcm_frames_to_bytes(AlsaPCMHandle, buffer_size) * 1000 / (*freq * *channels * AudioBytesProSample),
         period_size, snd_pcm_frames_to_bytes(AlsaPCMHandle,
@@ -1341,6 +1575,7 @@ static int AlsaSetup(int *freq, int *channels, int passthrough)
     if (AudioStartThreshold > AudioRingBufferSize / 3) {
         AudioStartThreshold = AudioRingBufferSize / 3;
     }
+
     if (!AudioDoingInit) {
         Info(_("audio: start delay %ums\n"), (AudioStartThreshold * 1000)
             / (*freq * *channels * AudioBytesProSample));
@@ -1959,13 +2194,13 @@ void AudioVideoReady(uint64_t pts)
     }
 
     if (!pts || pts == (int64_t) AV_NOPTS_VALUE) {
-        Debug(3, "audio: a/v start, no valid video\n");
+        //Debug(3, "audio: a/v start, no valid video\n");
         return;
     }
     // no valid audio known
     if (!AudioRing[AudioRingWrite].HwSampleRate || !AudioRing[AudioRingWrite].HwChannels
         || AudioRing[AudioRingWrite].PTS == (int64_t) AV_NOPTS_VALUE) {
-        Debug(3, "audio: a/v start, no valid audio\n");
+        //Debug(3, "audio: a/v start, no valid audio\n");
         //AudioVideoIsReady = 1;
         return;
     }
@@ -2263,7 +2498,7 @@ void AudioPlay(void)
 {
     if (!AudioPaused) {
         Debug(3, "audio: not paused, check the code\n");
-        //return;
+        return;
     }
     Debug(3, "audio: resumed\n");
     AudioPaused = 0;

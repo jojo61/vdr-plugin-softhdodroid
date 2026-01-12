@@ -1171,7 +1171,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     }
 
 
-    uint8_t* src_ptr = posd;
+    uint8_t* src_ptr = (uint8_t*) posd;
     uint8_t* dst_ptr = (uint8_t*)map_ptr;
     dst_ptr += stride * (fb->Height() - 1);
     for(int i = 0; i < fb->Height(); ++i)

@@ -256,74 +256,32 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 {
     AVCodec *audio_codec;
     
-    if (myKernel == 4 ) {
-        if (CodecPassthrough) {
-            switch (codec_id) {
-            case AV_CODEC_ID_MP2:
-                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-                break;
-            case AV_CODEC_ID_AC3:
-                    amlSetInt("/sys/class/audiodsp/digital_codec", 2);
-                break;
-            case AV_CODEC_ID_EAC3:
-                    amlSetInt("/sys/class/audiodsp/digital_codec", 4);
-                break;
-            case AV_CODEC_ID_AAC_LATM:
-                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-                break;
-            case AV_CODEC_ID_AAC:
-                    amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-                break;
-            default:
-                Debug(3,"Unknown Audio Codec\n");
-                return;
-            }
+    if (myKernel == 4 && CodecPassthrough) {   
+        switch (codec_id) {
+        case AV_CODEC_ID_MP2:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        case AV_CODEC_ID_AC3:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 2);
+            break;
+        case AV_CODEC_ID_EAC3:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 4);
+            break;
+        case AV_CODEC_ID_AAC_LATM:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        case AV_CODEC_ID_AAC:
+                amlSetInt("/sys/class/audiodsp/digital_codec", 0);
+            break;
+        default:
+            Debug(3,"Unknown Audio Codec\n");
+            return;
         }
-        else {
-            amlSetInt("/sys/class/audiodsp/digital_codec", 0);
-        }
-        amlSetInt("/sys/class/audiodsp/digital_raw",CodecPassthrough ? 2: 0);
     }
-#if 0  
-    AHandle = audio_decoder->handle = open("/dev/amstream_abuf", O_WRONLY);
-    if (audio_decoder->handle < 0)
-	{	
-		Debug(3,"AmlAudio open failed. %d\n",audio_decoder->handle);
-        return;
-	}
-    int r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_AFORMAT, aFormat);
-    if (r < 0) {
-        Debug(3,"AmlAudio unable to set Audio Codec %d\n",aFormat);
-        return;
-    }
-    r = codec_h_ioctl_set(audio_decoder->handle,AMSTREAM_PORT_INIT,0);
-    if (r < 0) {
-        Debug(3,"AmlAudio unable to Init PORT \n");
-        return;
-    }
-    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_ACHANNEL, 2);
-    if (r < 0) {
-        Debug(3,"AmlAudio unable to set Audio Channels to 2\n");
-        return;
-    }
-    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_SAMPLERATE, 48000);
-    if (r < 0) {
-        Debug(3,"AmlAudio unable to set Audio Samplerate\n");
-        return;
-    }
-    r = codec_h_ioctl_set(audio_decoder->handle, AMSTREAM_SET_DATAWIDTH, 16);
-    if (r < 0) {
-        Debug(3,"AmlAudio unable to set Audio Datawidth\n");
-        return;
-    }
-    
-    //return;
-#endif
 
     Debug(3, "codec: using audio codec ID %#06x (%s)\n", codec_id, avcodec_get_name(codec_id));
 
     if (!(audio_codec = avcodec_find_decoder(codec_id))) {
-        // if (!(audio_codec = avcodec_find_decoder(codec_id))) {
         Fatal(_("codec: codec ID %#06x not found\n"), codec_id);
         // FIXME: errors aren't fatal
     }
@@ -369,13 +327,6 @@ void CodecAudioOpen(AudioDecoder * audio_decoder, int codec_id)
 void CodecAudioClose(AudioDecoder * audio_decoder)
 {
     // FIXME: output any buffered data
-
-#if 0
-    if (audio_decoder->handle > 0) {
-        close(audio_decoder->handle);
-        audio_decoder->handle = -1;
-    }
-#endif
 
 #ifdef USE_SWRESAMPLE
     if (audio_decoder->Resample) {
@@ -457,6 +408,7 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
     int ls;
     int rs;
     int lfe;
+    
 
     switch (channels) {
         case 5:
@@ -475,12 +427,12 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
             for (i = 0; i < size; i += 6) {
                 c = buf[i + 2];
                 lfe = buf[i + 3];
-                ls = buf[i + 4];
-                rs = buf[i + 5];
-                buf[i + 2] = lfe; // ls
-                buf[i + 3] = c;   // rs;
-                buf[i + 4] = ls;  //c;
-                buf[i + 5] = rs;  //lfe;
+//                ls = buf[i + 4];
+//                rs = buf[i + 5];
+                buf[i + 2] = lfe; //ls;
+                buf[i + 3] = c;   //rs;
+//                buf[i + 4] = ls;  //c;
+//                buf[i + 5] = rs;  //lfe;
 
             }
             break;
@@ -489,123 +441,15 @@ static void CodecReorderAudioFrame(int16_t * buf, int size, int channels)
             for (i = 0; i < size; i += 8) {
                 c = buf[i + 2];
                 lfe = buf[i + 3];
-                ls = buf[i + 4];
-                rs = buf[i + 5];
+//                ls = buf[i + 4];
+//                rs = buf[i + 5];
                 buf[i + 2] = lfe; //ls;
                 buf[i + 3] = c;   //rs;
-                buf[i + 4] = ls;  //c;
-                buf[i + 5] = rs;  //lfe;
+//                buf[i + 4] = ls;  //c;
+//                buf[i + 5] = rs;  //lfe;
             }
             break;
     }
-}
-
-void amlSetMixer(int codec, int passthrough) {
-    
-  int err;
-  int cardNr = 0;
-  
-  if (cardNr >= 0)
-  {
-    snd_mixer_t *handle = NULL;
-    snd_mixer_elem_t *elem;
-    snd_mixer_selem_id_t *sid;
-
-    char card[64] = { 0 };
-    sprintf(card, "hw:%i", cardNr);
-
-    Debug(3,"CAESinkALSA - Use card \"%s\" and set codec format %d\n", card,codec );
-
-    snd_mixer_selem_id_alloca(&sid);
-    snd_mixer_selem_id_set_index(sid, 0);
-
-    if ((err = snd_mixer_open(&handle, 0)) < 0)
-    {
-      Debug(3, "CAESinkALSA- can not open Mixer: %s\n", snd_strerror(err));
-      return;
-    }
-
-    if ((err = snd_mixer_attach(handle, card)) < 0)
-    {
-      Debug(3, "CAESinkALSA - Mixer attach %s error: %s", card, snd_strerror(err));
-      snd_mixer_close(handle);
-      return;
-    }
-
-    if ((err = snd_mixer_selem_register(handle, NULL, NULL)) < 0)
-    {
-      Debug(3, "CAESinkALSA - Mixer register error: %s", snd_strerror(err));
-      snd_mixer_close(handle);
-      return;
-    }
-
-    if ((err = snd_mixer_load(handle)) < 0)
-    {
-      Debug(3, "CAESinkALSA- Mixer %s load error: %s", card, snd_strerror(err));
-      snd_mixer_close(handle);
-      return;
-    }
-    
-    if (myKernel == 5) {
-        Debug(3,"CAESinkALSA - Set HDMITX Source to spdif_b \n");
-        snd_mixer_selem_id_set_name(sid, "HDMITX Audio Source Select");
-        elem = snd_mixer_find_selem(handle, sid);
-        if (!elem) {
-            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
-                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
-            snd_mixer_close(handle);
-            return;
-        } else {
-            if (passthrough)
-                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, UseAudioSpdif ? 0 : 1 ); // 0 = spdif  1= spdif_b
-            else
-                snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0,1); 
-        }
-        Debug(3,"CAESinkALSA - Set SPDIF CLK Fine Setting \n");
-        snd_mixer_selem_id_set_name(sid, "SPDIF CLK Fine Setting");
-        elem = snd_mixer_find_selem(handle, sid);
-        if (!elem) {
-            Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
-                snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
-            snd_mixer_close(handle);
-            return;
-        } else
-            snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, 0); // SPDIF CLK FINE Setting to 0
-    }
-
-    // set codec format for SPDIF-B
-    Debug(3,"CAESinkALSA - Set codec for Spdif_b\n");
-    snd_mixer_selem_id_set_name(sid, "Audio spdif_b format");
-    elem = snd_mixer_find_selem(handle, sid);
-    if (!elem) {
-        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
-            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
-        snd_mixer_close(handle);
-        return;
-    }
-
-    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
-
-    /* FALLTHROUGH */
-
-    // set codec format for SPDIF-A
-    Debug(3,"CAESinkALSA - Set codec for spdif\n");
-    snd_mixer_selem_id_set_name(sid, "Audio spdif format");
-    elem = snd_mixer_find_selem(handle, sid);
-    if (!elem) {
-        Debug(3, "CAESinkALSA - Unable to find simple control '%s',%i\n",
-            snd_mixer_selem_id_get_name(sid), snd_mixer_selem_id_get_index(sid));
-        snd_mixer_close(handle);
-        return;
-    }
-
-    snd_mixer_selem_set_enum_item(elem, (snd_mixer_selem_channel_id_t)0, codec);
-    snd_mixer_close(handle);
-    
-    
-    
-  }
-
 }
 
 /**
@@ -659,12 +503,6 @@ static int CodecAudioUpdateHelper(AudioDecoder * audio_decoder, int *passthrough
         audio_decoder->SpdifCount = 0;
         *passthrough = 1;
     }
-    
-    
-    amlSetMixer(audio_decoder->HwChannels > 2 ? 6 : 0, *passthrough);
-
-    if (!*passthrough && myKernel==4)
-        amlSetInt("/sys/class/audiodsp/digital_codec",audio_decoder->HwChannels > 2 ? 6 : 0 );
     
     // channels/sample-rate not support?
     if ((err = AudioSetup(&audio_decoder->HwSampleRate, &audio_decoder->HwChannels, *passthrough))) {
@@ -956,8 +794,10 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
     if (!CodecDownmix || CodecPassthrough) dmlayout = audio_ctx->channel_layout;
 #else
     if (!CodecDownmix || CodecPassthrough) dmlayout = audio_ctx->ch_layout;
+    
+    Debug(3,"Channelslayout %d chans %d mask %lx",dmlayout.order, dmlayout.nb_channels,dmlayout.u.mask);
 #endif
-
+    
 #ifdef DEBUG
     if (audio_ctx->sample_fmt == AV_SAMPLE_FMT_S16 && audio_ctx->sample_rate == audio_decoder->HwSampleRate
         && !CodecAudioDrift) {
@@ -980,6 +820,7 @@ static void CodecAudioUpdateFormat(AudioDecoder * audio_decoder)
 
     if (audio_decoder->Resample) {
 	    swr_init(audio_decoder->Resample);
+        
     } else {
 	    Error(_("codec/audio: can't setup resample\n"));
     }

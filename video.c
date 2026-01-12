@@ -117,7 +117,6 @@ int locale_dot=0;
 int myKernel,myMajor,myMinor;			/// Kernel Version
 int dovi;								/// Supports Dolby Vision
 
-
 #ifdef PERFTEST
 uint64_t last_time = 0,firstvpts,firstapts;
 #endif
@@ -225,6 +224,8 @@ const long USE_IDR_FRAMERATE = 0x04;
 const long UCODE_IP_ONLY_PARAM = 0x08;
 const long MAX_REFER_BUF = 0x10;
 const long ERROR_RECOVERY_MODE_IN = 0x20;
+
+#include "drm.c"
 
 /// Poll video events.
  void VideoPollEvent(void) {};
@@ -651,7 +652,7 @@ int GrabOsd(char *base, int width, int height) {
 
 	int _fbfd = open("/dev/fb0", O_RDONLY);
 	if (_fbfd < 0) {
-		printf("Unable to open fd0\n");
+		Debug(3,"Unable to open Framebuffer fd0\n");
 		return false;
 	}
 
@@ -663,12 +664,14 @@ int GrabOsd(char *base, int width, int height) {
 	capSize = VideoWindowWidth * VideoWindowHeight * bytesPerPixel;
 
 	/* map the device to memory */
-	char *_fbp = (char*)mmap(0, capSize, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, _fbfd, 0);
-	if (!_fbp)	{
-		printf("Unable to MMAP fb0\n");
+	char* _fbp = (char*)mmap(0, capSize, PROT_READ, MAP_SHARED , _fbfd, 0);
+	
+	if (_fbp == MAP_FAILED)	{
+		Debug(3,"Unable to MMAP Framebuffer fb0\n");
 		return false;
 	}
-	memcpy(base,_fbp,capSize);
+
+	memcpy(base,_fbp, capSize);
 	munmap(_fbp, capSize);
 	close(_fbfd);
 	return true;
@@ -1030,7 +1033,7 @@ void VideoGetVideoSize(VideoHwDecoder *i, int *width, int *height, int *aspect_n
 
  void VideoOsdExit(void) {};         ///< Cleanup osd.
 
-#include "drm.c"
+
 
 extern char SuspendMode;
 
@@ -2084,7 +2087,7 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 					hwdecoder->handle = open("/dev/amstream_hevc_frame", flags); 
 				}
 			} else {
-				hwdecoder->handle = open("/dev/amstream_hevc", flags);
+				hwdecoder->handle = open("/dev/amstream_hevc_frame", flags);
 			}
 			Debug(3,"AmlVideoSink - VIDEO/HEVC\n");
 
