@@ -204,7 +204,7 @@ static int FindDevice(VideoRender *render) {
     int found = 0;
     render->fd_drm = open("/dev/dri/card0", O_RDWR);
     if (render->fd_drm < 0) {
-        fprintf(stderr, "FindDevice: cannot open /dev/dri/card0: %m\n");
+        Debug(3, "FindDevice: cannot open /dev/dri/card0: %m\n");
         return -errno;
     }
 
@@ -227,29 +227,29 @@ static int FindDevice(VideoRender *render) {
     }
 
     version = drmGetVersion(render->fd_drm);
-    fprintf(stderr, "FindDevice: open /dev/dri/card0:  %s\n", version->name);
+    Debug(3, "FindDevice: open /dev/dri/card0:  %s\n", version->name);
 
     // check capability
     if (drmGetCap(render->fd_drm, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || has_dumb == 0)
-        fprintf(stderr, "FindDevice: drmGetCap DRM_CAP_DUMB_BUFFER failed or doesn't have dumb buffer\n");
+        Debug(3, "FindDevice: drmGetCap DRM_CAP_DUMB_BUFFER failed or doesn't have dumb buffer\n");
 
     if (drmSetClientCap(render->fd_drm, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) != 0)
-        fprintf(stderr, "FindDevice: DRM_CLIENT_CAP_UNIVERSAL_PLANES not available.\n");
+        Debug(3, "FindDevice: DRM_CLIENT_CAP_UNIVERSAL_PLANES not available.\n");
 
     if (drmSetClientCap(render->fd_drm, DRM_CLIENT_CAP_ATOMIC, 1) != 0)
-        fprintf(stderr, "FindDevice: DRM_CLIENT_CAP_ATOMIC not available.\n");
+        Debug(3, "FindDevice: DRM_CLIENT_CAP_ATOMIC not available.\n");
 
     if (drmGetCap(render->fd_drm, DRM_CAP_PRIME, &has_prime) < 0)
-        fprintf(stderr, "FindDevice: DRM_CAP_PRIME not available.\n");
+        Debug(3, "FindDevice: DRM_CAP_PRIME not available.\n");
 
     if (drmGetCap(render->fd_drm, DRM_PRIME_CAP_EXPORT, &has_prime) < 0)
-        fprintf(stderr, "FindDevice: DRM_PRIME_CAP_EXPORT not available.\n");
+        Debug(3, "FindDevice: DRM_PRIME_CAP_EXPORT not available.\n");
 
     if (drmGetCap(render->fd_drm, DRM_PRIME_CAP_IMPORT, &has_prime) < 0)
-        fprintf(stderr, "FindDevice: DRM_PRIME_CAP_IMPORT not available.\n");
+        Debug(3, "FindDevice: DRM_PRIME_CAP_IMPORT not available.\n");
 
     if ((resources = drmModeGetResources(render->fd_drm)) == NULL) {
-        fprintf(stderr, "FindDevice: cannot retrieve DRM resources (%d): %m\n", errno);
+        Debug(3, "FindDevice: cannot retrieve DRM resources (%d): %m\n", errno);
         return -errno;
     }
 
@@ -286,7 +286,7 @@ static int FindDevice(VideoRender *render) {
             render->connector_id = connector->connector_id;
             // FIXME: use default encoder/crtc pair
             if ((encoder = drmModeGetEncoder(render->fd_drm, connector->encoder_id)) == NULL) {
-                fprintf(stderr, "FindDevice: cannot retrieve encoder (%d): %m\n", errno);
+                Debug(3, "FindDevice: cannot retrieve encoder (%d): %m\n", errno);
                 return -errno;
             }
             render->crtc_id = encoder->crtc_id;
@@ -333,22 +333,22 @@ static int FindDevice(VideoRender *render) {
         printf("Requested Connector not found or not connected\n");
         return -1;
     }
-
+#if 0
     // find first plane
     if ((plane_res = drmModeGetPlaneResources(render->fd_drm)) == NULL)
-        fprintf(stderr, "FindDevice: cannot retrieve PlaneResources (%d): %m\n", errno);
+        Debug(3, "FindDevice: cannot retrieve PlaneResources (%d): %m\n", errno);
 
     for (j = 0; j < plane_res->count_planes; j++) {
         plane = drmModeGetPlane(render->fd_drm, plane_res->planes[j]);
 
         if (plane == NULL)
-            fprintf(stderr, "FindDevice: cannot query DRM-KMS plane %d\n", j);
+            Debug(3, "FindDevice: cannot query DRM-KMS plane %d\n", j);
 
         for (i = 0; i < resources->count_crtcs; i++) {
             if (plane->possible_crtcs & (1 << i))
                 break;
         }
-#if 0
+
         uint64_t type = GetPropertyValue(render->fd_drm, plane_res->planes[j], DRM_MODE_OBJECT_PLANE, "type");
         uint64_t zpos = 0;
 
@@ -376,11 +376,11 @@ static int FindDevice(VideoRender *render) {
             }
         }
         drmModeFreePlane(plane);
-#endif
+
     }
 
     drmModeFreePlaneResources(plane_res);
-
+#endif
     drmModeFreeEncoder(encoder);
     drmModeFreeResources(resources);
 
@@ -414,11 +414,11 @@ void VideoInitDrm() {
     uint32_t modeID = 0;
 
     if (drmModeCreatePropertyBlob(render->fd_drm, &render->mode, sizeof(render->mode), &modeID) != 0) {
-        fprintf(stderr, "Failed to create mode property.\n");
+        Debug(3, "Failed to create mode property.\n");
         return;
     }
     if (!(ModeReq = drmModeAtomicAlloc())) {
-        fprintf(stderr, "cannot allocate atomic request (%d): %m\n", errno);
+        Debug(3, "cannot allocate atomic request (%d): %m\n", errno);
         return;
     }
     //printf("set CRTC %d of Connector %d aktiv\n", render->crtc_id, render->connector_id);
@@ -428,25 +428,31 @@ void VideoInitDrm() {
     SetPropertyRequest(ModeReq, render->fd_drm, render->crtc_id, DRM_MODE_OBJECT_CRTC, "ACTIVE", 1);
 
     if (drmModeAtomicCommit(render->fd_drm, ModeReq, flags, NULL) != 0)
-        fprintf(stderr, "cannot set atomic mode (%d): %m\n", errno);
+        Debug(3, "cannot set atomic mode (%d): %m\n", errno);
 
     if (drmModeDestroyPropertyBlob(render->fd_drm, modeID) != 0)
-        fprintf(stderr, "cannot destroy property blob (%d): %m\n", errno);
+        Debug(3, "cannot destroy property blob (%d): %m\n", errno);
 
     drmModeAtomicFree(ModeReq);
-    drmDropMaster(render->fd_drm);
-    close(render->fd_drm);
-    free(render);
+    //drmDropMaster(render->fd_drm);
+    //close(render->fd_drm);
+    //free(render);
 }
 
-
-#if 0
 static void drm_clean_up() {
    
+    Debug(3,"drm cleanup %p",render);
     if (!render)
         return;
+    
+    if (render->saved_crtc) {
+        drmModeSetCrtc(render->fd_drm, render->saved_crtc->crtc_id, render->saved_crtc->buffer_id, render->saved_crtc->x,
+                   render->saved_crtc->y, &render->connector_id, 1, &render->saved_crtc->mode);
+        drmModeFreeCrtc(render->saved_crtc);
+    }
     drmDropMaster(render->fd_drm);
     close(render->fd_drm);
     free(render);
+    render = NULL;
+    NeedDRM = 1;  // activate drm for attach
 }
-#endif

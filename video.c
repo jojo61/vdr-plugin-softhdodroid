@@ -1086,8 +1086,10 @@ extern char SuspendMode;
 	}
 #endif
 	amlSetInt("/sys/class/graphics/fb0/blank", 1);
-	if (myKernel == 5)
+	if (myKernel == 5) {
+		drm_clean_up();
 		close(fd);
+	}
 #if 1
 	// Restore alpha setting
 	fd_m = open("/dev/fb0", O_RDWR);
