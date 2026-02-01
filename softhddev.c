@@ -3243,25 +3243,18 @@ void PipStop(void)
     if (!MyVideoStream->HwDecoder) {    // video not running
         return;
     }
-    amlSetVideoAxis(1, 0,0,0,0);
     
     mwx = 0; mwy = 0; mww = 0; mwh = 0;
-    amlSetVideoAxis(0, 0,0,VideoWindowWidth,VideoWindowHeight);
     PipVideoStream->Close = 1;
-#if 0
-    sleep(1);
-    InternalClose(OdroidDecoders[1]->pip);
-    amlSetString("/sys/class/vfm/map","rm vdec-map-1");
-    isPIP = 0;
-    DelPip();
-#endif
-    for (i = 0; PipVideoStream->Close && i < 50; ++i) {
+
+    for (i = 0; PipVideoStream->Close && i < 5000; ++i) {
         usleep(1 * 1000);
     }
-
+    
     PiPActive = 0;
+    amlSetVideoAxis(1, 0,0,0,0);    // clear pip video window
     amlSetVideoAxis(0, 0,0,VideoWindowWidth,VideoWindowHeight);
-    Debug(3,"[softhddev]%s: pip close %d\n", __FUNCTION__,i);
+    Debug(3,"[softhddev]%s: pip close in %dms\n", __FUNCTION__,i);
 }
 
 /**

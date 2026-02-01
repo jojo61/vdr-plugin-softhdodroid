@@ -794,7 +794,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
     width = scan_str(vdec_status,"width : ");
 	height = scan_str(vdec_status,"height : ");
 
-	//printf("Video is %d-%d\n",width,height);
+	//Debug(3,"Video is %d-%d\n",width,height);
     // get real surface size
 
 //	if ( (mitosd & OsdShown)) {
@@ -836,7 +836,7 @@ uint8_t *OdroidVideoGrab(int *ret_size, int *ret_width, int *ret_height, int mit
             }
         }
 #endif
-        //printf("video/cuvid: grab source  dim %dx%d\n", width, height);
+        //Debug(3,"video/cuvid: grab source  dim %dx%d\n", width, height);
 
         size = width * height * sizeof(uint32_t);
 
@@ -1855,7 +1855,7 @@ bool getResolution(char *mode) {
 
 	winx = VideoWindowX; winy = VideoWindowY; winh = VideoWindowHeight; winw = VideoWindowWidth;
 
-	if (myKernel == 4) {
+	if (1) {  // Hint: check here for kernel Version 
 		// Check if H264-PIP is available
 		int fd1 = open("/dev/amstream_vframe", O_WRONLY);
 		int fd2 = open("/dev/amstream_vframe", O_WRONLY);  // can we open a second time
@@ -2186,7 +2186,9 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 	if (apiLevel >= S905) // S905
 	{
 		if (!pip) {
-			//codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
+#if 0
+			codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_TUNNEL_MODE);
+#else
 			if (myKernel == 5 && format == Hevc) {
 				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.h265.00 amvideo");
@@ -2204,16 +2206,21 @@ void InternalOpen(VideoHwDecoder *hwdecoder, int format, double frameRate)
 				amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 				amlSetString("/sys/class/vfm/map","add pip0 vdec.mpeg12.00 ppmgr deinterlace  amvideo");
 			}
+#endif
 		}
 		//amlSetInt("/sys/class/video/blackout_policy", 0);
 
 		if (use_pip && PIP_allowed && pip) {
 			isPIP = true;
-		    if (format == Avc) {
-		       	amlSetString("/sys/class/vfm/map","add pip1 vdec.h264.01 videopip");
-			}
-			else {
-			   amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videopip");
+			if (myKernel == 4) {
+				if (format == Avc) {
+					amlSetString("/sys/class/vfm/map","add pip1 vdec.h264.01 videopip");
+				}
+				else {
+					amlSetString("/sys/class/vfm/map","add pip1 vdec.mpeg12.01 videopip");
+				}
+			} else {
+				codec_h_ioctl_set(handle,AMSTREAM_SET_FRAME_BASE_PATH,FRAME_BASE_PATH_PIP_TUNNEL_MODE);
 			}
 			amlSetInt("/sys/class/video/pip_global_output",1);
 		}
@@ -3138,6 +3145,7 @@ void amlReset()
 void InternalClose(int pip)
 {
 	int r;
+	uint32_t nMode;
 	
 	pthread_mutex_lock(&VideoLockMutex);
 	int handle = OdroidDecoders[pip]->handle;
@@ -3148,29 +3156,38 @@ void InternalClose(int pip)
 		return;
 	}
 
-	r = close(handle);
-	if (r < 0)
-	{
-		//codecMutex.Unlock();
-		printf("close handle failed PIP %d %s\n.",pip,strerror(errno));
-		pthread_mutex_unlock(&VideoLockMutex);
-		return;
+	if (pip) {
+		
+		if (myKernel == 4) {
+			r = close(handle);
+			nMode = 1;
+			ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
+		} else {
+			nMode = 2;	
+			ioctl(cntl_handle, AMSTREAM_IOC_CLEAR_VIDEOPIP, &nMode);
+			usleep(50000);  // wait 50ms for clear to finish
+			r = close(handle);
+		}
+
+		if (r < 0)
+			Debug(3,"close handle failed PIP %d %s\n.",pip,strerror(errno));
+		
+		amlSetInt("/sys/class/video/pip_global_output",0);
+		
+		if (myKernel == 4) {
+			amlSetString("/sys/class/vfm/map","rm pip1");
+			amlSetString("/sys/class/vfm/map","rm vdec-map-1");
+		}
+		
+	} else {
+		r = close(handle);
+		if (r < 0)
+			Debug(3,"close handle failed PIP %d %s\n.",pip,strerror(errno));
+
+		amlSetString("/sys/class/vfm/map","rm pip0");
+		amlSetString("/sys/class/vfm/map","rm vdec-map-0");
 	}
 	
-
-	if (pip) {
-		if (myKernel == 4) {
-			uint32_t nMode = 1;
-			ioctl(cntl_handle, AMSTREAM_IOC_SET_VIDEOPIP_DISABLE, &nMode);
-		}
-		amlSetString("/sys/class/vfm/map","rm pip1");
-		amlSetString("/sys/class/vfm/map","rm vdec-map-1");
-		amlSetInt("/sys/class/video/pip_global_output",0);
-	} else {
-		amlSetString("/sys/class/vfm/map","rm pip0");
-	}
-
-
 	OdroidDecoders[pip]->handle = -1;
 
 	if (pip)
