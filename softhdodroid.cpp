@@ -1865,6 +1865,7 @@ static void SwapPipChannels(void)
     channel = PipChannel;
 
     DelPip();
+    sleep(1);
     NewPip(0);
 
     if (channel) {
