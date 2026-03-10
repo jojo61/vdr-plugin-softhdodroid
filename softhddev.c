@@ -2432,6 +2432,7 @@ int SetPlayMode(int play_mode)
     switch (play_mode) {
         case 0:
             hasVideo = 0;
+            AudioPause();
             if (MyVideoStream->Decoder && !MyVideoStream->SkipStream) {
                Clear();
                MyVideoStream->ClearClose = 0;
@@ -2451,7 +2452,11 @@ int SetPlayMode(int play_mode)
         case 3:                        // audio only from player, no video (black screen)
         case 4:                        // video only from player, audio from decoder
         case 5:                        // pmExtern_THIS_SHOULD_BE_AVOIDED
-            Play();
+            //Play();
+            TrickSpeed(0,0);           // normal play
+            SkipAudio = 0;
+            amlResume();
+
             break;
     }
     return 1;

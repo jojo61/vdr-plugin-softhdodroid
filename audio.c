@@ -2261,6 +2261,7 @@ void AudioVideoReady(uint64_t pts)
     //}
     Debug(3,"audio: AudioVideoIsReady");
     AudioVideoIsReady = 1;
+    AudioPlay();
 
 }
 
