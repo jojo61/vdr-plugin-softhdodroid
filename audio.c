@@ -2170,7 +2170,7 @@ void AudioEnqueue(const void *samples, int count)
             pthread_cond_signal(&AudioStartCond);
             Debug(3, "audio: Start on AudioEnque Threshold %d n %ld IsReady %d\n", AudioStartThreshold, n, AudioVideoIsReady);
         }
-
+        AudioPlay();
     }
     // Update audio clock (stupid gcc developers thinks INT64_C is unsigned)
     if (AudioRing[AudioRingWrite].PTS != (int64_t) AV_NOPTS_VALUE) {
@@ -2261,7 +2261,6 @@ void AudioVideoReady(uint64_t pts)
     //}
     Debug(3,"audio: AudioVideoIsReady");
     AudioVideoIsReady = 1;
-    AudioPlay();
 
 }
 
