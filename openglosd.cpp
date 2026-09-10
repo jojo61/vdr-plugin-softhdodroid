@@ -29,8 +29,12 @@
 #define EGL_EGLEXT_PROTOTYPES
 #define MESA_EGL_NO_X11_HEADERS
 #include <EGL/egl.h>
+#include <EGL/eglplatform.h>
 #include <libdrm/drm_fourcc.h>
 #include <EGL/eglext.h>
+#include <gbm.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 #include "ge2d.h"
 #include "ge2d_cmd.h"
@@ -63,18 +67,23 @@
 int ge2d_fd = -1;
 int ion_fd = -1;
 
-static EGLSurface eglSurface;
-static EGLDisplay eglDisplay;
-static EGLContext eglContext;
+
+int drm_fd = -1;
+static struct gbm_device *gbm_dev;
+EGLContext egl_ctx;
+EGLDisplay egl_dpy;
+
+
+int eglInitiated = 0;
 
 int MyOsdWidth, MyOsdHeight;
-
 
 
 extern "C" void ClearDisplay();
 extern "C" void WaitVsync();;
 extern "C" void ClearCursor(int);
 extern "C" void makejpg(uint8_t * data, int width, int height);
+
 
 /****************************************************************************************
 * Helpers
@@ -236,7 +245,7 @@ void main() \
     GLenum err;\
 \
     if ((err = glGetError()) != GL_NO_ERROR) {\
-        esyslog( "video/glx: error %s:%d %d \n",__FILE__,__LINE__, err);\
+        esyslog( "video/glx: error %s:%d %x \n",__FILE__,__LINE__, err);\
     }\
 }
 
@@ -632,27 +641,28 @@ cOglFb::~cOglFb(void)
 bool cOglFb::Init(void)
 {
     initiated = true;
-
+    
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    GlxCheck();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
     glGenFramebuffers(1, &fb);
     glBindFramebuffer(GL_FRAMEBUFFER, fb);
-
+    GlxCheck();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     GlxCheck();
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        esyslog("[softhddev]ERROR: %d Framebuffer is not complete!\n", __LINE__);
-
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        esyslog("[softhddev]ERROR: %d Framebuffer is not complete! Code: 0x%X\n", __LINE__, status);
+        glDeleteTextures(1, &texture);
+        glDeleteFramebuffers(1, &fb);
         return false;
     }
-
+    
     return true;
 }
 
@@ -716,49 +726,59 @@ extern int DmaBufferHandle, VideoWindowWidth, VideoWindowHeight;
 bool cOglOutputFb::Init(void)
 {
     initiated = true;
+    
+    glGenTextures(1, &texture);
+    void *frameBufferImage = nullptr;
 
-	glGenTextures(1, &texture);
+    // === DMA-BUF ALS RENDER-TARGET (MUSS GL_TEXTURE_2D SEIN) ===
     glBindTexture(GL_TEXTURE_2D, texture);
-    void *frameBufferImage = {0};
-
-    if (DmaBufferHandle >= 0 ) {
-        EGLint img_attrs[] = {
-                EGL_WIDTH, VideoWindowWidth,
-                EGL_HEIGHT, VideoWindowHeight,
-                EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888,	//DRM_FORMAT_RGBA8888
-                EGL_DMA_BUF_PLANE0_FD_EXT,	DmaBufferHandle,
-                EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-                EGL_DMA_BUF_PLANE0_PITCH_EXT, VideoWindowWidth * 4,
-                EGL_NONE
-            };
-
-        frameBufferImage = eglCreateImageKHR(eglDisplay, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, 0, img_attrs);
-        GlxCheck();
-    } else {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    }
-
-    GlxCheck();
+    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    if (DmaBufferHandle >= 0) {
+        EGLint img_attrs[] = {
+            EGL_WIDTH, VideoWindowWidth,
+            EGL_HEIGHT, VideoWindowHeight,
+            EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_ARGB8888, 
+            EGL_DMA_BUF_PLANE0_FD_EXT, DmaBufferHandle,
+            EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+            EGL_DMA_BUF_PLANE0_PITCH_EXT, VideoWindowWidth * 4,
+            EGL_NONE
+        };
 
-    if (DmaBufferHandle >= 0)
-        glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, frameBufferImage);
+        frameBufferImage = eglCreateImageKHR(egl_dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, 0, img_attrs);
+        
+        if (frameBufferImage != EGL_NO_IMAGE_KHR) {
+            // Hier nutzen wir nun GL_TEXTURE_2D statt EXTERNAL_OES
+            glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, frameBufferImage);
+            GlxCheck(); 
+        } else {
+            esyslog("[softhddev] ERROR: eglCreateImageKHR failed!");
+            return false;
+        }
+    } else {
+        // Fallback falls kein DMA-Handle da ist
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VideoWindowWidth, VideoWindowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
 
+    // FBO Setup
     glGenFramebuffers(1, &fb);
     glBindFramebuffer(GL_FRAMEBUFFER, fb);
-    
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
     GlxCheck();
+    
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        esyslog("[softhddev]ERROR::cOglOutputFb: Framebuffer is not complete!");
+        esyslog("[softhddev]ERROR::cOglOutputFb: Framebuffer is not complete! %04x", glCheckFramebufferStatus(GL_FRAMEBUFFER));
         return false;
     }
+    
     return true;
 }
+
 
 void cOglOutputFb::BindWrite(void)
 {
@@ -1053,7 +1073,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
     if (OsdIsClosing || Opening)
         return true;
     Opening = 1;
-    eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+
     OsdShown = 1;
     if (DmaBufferHandle >= 0) {
         fb->BindRead();
@@ -1100,12 +1120,12 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         VertexBuffers[vbTexture]->EnableBlending();
         glFlush();
 
-        oFb->Unbind();
-        fb->BindRead();
         if (myKernel == 5) {
-            usleep(25000);
+            usleep(5000);
 	        amlSetInt(path, 0 );
         }
+        oFb->Unbind();
+        fb->BindRead();
         Opening = 0;
         return true;
     }
@@ -1915,7 +1935,8 @@ cOglThread::~cOglThread()
     ClearCursor(0);
     //close(fd);
     //close(ge2d_fd);
-    close(ion_fd);
+    if (ion_fd >= 0 ) 
+        close(ion_fd);
 }
 
 void cOglThread::Stop(void)
@@ -1927,6 +1948,14 @@ void cOglThread::Stop(void)
     }
     Cancel(2);
     stalled = false;
+
+#ifndef _MALI_FBDEV_TYPES_H_ 
+    if (drm_fd >= 0) {
+        gbm_device_destroy(gbm_dev);
+        close(drm_fd);
+    }
+    drm_fd = -1;
+#endif
 }
 
 void cOglThread::DoCmd(cOglCmd * cmd)
@@ -2068,6 +2097,7 @@ void cOglThread::DropImageData(int imageHandle)
 
 void cOglThread::Action(void)
 {
+    
     if (!InitOpenGL()) {
         esyslog("[softhddev]Could not initiate OpenGL Context");
         Cleanup();
@@ -2131,141 +2161,121 @@ bool cOglThread::InitOpenGL(void)
 
     EGLNativeDisplayType nativeDisplay=EGL_DEFAULT_DISPLAY;
 
-	ion_fd = open("/dev/ion", O_RDWR);
-	if (ion_fd < 0)
-	{
-		printf("open /dev/ion failed.");
-	}
+    ion_fd = open("/dev/ion", O_RDWR);
+    if (ion_fd < 0)
+    {
+            printf("open /dev/ion failed.");
+    }
 
-    eglDisplay = eglGetDisplay(nativeDisplay);
 
-        // Initialize EGL
-	EGLint major;
-	EGLint minor;
-	EGLBoolean success = eglInitialize( eglDisplay, &major, &minor);
-	if (success != EGL_TRUE)
-	{
-        printf("failed to initialize EGL display\n");
-		GlxCheck();
-	}
+    egl_dpy = eglGetDisplay(nativeDisplay);
+    
+    // Initialize EGL
+    EGLint major;
+    EGLint minor;
+    EGLBoolean success;
 
-#if 0
-	printf("EGL: major=%d, minor=%d\n", major, minor);
-	printf("EGL: Vendor=%s\n", eglQueryString(eglDisplay, EGL_VENDOR));
-	printf("EGL: Version=%s\n", eglQueryString(eglDisplay, EGL_VERSION));
-	printf("EGL: ClientAPIs=%s\n", eglQueryString(eglDisplay, EGL_CLIENT_APIS));
-	printf("EGL: Extensions=%s\n", eglQueryString(eglDisplay, EGL_EXTENSIONS));
-	printf("EGL: ClientExtensions=%s\n", eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS));
-	printf("\n");
+#ifdef _MALI_FBDEV_TYPES_H_ 
+    success = eglInitialize( egl_dpy, &major, &minor);
+    if (success != EGL_TRUE)
+    {
+        printf("Unable to open Display\n");
+        return false;
+    }
+#else
+    printf("Try Mesa GBM\n");
+    // DRM initialisieren (Grafikkarte öffnen)
+    drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (drm_fd < 0) {
+        perror("Fehler beim Öffnen von /dev/dri/card0");
+        return false;
+    }
+
+    // GBM initialisieren
+    gbm_dev = gbm_create_device(drm_fd);
+    // EGL initialisieren über die GBM-Plattform
+    PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT = 
+        (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    
+    egl_dpy = eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_MESA, gbm_dev, NULL);
+    success = eglInitialize(egl_dpy, NULL, NULL);
+    if (success != EGL_TRUE)
+    {
+        printf("failed to initialize EGL display with GBM\n");
+        return false;
+    }
 #endif
+    
 
-    const EGLint configAttributes[] = {
+    EGLConfig *configs = nullptr;
+    EGLint num_configs;
+    EGLint attribs[] = {
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_ALPHA_SIZE, 0,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_DEPTH_SIZE, 16,
-        EGL_STENCIL_SIZE, 0,
-        EGL_BUFFER_SIZE,  32,
-        EGL_SAMPLES, 4,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_RED_SIZE, 8, 
+        EGL_GREEN_SIZE, 8, 
+        EGL_BLUE_SIZE, 8, 
+        EGL_ALPHA_SIZE,6, 
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
         EGL_NONE
     };
 
-	int num_configs;
-	success = eglChooseConfig(eglDisplay, configAttributes, NULL, 0, &num_configs);
-	if (success != EGL_TRUE)
-	{
-		GlxCheck();
-	}
+    EGLint count = 0;
+	eglGetConfigs(egl_dpy, NULL, 0, &count);
+	if (count < 1) {
+		printf("drmdevice: %s: no EGL configs to choose from\n", __FUNCTION__);
+        return false;
+    }
+	printf("drmdevice: %s: %d EGL configs found\n", __FUNCTION__, count);
 
-    EGLConfig* configs = new EGLConfig[num_configs];
-	success = eglChooseConfig(eglDisplay, configAttributes, configs, num_configs, &num_configs);
-	if (success != EGL_TRUE)
-	{
-        printf("No EGL Config found\n");
-		GlxCheck();
-	}
-
-	EGLConfig match = 0;
-
-	for (int i = 0; i < num_configs; ++i)
-	{
-		EGLint configRedSize;
-		EGLint configGreenSize;
-		EGLint configBlueSize;
-		EGLint configAlphaSize;
-		EGLint configDepthSize;
-		EGLint configStencilSize;
-
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_RED_SIZE, &configRedSize);
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_GREEN_SIZE, &configGreenSize);
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_BLUE_SIZE, &configBlueSize);
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_ALPHA_SIZE, &configAlphaSize);
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_DEPTH_SIZE, &configDepthSize);
-		eglGetConfigAttrib(eglDisplay, configs[i], EGL_STENCIL_SIZE, &configStencilSize);
-
-		if (configRedSize == 8 &&
-			configBlueSize == 8 &&
-			configGreenSize == 8 &&
-			configAlphaSize == 8 )
-		{
-			match = configs[i];
-			break;
-		}
-	}
-
-    delete[] configs;
-
-    if (match == 0) {
-        printf("No config found\n");
+	configs = (EGLConfig *)malloc(count * sizeof(*configs));
+	if (!configs) {
+		printf("drmdevice: %s: can't allocate space for EGL configs\n", __FUNCTION__);
+        return false;
     }
 
-    const EGLint contextAttributes[] =
-    {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
-        EGL_NONE
-    };
+    eglChooseConfig(egl_dpy, attribs, configs, 1, &num_configs);
+    if (!num_configs) {
+		free(configs);
+		printf("drmdevice: %s: no EGL configs with appropriate attributes\n", __FUNCTION__);
+        return false;
+	}
+    printf("drmdevice: %s: %d appropriate EGL configs found, which match attributes\n", __FUNCTION__, num_configs);
 
+	EGLConfig chosen = NULL;
+    EGLint configRedSize;
+    EGLint configGreenSize;
+    EGLint configBlueSize;
+    EGLint configAlphaSize;
 
-    if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE)
-    {
-        printf( "failed to bind EGL API\n");
+	for (int i = 0; i < num_configs; ++i) {
+		
+        eglGetConfigAttrib(egl_dpy, configs[i], EGL_RED_SIZE, &configRedSize);
+        eglGetConfigAttrib(egl_dpy, configs[i], EGL_GREEN_SIZE, &configGreenSize);
+        eglGetConfigAttrib(egl_dpy, configs[i], EGL_BLUE_SIZE, &configBlueSize);
+        eglGetConfigAttrib(egl_dpy, configs[i], EGL_ALPHA_SIZE, &configAlphaSize);        
+        
+        if (configRedSize == 8 &&
+            configBlueSize == 8 &&
+            configGreenSize == 8 &&
+            configAlphaSize == 8 )
+        {
+            chosen = configs[i];
+            break;
+        } 
+	}
+
+	free(configs);
+	if (chosen == NULL) {
+		printf("drmdevice: %s: no matching config found\n", __FUNCTION__);
+        return false;
     }
-    GlxCheck();
 
-    eglContext = eglCreateContext(eglDisplay, match, EGL_NO_CONTEXT, contextAttributes);
-    GlxCheck();
-    if (eglContext == EGL_NO_CONTEXT) {
-        printf("no Context created\n");
-    }
+    eglBindAPI(EGL_OPENGL_ES_API);
+    EGLint ctx_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+    egl_ctx = eglCreateContext(egl_dpy, chosen, EGL_NO_CONTEXT, ctx_attribs);
 
-    //eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+    eglMakeCurrent(egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, egl_ctx);
 
-    ClearCursor(1);
-
-    eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, eglContext);
-
-#if 0
-    // Clear 3 OSD Buffers
-    glClearColor(0,0,0,0) ;
-    glClear(GL_COLOR_BUFFER_BIT);
-    WaitVsync();
-    eglSwapBuffers(eglDisplay, eglSurface);
-    glClear(GL_COLOR_BUFFER_BIT);
-    WaitVsync();
-    eglSwapBuffers(eglDisplay, eglSurface);
-    glClear(GL_COLOR_BUFFER_BIT);
-    WaitVsync();
-    eglSwapBuffers(eglDisplay, eglSurface);
-#endif
-
-    VertexBuffers[vbText]->EnableBlending();
-
-    glDisable(GL_DEPTH_TEST);
-    GlxCheck();
-    OsdClose();
     return true;
 
 }

@@ -95,7 +95,7 @@ static int VideoWindowX = 0;                ///< video output window x coordinat
 static int VideoWindowY = 0;                ///< video outout window y coordinate
 int VideoWindowWidth = 1920;       ///< video output window width
 int VideoWindowHeight = 1080;      ///< video output window height
-int NeedDRM = 0;
+int NeedDRM = 1;
 static int OsdConfigWidth;              ///< osd configured width
 static int OsdConfigHeight;             ///< osd configured height
 static int OsdWidth;                    ///< osd width

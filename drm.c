@@ -456,3 +456,248 @@ static void drm_clean_up() {
     render = NULL;
     NeedDRM = 1;  // activate drm for attach
 }
+
+#if 0
+
+    // DRM Master-Rechte anfordern (wichtig für Legacy KMS Modosetting)
+    if (drmSetMaster(drm_fd) < 0) {
+        printf("Fehler beim Setzen von DRM Master \n");
+        close(drm_fd);
+        return false;
+    }
+
+    // Passende Ressourcen (Connector, CRTC) finden
+    drmModeRes *resources = drmModeGetResources(drm_fd);
+    
+    for (int i = 0; i < resources->count_connectors; i++) {
+        drmModeConnector *conn = drmModeGetConnector(drm_fd, resources->connectors[i]);
+        if (conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0) {
+            connector_id = conn->connector_id;
+            mode = conn->modes[0]; // Nutze die erste (oft native) Auflösung
+            drmModeFreeConnector(conn);
+            break;
+        }
+        drmModeFreeConnector(conn);
+    }
+
+    if (connector_id == 0) {
+        fprintf(stderr, "Keinen aktiven Bildschirm gefunden.\n");
+        return false;
+    }
+
+    // Aktive CRTC ermitteln
+    int crtc_index = -1;
+    crtc_id = find_active_crtc(drm_fd, &crtc_index);
+    if (crtc_id == 0 || crtc_index == -1) {
+        fprintf(stderr, "Keine aktive CRTC/Bildschirm gefunden.\n");
+        close(drm_fd);
+        return false;
+    }
+    printf("[DRM] Nutze aktive CRTC ID: %u (Index: %d)\n", crtc_id, crtc_index);
+
+    drmModeFreeResources(resources);
+
+    // Set atomic client caps so the kernel exposes atomic planes/properties
+    drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+    drmSetClientCap(drm_fd, DRM_CLIENT_CAP_ATOMIC, 1);
+
+       // Nach einer geeigneten Video Plane suchen
+    drmModePlaneRes *plane_res = drmModeGetPlaneResources(drm_fd);
+    if (!plane_res) {
+        perror("Kann Plane-Ressourcen nicht auslesen");
+        close(drm_fd);
+        return false;
+    }
+
+    video_plane_id = 0;
+    
+    for (uint32_t i = 0; i < plane_res->count_planes; i++) {
+        uint32_t p_id = plane_res->planes[i];
+        drmModePlane *plane = drmModeGetPlane(drm_fd, p_id);
+        if (!plane) continue;
+
+        // Kriterium 1: Passt die Plane zur aktuellen CRTC?
+        if (!(plane->possible_crtcs & (1 << crtc_index))) {
+            printf("Plane Nr %d passt nicht zum CRTC\n",p_id);
+            drmModeFreePlane(plane);
+            continue;
+        }
+
+        // Kriterium 2: Prüfen, ob das Format unterstützt wird
+        bool format_ok = false;
+        for (uint32_t j = 0; j < plane->count_formats; j++) {
+            if (plane->formats[j] == target_format) {
+                format_ok = true;
+                break;
+            }
+        }
+        if (!format_ok) {
+            drmModeFreePlane(plane);
+            continue;
+        }
+
+        // Kriterium 3: Über Properties prüfen, ob es sich um eine OVERLAY Plane handelt
+        uint64_t plane_type = -1;
+        if (get_plane_property_value(drm_fd, p_id, "type", &plane_type)) {
+            // DRM_PLANE_TYPE_OVERLAY hat den numerischen Wert 0
+            if (plane_type == DRM_PLANE_TYPE_PRIMARY) {
+                video_plane_id = p_id;
+                drmModeFreePlane(plane);
+                break; // Gefunden!
+            }
+        }
+        drmModeFreePlane(plane);
+    }
+#if 0
+        // Retrieve properties attached to this plane
+        drmModeObjectProperties *props = drmModeObjectGetProperties(drm_fd, video_plane_id, DRM_MODE_OBJECT_PLANE);
+        if (!props) {
+            fprintf(stderr, "Failed to get plane properties\n");
+            return false;
+        }
+
+        // Discover the "pixel blend mode" property ID
+        uint32_t blend_mode_prop_id = find_property_id(drm_fd, props, "pixel blend mode");
+        if (blend_mode_prop_id == 0) {
+            printf("The driver or this plane does not support the 'pixel blend mode' property.\n");
+            return false;
+        }
+        printf("Found 'pixel blend mode' Property ID: %d\n", blend_mode_prop_id);
+
+        // Discover the "alpha" property ID
+        uint32_t alpha_prop_id = find_property_id(drm_fd, props, "alpha");
+        if (alpha_prop_id == 0) {
+            printf("The driver or this plane does not support the 'alpha' property.\n");
+            return false;
+        }
+        printf("Found 'pixel blend mode' Property ID: %d\n", alpha_prop_id);
+
+        // Look up the specific enum value for "Pre-multiplied"
+        // Standard names are: "None", "Pre-multiplied", "Coverage"
+        uint64_t coverage_val = find_enum_value(drm_fd, blend_mode_prop_id, "Coverage");
+        if (coverage_val == (uint64_t)-1) {
+            fprintf(stderr, "The hardware doesn't support Pre-multiplied blending.\n");
+            return 1;
+        }
+        printf("Enum value index for 'Pre-multiplied': %lu\n", coverage_val);
+        // Create an atomic request to update the property
+        drmModeAtomicReq *req = drmModeAtomicAlloc();
+        if (!req) {
+            fprintf(stderr, "Failed to allocate atomic request\n");
+            return false;
+        }
+
+        // Add the property change to the atomic batch
+        int ret = drmModeAtomicAddProperty(req, video_plane_id, blend_mode_prop_id, coverage_val);
+        if (ret < 0) {
+            fprintf(stderr, "Failed to add property to atomic request\n");
+            return false;
+        }
+
+        // Add the property change to the atomic batch
+        ret = drmModeAtomicAddProperty(req, video_plane_id, alpha_prop_id, 0xffff);
+        if (ret < 0) {
+            fprintf(stderr, "Failed to add property to atomic request\n");
+            return false;
+        }
+
+        // Commit the change to the hardware
+        // Use DRM_MODE_ATOMIC_ALLOW_MODESET or DRM_MODE_ATOMIC_NONBLOCK as needed
+        uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET; // Use TEST_ONLY first to validate if the HW accepts it
+        ret = drmModeAtomicCommit(drm_fd, req, flags, NULL);
+        if (ret < 0) {
+            perror("Atomic test commit failed");
+        } else {
+            printf("Atomic configuration validated successfully! (Ready for actual page flip commit)\n");
+        }
+#endif
+        
+    
+    
+    drmModeFreePlaneResources(plane_res);
+
+    if (video_plane_id == 0) {
+        printf("Keine freie Overlay-Plane gefunden, die ABGR8888 auf dieser CRTC unterstützt.\n");
+        close(drm_fd);
+        return false;
+    }
+    printf("[DRM] Passende Video/Overlay Plane gefunden! ID: %u\n", video_plane_id);
+
+
+// Helper to find the numeric enum value for a specific string choice (e.g., "Pre-multiplied")
+uint64_t find_enum_value(int fd, uint32_t prop_id, const char *enum_name) {
+    drmModePropertyPtr prop = drmModeGetProperty(fd, prop_id);
+    if (!prop) return -1;
+
+    for (int i = 0; i < prop->count_enums; i++) {
+        if (strcmp(prop->enums[i].name, enum_name) == 0) {
+            uint64_t val = prop->enums[i].value;
+            drmModeFreeProperty(prop);
+            return val;
+        }
+    }
+    drmModeFreeProperty(prop);
+    return -1;
+}
+
+// Helper to look up the ID and value string of a DRM property
+uint32_t find_property_id(int fd, drmModeObjectProperties *props, const char *name) {
+    for (uint32_t i = 0; i < props->count_props; i++) {
+        drmModePropertyPtr prop = drmModeGetProperty(fd, props->props[i]);
+        if (!prop) continue;
+
+        if (strcmp(prop->name, name) == 0) {
+            uint32_t prop_id = prop->prop_id;
+            drmModeFreeProperty(prop);
+            return prop_id;
+        }
+        drmModeFreeProperty(prop);
+    }
+    return 0;
+}
+
+// Findet den Wert einer bestimmten Property (z.B. "type") einer Plane
+static bool get_plane_property_value(int drm_fd, uint32_t plane_id, const char *prop_name, uint64_t *value_out) {
+    drmModeObjectProperties *props = drmModeObjectGetProperties(drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
+    if (!props) return false;
+
+    bool found = false;
+    for (uint32_t i = 0; i < props->count_props; i++) {
+        drmModePropertyRes *prop = drmModeGetProperty(drm_fd, props->props[i]);
+        if (!prop) continue;
+
+        if (strcmp(prop->name, prop_name) == 0) {
+            *value_out = props->prop_values[i];
+            found = true;
+            drmModeFreeProperty(prop);
+            break;
+        }
+        drmModeFreeProperty(prop);
+    }
+
+    drmModeFreeObjectProperties(props);
+    return found;
+}
+
+// Hilfsfunktion: Findet eine aktive CRTC, um die Plane daran zu binden
+static uint32_t find_active_crtc(int drm_fd, int *crtc_index_out) {
+    drmModeRes *res = drmModeGetResources(drm_fd);
+    if (!res) return 0;
+
+    uint32_t crtc_id = 0;
+    for (int i = 0; i < res->count_crtcs; i++) {
+        drmModeCrtc *crtc = drmModeGetCrtc(drm_fd, res->crtcs[i]);
+        if (crtc && crtc->mode_valid) {
+            crtc_id = crtc->crtc_id;
+            *crtc_index_out = i;
+            drmModeFreeCrtc(crtc);
+            break;
+        }
+        if (crtc) drmModeFreeCrtc(crtc);
+    }
+
+    drmModeFreeResources(res);
+    return crtc_id;
+}
+
+#endif
