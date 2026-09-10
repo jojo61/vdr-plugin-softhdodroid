@@ -73,6 +73,10 @@ extern "C"
     extern int Poll(int);
     /// C plugin flush output buffers
     extern int Flush(int);
+#if APIVERSNUM >= 30014
+    /// C plugin drain output buffers
+    extern int Drain();
+#endif
 
     /// C plugin command line help
     extern const char *CommandLineHelp(void);

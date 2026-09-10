@@ -2785,6 +2785,21 @@ int Flush(int timeout)
     return 1;
 }
 
+#if APIVERSNUM >= 30014
+extern int amlGetBuffer(int pip, int filled);
+int Drain()
+{
+   int fill_percent;
+    fill_percent = amlGetBuffer(MyVideoStream->HwDecoder->pip, 1);
+    Debug(3, "Buffer Fill in Percent: %d\n", fill_percent);
+    if (fill_percent == 0) {
+        return 1; //replay can be ended
+    } else {
+        return 0; ////integer makes bool cSoftHdDevice::Drain false
+    }
+}
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 //  OSD
 //////////////////////////////////////////////////////////////////////////////

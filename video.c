@@ -1449,7 +1449,7 @@ void delete_decode()
 ///
 /// Handle a Odroid display.
 ///
-int amlGetBufferFree(int);
+int amlGetBuffer(int, int);
 void OdroidDisplayHandlerThread(void)
 {
     int i;
@@ -1463,7 +1463,7 @@ void OdroidDisplayHandlerThread(void)
 		if (!decoder)
 			continue;
 
-		free = amlGetBufferFree(decoder->pip);
+		free = amlGetBuffer(decoder->pip, 0);
 		//printf("Free in Prozent: %d\n",free);
 
 		if ( free > 40) {
@@ -3050,7 +3050,6 @@ Bool SendCodecData(int pip, uint64_t pts, unsigned char* data, int length)
 		else
 		{
 			//printf("codec_write failed for (%x).\n",length - offset, count);
-			//amlGetBufferStatus();
 			maxAttempts -= 1;
 
 			if (maxAttempts <= 0)
@@ -3264,7 +3263,7 @@ void amlTrickMode(int val)  // used in StillPicture
 	}
 }
 
-int amlGetBufferFree(int pip)
+int amlGetBuffer(int pip, int filled)
 {
 
     struct am_ioctl_parm_ex_new {
@@ -3323,10 +3322,16 @@ int amlGetBufferFree(int pip)
 		}
 	}
 	//printf("STatus: write %u read %u free %d size %d data %d\n",status.write_pointer,status.read_pointer,status.free_len,status.size,status.data_len);
-	if (status.size)
+	if (status.size) {
 		return (status.free_len * 100) / status.size;
-	else
+		if (filled) {
+			return (status.data_len * 100) / status.size;
+		} else {
+			return (status.free_len * 100) / status.size;
+		}
+	} else {
 		return 0;
+	}
 }
 
 

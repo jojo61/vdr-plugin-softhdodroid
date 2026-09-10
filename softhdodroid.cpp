@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "5.3"
+static const char *const VERSION = "5.31"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2247,6 +2247,9 @@ class cSoftHdDevice:public cDevice
     virtual void StillPicture(const uchar *, int);
     virtual bool Poll(cPoller &, int = 0);
     virtual bool Flush(int = 0);
+#if APIVERSNUM >= 30014
+    virtual bool Drain(void);
+#endif
     virtual int64_t GetSTC(void);
     virtual cRect CanScaleVideo(const cRect &, int = taCenter);
     virtual void ScaleVideo(const cRect & = cRect::Null);
@@ -2534,6 +2537,15 @@ bool cSoftHdDevice::Flush(int timeout_ms)
 
     return::Flush(timeout_ms);
 }
+
+#if APIVERSNUM >= 30014
+bool cSoftHdDevice::Drain(void)
+{
+    dsyslog("[softhddev]%s:\n", __FUNCTION__);
+
+    return::Drain();
+}
+#endif
 
 // ----------------------------------------------------------------------------
 
