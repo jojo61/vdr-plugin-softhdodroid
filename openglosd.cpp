@@ -32,7 +32,9 @@
 #include <EGL/eglplatform.h>
 #include <libdrm/drm_fourcc.h>
 #include <EGL/eglext.h>
+#ifndef _MALI_FBDEV_TYPES_H_ 
 #include <gbm.h>
+#endif
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
@@ -69,7 +71,9 @@ int ion_fd = -1;
 
 
 int drm_fd = -1;
+#ifndef _MALI_FBDEV_TYPES_H_ 
 static struct gbm_device *gbm_dev;
+#endif
 EGLContext egl_ctx;
 EGLDisplay egl_dpy;
 
@@ -1121,7 +1125,7 @@ bool cOglCmdCopyBufferToOutputFb::Execute(void)
         glFlush();
 
         if (myKernel == 5) {
-            usleep(5000);
+            usleep(25000);
 	        amlSetInt(path, 0 );
         }
         oFb->Unbind();
