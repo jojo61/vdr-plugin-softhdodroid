@@ -427,12 +427,13 @@ static int FindDevice(VideoRender *render) {
 ///
 void VideoInitDrm() {
 
+    int ret;
     if (!(render = calloc(1, sizeof(*render)))) {
        Debug(3,"video/DRM: out of memory\n");
         return;
     }
 
-    if (int ret = FindDevice(render)) {
+    if ((ret = FindDevice(render))) {
         Debug(3,"VideoInit: FindDevice() failed %d\n",ret);
         return;
     }
