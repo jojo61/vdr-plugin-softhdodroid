@@ -136,6 +136,27 @@ static uint32_t GetPropertyID(int fd_drm, uint32_t objectID, uint32_t objectType
 }
 #endif
 
+
+static uint32_t find_active_crtc(int drm_fd, int *crtc_index_out) {
+    drmModeRes *res = drmModeGetResources(drm_fd);
+    if (!res) return 0;
+
+    uint32_t crtc_id = 0;
+    for (int i = 0; i < res->count_crtcs; i++) {
+        drmModeCrtc *crtc = drmModeGetCrtc(drm_fd, res->crtcs[i]);
+        if (crtc) { 
+            crtc_id = crtc->crtc_id;
+            *crtc_index_out = i;
+            drmModeFreeCrtc(crtc);
+            break;
+        }
+        if (crtc) drmModeFreeCrtc(crtc);
+    }
+
+    drmModeFreeResources(res);
+    return crtc_id;
+}
+
 static int SetPropertyRequest(drmModeAtomicReqPtr ModeReq, int fd_drm, uint32_t objectID, uint32_t objectType,
                               const char *propName, uint64_t value) {
     uint32_t i;
@@ -193,10 +214,7 @@ static int FindDevice(VideoRender *render) {
     drmModeConnector *connector;
     drmModeEncoder *encoder = 0;
     drmModeModeInfo *mode;
-    drmModePlane *plane;
-    drmModePlaneRes *plane_res;
     
-    uint32_t j;
     uint64_t has_dumb;
     uint64_t has_prime;
     int i, ii = 0;
@@ -262,8 +280,10 @@ static int FindDevice(VideoRender *render) {
     for (i = 0; i < resources->count_connectors; i++) {
         connector = drmModeGetConnector(render->fd_drm, resources->connectors[i]);
         if (!connector) {
-            fprintf(stderr, "FindDevice: cannot retrieve DRM connector (%d): %m\n", errno);
-            return -errno;
+            Debug(3, "FindDevice: cannot retrieve DRM connector (%d): %m\n", errno);
+            drmDropMaster(render->fd_drm);
+            close(render->fd_drm);
+            return -1;
         }
 
         sprintf(connectorstr, "%s-%u", util_lookup_connector_type_name(connector->connector_type),
@@ -284,12 +304,18 @@ static int FindDevice(VideoRender *render) {
                 render->mmWidth = connector->mmWidth;
             }
             render->connector_id = connector->connector_id;
-            // FIXME: use default encoder/crtc pair
-            if ((encoder = drmModeGetEncoder(render->fd_drm, connector->encoder_id)) == NULL) {
-                Debug(3, "FindDevice: cannot retrieve encoder (%d): %m\n", errno);
-                return -errno;
+
+            // Aktive CRTC ermitteln
+            int crtc_index = -1;
+            int crtc_id = find_active_crtc(render->fd_drm, &crtc_index);
+            if (crtc_id == 0 || crtc_index == -1) {
+                Debug(3,"Keine aktive CRTC/Bildschirm gefunden.\n");
+                drmDropMaster(render->fd_drm);
+                close(render->fd_drm);
+                return -1;
             }
-            render->crtc_id = encoder->crtc_id;
+
+            render->crtc_id = crtc_id;
 
             memcpy(&render->mode, &connector->modes[0], sizeof(drmModeModeInfo)); // set fallback
             // search Modes for Connector
@@ -331,6 +357,8 @@ static int FindDevice(VideoRender *render) {
     if (!found) {
         Debug(3, "Requested Connector not found or not connected\n");
         printf("Requested Connector not found or not connected\n");
+        drmDropMaster(render->fd_drm);
+        close(render->fd_drm);
         return -1;
     }
 #if 0
@@ -384,8 +412,8 @@ static int FindDevice(VideoRender *render) {
     drmModeFreeEncoder(encoder);
     drmModeFreeResources(resources);
 
-#ifdef DRM_DEBUG
-    printf("[FindDevice] DRM setup CRTC: %i video_plane: %i \n", render->crtc_id, render->video_plane);
+#ifdef DEBUG
+    printf("[FindDevice] DRM setup CRTC: %i \n", render->crtc_id);
 #endif
 
     // save actual modesetting
@@ -404,8 +432,8 @@ void VideoInitDrm() {
         return;
     }
 
-    if (FindDevice(render)) {
-        Debug(3,"VideoInit: FindDevice() failed\n");
+    if (int ret = FindDevice(render)) {
+        Debug(3,"VideoInit: FindDevice() failed %d\n",ret);
         return;
     }
 
@@ -415,10 +443,14 @@ void VideoInitDrm() {
 
     if (drmModeCreatePropertyBlob(render->fd_drm, &render->mode, sizeof(render->mode), &modeID) != 0) {
         Debug(3, "Failed to create mode property.\n");
+        drmDropMaster(render->fd_drm);
+        close(render->fd_drm);
         return;
     }
     if (!(ModeReq = drmModeAtomicAlloc())) {
         Debug(3, "cannot allocate atomic request (%d): %m\n", errno);
+        drmDropMaster(render->fd_drm);
+        close(render->fd_drm);
         return;
     }
     //printf("set CRTC %d of Connector %d aktiv\n", render->crtc_id, render->connector_id);
