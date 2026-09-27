@@ -1449,7 +1449,6 @@ void delete_decode()
 ///
 /// Handle a Odroid display.
 ///
-int amlGetBuffer(int, int);
 void OdroidDisplayHandlerThread(void)
 {
     int i;
@@ -1463,7 +1462,7 @@ void OdroidDisplayHandlerThread(void)
 		if (!decoder)
 			continue;
 
-		free = amlGetBuffer(decoder->pip, 0);
+		free = amlGetBuffer(decoder->pip);
 		//printf("Free in Prozent: %d\n",free);
 
 		if ( free > 40) {
@@ -3263,7 +3262,7 @@ void amlTrickMode(int val)  // used in StillPicture
 	}
 }
 
-int amlGetBuffer(int pip, int filled)
+int amlGetBuffer(int pip)
 {
 
     struct am_ioctl_parm_ex_new {
@@ -3324,11 +3323,6 @@ int amlGetBuffer(int pip, int filled)
 	//printf("STatus: write %u read %u free %d size %d data %d\n",status.write_pointer,status.read_pointer,status.free_len,status.size,status.data_len);
 	if (status.size) {
 		return (status.free_len * 100) / status.size;
-		if (filled) {
-			return (status.data_len * 100) / status.size;
-		} else {
-			return (status.free_len * 100) / status.size;
-		}
 	} else {
 		return 0;
 	}

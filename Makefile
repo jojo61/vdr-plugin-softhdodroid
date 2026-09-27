@@ -68,6 +68,9 @@ ifeq ($(CXXFLAGS),)
 $(warning CXXFLAGS not set)
 endif
 
+CFLAGS += $(EXTRAFLAGS)
+CXXFLAGS += $(EXTRAFLAGS)
+
 ### The version number of VDR's plugin API:
 
 APIVERSION = $(call PKGCFG,apiversion)

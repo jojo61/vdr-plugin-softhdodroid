@@ -32,7 +32,12 @@
 #include <EGL/eglplatform.h>
 #include <libdrm/drm_fourcc.h>
 #include <EGL/eglext.h>
-#ifndef _MALI_FBDEV_TYPES_H_ 
+
+#if not defined _CE22_ and not defined _MALI_FBDEV_TYPES_H_ 
+#define _CE22_
+#endif
+
+#ifdef _CE22_
 #include <gbm.h>
 #endif
 #include <xf86drm.h>
@@ -71,7 +76,7 @@ int ion_fd = -1;
 
 
 int drm_fd = -1;
-#ifndef _MALI_FBDEV_TYPES_H_ 
+#ifdef _CE22_
 static struct gbm_device *gbm_dev;
 #endif
 EGLContext egl_ctx;
@@ -1953,7 +1958,7 @@ void cOglThread::Stop(void)
     Cancel(2);
     stalled = false;
 
-#ifndef _MALI_FBDEV_TYPES_H_ 
+#ifdef _CE22_
     if (drm_fd >= 0) {
         gbm_device_destroy(gbm_dev);
         close(drm_fd);
@@ -2175,11 +2180,12 @@ bool cOglThread::InitOpenGL(void)
     egl_dpy = eglGetDisplay(nativeDisplay);
     
     // Initialize EGL
-    EGLint major;
-    EGLint minor;
+    
     EGLBoolean success;
 
-#ifdef _MALI_FBDEV_TYPES_H_ 
+#ifndef _CE22_ 
+    EGLint major;
+    EGLint minor;
     success = eglInitialize( egl_dpy, &major, &minor);
     if (success != EGL_TRUE)
     {
@@ -2219,7 +2225,11 @@ bool cOglThread::InitOpenGL(void)
         EGL_GREEN_SIZE, 8, 
         EGL_BLUE_SIZE, 8, 
         EGL_ALPHA_SIZE,6, 
+#ifdef _CE22_
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+#else
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+#endif
         EGL_NONE
     };
 
@@ -2275,7 +2285,11 @@ bool cOglThread::InitOpenGL(void)
     }
 
     eglBindAPI(EGL_OPENGL_ES_API);
+#ifdef _CE22_
     EGLint ctx_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+#else
+    EGLint ctx_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+#endif
     egl_ctx = eglCreateContext(egl_dpy, chosen, EGL_NO_CONTEXT, ctx_attribs);
 
     eglMakeCurrent(egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, egl_ctx);

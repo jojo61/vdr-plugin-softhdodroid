@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "5.33"
+static const char *const VERSION = "5.34"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2218,24 +2218,6 @@ class cSoftHdDevice:public cDevice
   public:
     cSoftHdDevice(void);
     virtual ~ cSoftHdDevice(void);
-#ifdef CUVID
-    virtual cString DeviceName(void) const
-    {
-        return "softhdcuvid";
-    }
-#endif
-#if defined (VAAPI) && !defined (USE_DRM)
-    virtual cString DeviceName(void) const
-    {
-        return "softhdvaapi";
-    }
-#endif
-#if defined (VAAPI) && defined (USE_DRM)
-    virtual cString DeviceName(void) const
-    {
-        return "softhddrm";
-    }
-#endif
     virtual bool HasDecoder(void) const;
     virtual bool CanReplay(void) const;
     virtual bool SetPlayMode(ePlayMode);
@@ -2248,7 +2230,7 @@ class cSoftHdDevice:public cDevice
     virtual bool Poll(cPoller &, int = 0);
     virtual bool Flush(int = 0);
 #if APIVERSNUM >= 30014
-    virtual bool Drain(void);
+    virtual bool DrainDevice(void);
 #endif
     virtual int64_t GetSTC(void);
     virtual cRect CanScaleVideo(const cRect &, int = taCenter);
@@ -2539,11 +2521,16 @@ bool cSoftHdDevice::Flush(int timeout_ms)
 }
 
 #if APIVERSNUM >= 30014
-bool cSoftHdDevice::Drain(void)
+bool cSoftHdDevice::DrainDevice(void)
 {
-    dsyslog("[softhddev]%s:\n", __FUNCTION__);
-
-    return::Drain();
+    int free_percent;
+    free_percent = amlGetBuffer(0);
+    //printf( "Buffer Free in Percent: %d\n", free_percent);
+    if (free_percent == 100) {
+        return 1; //replay can be ended
+    } else {
+        return 0; ////integer makes bool cSoftHdDevice::Drain false
+    }
 }
 #endif
 

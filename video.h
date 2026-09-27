@@ -395,5 +395,6 @@ extern void ProcessBuffer(VideoHwDecoder *, const AVPacket* );
 extern int SendCodecData(int , uint64_t , unsigned char* , int );
 extern void getKernelVersion();
 extern void SetScreenMode(int, int);
+extern int amlGetBuffer(int);
 
 /// @}
