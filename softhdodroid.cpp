@@ -59,7 +59,7 @@ extern "C"
 /// vdr-plugin version number.
 /// Makefile extracts the version number for generating the file name
 /// for the distribution archive.
-static const char *const VERSION = "5.34"
+static const char *const VERSION = "5.35"
 #ifdef GIT_REV
     "-GIT-" GIT_REV
 #endif
@@ -2267,6 +2267,9 @@ class cSoftHdDevice:public cDevice
 
   protected:
     virtual void MakePrimaryDevice(bool);
+
+  public:
+     int MySpeed;
 };
 
 /**
@@ -2427,6 +2430,9 @@ void cSoftHdDevice::TrickSpeed(int speed, bool forward)
 {
     dsyslog("[softhddev]%s: %d %d\n", __FUNCTION__, speed, forward);
 
+#if VDRVERSNUM == 20803
+    MySpeed = speed;
+#endif
     ::TrickSpeed(speed,forward);
 }
 
@@ -2450,6 +2456,8 @@ void cSoftHdDevice::Play(void)
 
     cDevice::Play();
     ::Play();
+    MySpeed = 0;
+    
 }
 
 /**
@@ -2524,12 +2532,23 @@ bool cSoftHdDevice::Flush(int timeout_ms)
 bool cSoftHdDevice::DrainDevice(void)
 {
     int free_percent;
-    free_percent = amlGetBuffer(0);
-    //printf( "Buffer Free in Percent: %d\n", free_percent);
-    if (free_percent == 100) {
-        return 1; //replay can be ended
-    } else {
-        return 0; ////integer makes bool cSoftHdDevice::Drain false
+    if (!hasVideo) { //Audio-only recording
+        //printf("used Audio Buffer =%d\n", AudioGetBufferUsedbytes());
+        if (AudioGetBufferUsedbytes() == 0 && MySpeed == 0) {
+            dsyslog("Audio Buffer is drained, Audio-only replay can be ended");
+            return true;
+        } else {
+            return false;
+        }
+    } else {    
+        free_percent = amlGetBuffer(0);
+        //printf("Video Buffer Free in Percent: %d\n", free_percent);
+        if (free_percent == 100 && MySpeed == 0) {
+            dsyslog("Video Buffer is drained, replay can be ended");
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 #endif
